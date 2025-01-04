@@ -1,0 +1,16 @@
+# editors
+.nova
+.vscode
+
+# nix
+.envrc
+.direnv
+.nix*
+
+# misc
+.DS_Store
+*~
+
+# builds
+.zig-cache
+zig-out
