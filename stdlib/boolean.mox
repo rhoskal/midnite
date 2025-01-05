@@ -1,0 +1,117 @@
+module Boolean exposing
+  ( Bool(..)
+  , and
+  , nand
+  , nor
+  , not
+  , or
+  , xor
+  )
+
+  ## The `Bool` type represents binary true/false values used for logical operations.
+  type Bool =
+    | True
+    | False
+
+  ## Negates a boolean value.
+  ## Returns `True` for `False` input and `False` for `True` input.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ not True
+  ## False : Bool
+  ## ```
+  let not : Bool -> Bool =
+    \x =>
+      match x on
+      | True => False
+      | False => True
+
+  ## Returns `True` only if both inputs are `True`.
+  ## Classic logical AND operation from boolean algebra.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ and True False
+  ## False : Bool
+  ##
+  ## ➢ and True True
+  ## True : Bool
+  ## ```
+  let and : Bool -> Bool -> Bool =
+    \x y =>
+      match (x, y) on
+      | (True, True) => True
+      | _ => False
+
+  ## Returns `False` only if both inputs are `True`.
+  ## Equivalent to negating the AND of both inputs.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ nand True False
+  ## True : Bool
+  ##
+  ## ➢ nand True True
+  ## False : Bool
+  ## ```
+  let nand : Bool -> Bool -> Bool =
+    \x y =>
+      not (and x y)
+
+  ## Returns `True` if either input is `True`.
+  ## Classic logical OR operation from boolean algebra.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ or True False
+  ## True : Bool
+  ##
+  ## ➢ or False False
+  ## False : Bool
+  ## ```
+  let or : Bool -> Bool -> Bool =
+    \x y =>
+      match (x, y) on
+      | (False, False) => False
+      | _ => True
+
+  ## Returns `True` only if both inputs are `False`.
+  ## Equivalent to negating the OR of both inputs.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ nor False False
+  ## True : Bool
+  ##
+  ## ➢ nor True False
+  ## False : Bool
+  ## ```
+  let nor : Bool -> Bool -> Bool =
+    \x y =>
+      not (or x y)
+
+  ## Returns `True` if exactly one input is `True`.
+  ## Also known as "exclusive or" - `True` when inputs differ.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ xor True False
+  ## True : Bool
+  ##
+  ## ➢ xor True True
+  ## False : Bool
+  ## ```
+  let xor : Bool -> Bool -> Bool =
+    \x y =>
+      match (x, y) on
+      | (False, False) => False
+      | (True, True) => False
+      | _ => True
+end

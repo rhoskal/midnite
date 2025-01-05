@@ -1,0 +1,44 @@
+module Date exposing
+  ( Date
+  , Month(..)
+  , and_then
+  , map
+  , mk_date
+  , today
+  )
+
+  type Date = Date
+    { month : Month
+    , day : Int
+    , year : Int
+    }
+
+  type Month =
+    | January
+    | February
+    | March
+    | April
+    | May
+    | June
+    | July
+    | August
+    | September
+    | October
+    | November
+    | December
+
+  let mk_date : Month -> Int -> Int -> Date =
+    \month day year =>
+      Date { month, day, year }
+
+  let today : Eff () Date =
+    todo "not implemented"
+
+  let map : (Date -> Date) -> Date -> Date =
+    \f date =>
+      f date
+
+  let and_then : (Date -> Maybe Date) -> Maybe Date -> Maybe Date
+    \f mdate =>
+      Maybe.map f mdate
+end

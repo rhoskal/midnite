@@ -1,0 +1,39 @@
+module Tuple exposing
+  ( fst
+  , map_both
+  , map_first
+  , map_second
+  , pair
+  , snd
+  )
+
+  # CREATE
+
+  let pair : a -> b -> (a, b) =
+    \x y =>
+      (x, y)
+
+  # ACCESS
+
+  let fst : (a, b) -> a =
+    \(x, _) =>
+      x
+
+  let snd : (a, b) -> a =
+    \(_, y) =>
+      y
+
+  # TRANSFORM
+
+  let map_both : (a -> x) -> (b -> y) -> (a, b) -> (x, y) =
+    \f g (x, y) =>
+      (f x, g y)
+
+  let map_first : (a -> x) -> (a, b) -> (x, b) =
+    \f (x, y) =>
+      (f x, y)
+
+  let map_second : (b -> y) -> (a, b) -> (a, y) =
+    \f (x, y) =>
+      (x, f y)
+end

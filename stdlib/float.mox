@@ -1,0 +1,384 @@
+module Float exposing
+  ( Degrees
+  , Radians
+  , abs
+  , acos
+  , acosech
+  , acosh
+  , acoth
+  , asech
+  , asin
+  , asinh
+  , atan
+  , atan2
+  , atanh
+  , ceil
+  , clamp
+  , cos
+  , cosech
+  , cosh
+  , e
+  , floor
+  , from_int
+  , log
+  , log10
+  , log2
+  , max
+  , min
+  , mod
+  , negate
+  , pi
+  , pow
+  , round
+  , sech
+  , sin
+  , sinh
+  , sqrt
+  , tan
+  , tanh
+  , to_degress
+  , to_radians
+  , trunc
+  )
+
+  type alias Radians = Float
+  type alias Degrees = Float
+
+  foreign float_sqrt : Float -> Float = "zig_float_sqrt"
+  foreign float_log : Float -> Float -> Float = "zig_float_log"
+  foreign float_e : Float = "zig_float_e"
+  foreign float_pi : Float = "zig_float_pi"
+  foreign float_cos : Float -> Float = "zig_float_cos"
+  foreign float_sin : Float -> Float = "zig_float_sin"
+  foreign float_tan : Float -> Float = "zig_float_tan"
+  foreign float_acos : Float -> Float = "zig_float_acos"
+  foreign float_asin : Float -> Float = "zig_float_asin"
+  foreign float_atan : Float -> Float = "zig_float_atan"
+  foreign float_atan2 : Float -> Float -> Float = "zig_float_atan2"
+  foreign float_trunc : Float -> Int = "zig_float_trunc"
+  foreign float_ceil : Float -> Int = "zig_float_ceil"
+  foreign float_floor : Float -> Int = "zig_float_floor"
+  foreign float_round : Float -> Int = "zig_float_round"
+  foreign float_cosh : Float -> Float = "zig_float_cosh"
+  foreign float_sinh : Float -> Float = "zig_float_sinh"
+  foreign float_tanh : Float -> Float = "zig_float_tanh"
+  foreign float_sech : Float -> Float = "zig_float_sech"
+  foreign float_cosech : Float -> Float = "zig_float_cosech"
+  foreign float_acosh : Float -> Float = "zig_float_acosh"
+  foreign float_asinh : Float -> Float = "zig_float_asinh"
+  foreign float_atanh : Float -> Float = "zig_float_atanh"
+  foreign float_acoth : Float -> Float = "zig_float_acoth"
+  foreign float_asech : Float -> Float = "zig_float_asech"
+  foreign float_acosech : Float -> Float = "zig_float_acosech"
+  foreign float_min : Float = "zig_float_min"
+  foreign float_max : Float = "zig_float_max"
+  foreign float_from_int : Float = "zig_float_from_int"
+
+  ## Get the absolute value of a number.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Float.abs -42.0
+  ## 42.0 : Float
+  ## ```
+  let abs : Float -> Float =
+    \x =>
+      if x < 0 then
+        -x
+      else
+        x
+
+  ## Calculates the value of *x* to the power of *y*.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Float.pow 9.0 3.0
+  ## 729.0 : Float
+  ## ```
+  let pow : Float -> Float -> Float =
+    \x y =>
+      todo "not implemented"
+
+  ## Integer remainder.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Float.mod 42 8
+  ## 2 : Int
+  ## ```
+  let mod : Float -> Float -> Float =
+    \x y =>
+      todo "not implemented"
+
+  ## Clamps a number within a given range.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Float.clamp 100.0 200.0 99.0
+  ## 100.0 : Float
+  ## ```
+  let clamp : Float -> Float -> Float -> Float =
+    \low high n =>
+      if n < low then
+        low
+      else if n > high then
+        high
+      else
+        n
+
+  ## Negate a number.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Float.negate 42.0
+  ## -42.0 : Float
+  ## ```
+  let negate : Float -> Float =
+    \x =>
+      -x
+
+  ## Calculate the square root of a number.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Float.sqrt 16.0
+  ## 4.0 : Float
+  ## ```
+  let sqrt : Float -> Float = float_sqrt
+    # Unsafe for: Negative inputs (x < 0)
+    # Reason: The square root of a negative number is undefined for real numbers. It typically results in NaN (Not-a-Number) or an error.
+
+  ## Calculate the logarithm of a number with a given base.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Float.log 2.0 256.0
+  ## 8.0 : Float
+  ## ```
+  let log : Float -> Float -> Float = float_log
+    # x <= 0 for log x (undefined for non-positive inputs).
+    # log base x where base <= 0 or base == 1 (invalid base).
+    # log(0) approaches negative infinity, and log(x) for x < 0 is undefined.
+    # The logarithm base must be greater than 0 and not equal to 1.
+
+  ##
+  let log2 : Float -> Float = log 2
+
+  ##
+  let log10 : Float -> Float = log 10
+
+  ## An approximation of *e*.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Float.e
+  ## 3.141592653589793 : Float
+  ## ```
+  let e : Float = float_e
+
+  ## An approximation of pie.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Float.pi
+  ## 3.141592653589793 : Float
+  ## ```
+  let pi : Float = float_pi
+
+  ## Calculate the cosine given an angle in radians.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Float.cos 3.141592653589793
+  ## -1.0 : Float
+  ## ```
+  let cos : Float -> Float = float_cos
+
+  ## Calculate the sine given an angle in radians.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Float.sin 90.0
+  ## 0.8939966636005579 : Float
+  ## ```
+  let sin : Float -> Float = float_sin
+
+  ## Calculate the tangent given an angle in radians.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Float.tan 90.0
+  ## -1.995200412208242 : Float
+  ## ```
+  let tan : Float -> Float = float_tan
+    # Unsafe for: Inputs near (pi/2 + n*pi) where n is an integer.
+    # Reason: Tangent is undefined at odd multiples of pi/2 and results in NaN or large values.
+
+  ## ??
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢
+  ## :
+  ## ```
+  let acos : Float -> Float = float_acos
+    # Unsafe for: Inputs outside the range [-1, 1]
+    # Reason: The inverse cosine is only defined for values between -1 and 1. Outside this range, it results in NaN.
+
+  ## ??
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢
+  ## :
+  ## ```
+  let asin : Float -> Float = float_asin
+    # Unsafe for: Inputs outside the range [-1, 1].
+    # Reason: Similar to acos, asin is only defined for inputs between -1 and 1.
+
+  ## ??
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢
+  ## :
+  ## ```
+  let atan : Float -> Float = float_atan
+
+  ## ??
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢
+  ## :
+  ## ```
+  let atan2 : Float -> Float -> Float = float_atan2
+
+  ## Converts a degree value into radians.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Float.radians Float.pi
+  ## 3.141592653589793 : Float
+  ## ```
+  let to_radians : Degrees -> Radians =
+    \deg =>
+      deg *. (pi /. 180.0)
+
+  ## Converts an angle from radians to degrees.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Float.degrees 180.0
+  ## 3.141592653589793 : Float
+  ## ```
+  let to_degrees : Radians -> Degrees =
+    \rad =>
+      rad *. (180.0 /. pi)
+
+  ## Truncate a number, rounding towards zero.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Float.trunc -99.29
+  ## -99 : Int
+  ## ```
+  let trunc : Float -> Int = float_trunc
+
+  ## Rounds a number up to the nearest integer.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Float.ceil 1.4
+  ## 2 : Int
+  ## ```
+  let ceil : Float -> Int = float_ceil
+
+  ## Rounds a number down to the nearest integer.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Float.floor 1.2
+  ## 1 : Int
+  ## ```
+  let floor : Float -> Int = float_floor
+
+  ## Round a number to the nearest integer.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Float.round 1.2
+  ## 1 : Int
+  ##
+  ## ➢ Float.round 1.5
+  ## 2 : Int
+  ## ```
+  let round : Float -> Int = float_round
+
+  ## Hyperbolic cosine. Argument is in radians.
+  let cosh : Radians -> Float = float_cosh
+
+  ## Hyperbolic sine. Argument is in radians.
+  let sinh : Radians -> Float = float_sinh
+
+  ## Hyperbolic tangent. Argument is in radians.
+  let tanh : Radians -> Float = float_tanh
+
+  ## Hyperbolic cotangent. Argument is in radians.
+  let coth : Radians -> Float = float_coth
+
+  ## Hyperbolic secant. Argument is in radians.
+  let sech : Radians -> Float = float_sech
+
+  ## Hyperbolic cosecant. Argument is in radians.
+  let cosech : Radians -> Float = float_cosech
+
+  ## Hyperbolic arc cosine.
+  let acosh : Float -> Float = float_acosh
+
+  ## Hyperbolic arc sine.
+  let asinh : Float -> Float = float_asinh
+
+  ## Hyperbolic arc cotangent.
+  let acoth : Float -> Float = float_acoth
+
+  ## Hyperbolic arc tangent.
+  let atanh : Float -> Float = float_atanh
+
+  ## Hyperbolic arc secant.
+  let asech : Float -> Float = float_asech
+
+  ## Hyperbolic arc cosecant.
+  let acosech : Float -> Float = float_acosech
+
+  ##
+  let from_int : Float = float_from_int
+
+  ##
+  let max : Float = float_max
+
+  ##
+  let min : Float = float_min
+end

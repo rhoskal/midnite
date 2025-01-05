@@ -1,0 +1,502 @@
+module String exposing
+  ( Pattern(..)
+  , all?
+  , any?
+  , append
+  , at
+  , concat
+  , contains?
+  , drop_right
+  , drop_while
+  , empty?
+  , ends_with?
+  , fold_left
+  , fold_right
+  , from_char
+  , index_of
+  , indexes_of
+  , join
+  , keep
+  , last_index_of
+  , lines
+  , map
+  , match?
+  , pad
+  , pad_left
+  , pad_right
+  , reject
+  , repeat
+  , replace
+  , reverse
+  , size
+  , slice
+  , split_at
+  , split_on
+  , starts_with?
+  , take_left
+  , take_right
+  , take_while
+  , to_float
+  , to_int
+  , to_lower
+  , to_upper
+  , trim
+  , trim_left
+  , trim_right
+  , words
+  )
+
+  type Pattern =
+    Pattern String
+
+  ## Calculate the number of characters in a string.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.size "foobar"
+  ## 6 : Int
+  ## ```
+  let size : String -> Int =
+    \str =>
+      todo "not implemented"
+
+  ## Append two strings.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.append "foo" "bar"
+  ## "foobar" : String
+  ## ```
+  let append : String -> String -> String =
+    \str1 str2 =>
+      todo "not implemented"
+
+  ## Concatenate many strings into one.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.concat ["foo", "bar"]
+  ## "foobar" : String
+  ## ```
+  let concat : List String -> String =
+    \list =>
+      todo "not implemented"
+
+  ## Put many strings together with a given pattern.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.concat (Pattern "/") ["foo", "bar", "baz"]
+  ## "foo/bar/baz" : String
+  ## ```
+  let join : Pattern -> List String -> String =
+    \pattern list =>
+      todo "not implemented"
+
+  ## Take *n* characters from the left side of a string.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.take_left 3 "foobar"
+  ## "foo" : String
+  ## ```
+  let take_left : Int -> String -> String =
+    \n str =>
+      if n < 1 then
+        ""
+      else
+        slice 0 n str
+
+  ## Take *n* characters from the right side of a string.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.take_right 3 "foobar"
+  ## "bar" : String
+  ## ```
+  let take_right : Int -> String -> String =
+    \n str =>
+      todo "not implemented"
+
+  ## ???
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.take_while vowel? "foobar"
+  ## : String
+  ## ```
+  let take_while : (Char -> Bool) -> String -> String =
+    \predicate str =>
+      todo "not implemented"
+
+  ## Drop *n* characters from the right side of a string.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.drop_left 3 "foobar"
+  ## "bar" : String
+  ## ```
+  let drop_left : Int -> String -> String =
+    \n str =>
+      todo "not implemented"
+
+  ## Drop *n* characters from the right side of a string.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.drop_right 3 "foobar"
+  ## "foo" : String
+  ## ```
+  let drop_right : Int -> String -> String =
+    \n str =>
+      todo "not implemented"
+
+  ## ???
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢
+  ## : String
+  ## ```
+  let drop_while : (Char -> Bool) -> String -> String =
+    \predicate str =>
+      todo "not implemented"
+
+  ## Determin if the second string contains the first one.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢
+  ## : String
+  ## ```
+  let contains? : Pattern -> String -> Bool =
+    \pattern str =>
+      todo "not implemented"
+
+  ## Break a string into words, splitting on chunks of whitespace.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.words "..."
+  ## [] : List String
+  ## ```
+  let words : String -> List String =
+    \str =>
+      todo "not implemented"
+
+  ## Break a string into lines, splitting on newlines.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.lines "..."
+  ## [] : List String
+  ## ```
+  let lines : String -> List String =
+    \str =>
+      todo "not implemented"
+
+  ## ???
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢
+  ## : String
+  ## ```
+  let index_of : Pattern -> String -> Maybe Int =
+    \pattern str =>
+      todo "not implemented"
+
+  ## ???
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢
+  ## : String
+  ## ```
+  let last_index_of : Pattern -> String -> Maybe Int =
+    \pattern str =>
+      todo "not implemented"
+
+  ## Split a string using a given pattern.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.split_on (Pattern ",") "foo,bar"
+  ## ["foo", "bar"] : List String
+  ## ```
+  let split_on : Pattern -> String -> List String =
+    \pattern str =>
+      todo "not implemented"
+
+  ## Split a string using a given pattern.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.split_at 3 "foobar"
+  ## ("foo", "bar") : (String, String)
+  ## ```
+  let split_at : Int -> String -> (String, String) =
+    \pattern str =>
+      todo "not implemented"
+
+  ## Take a substring given a start and end index.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.slice 1 3 "abcd"
+  ## "bc" : String
+  ## ```
+  let slice : Int -> Int -> String =
+    \start end str =>
+      todo "not implemented"
+
+  ## Convert a string to all lower case.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.to_lower "FOOBAR"
+  ## "foobar" : String
+  ## ```
+  let to_lower : String -> String =
+    \str =>
+      todo "not implemented"
+
+  ## Convert a string to all upper case.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.to_upper "foobar"
+  ## "FOOBAR" : String
+  ## ```
+  let to_upper : String -> String =
+    \str =>
+      todo "not implemented"
+
+  ## Reverse a string.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.reverse "foobar"
+  ## "raboof" : String
+  ## ```
+  let reverse : String -> String =
+    \str =>
+      todo "not implemented"
+
+  ## Repeat a string *n* times.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.repeat 3 "ha"
+  ## "hahaha" : String
+  ## ```
+  let repeat : Int -> String -> String =
+    \count str =>
+      todo "not implemented"
+
+  ## ???
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢
+  ## : string
+  ## ```
+  let empty? : String -> Bool =
+    \str =>
+      todo "not implemented"
+
+  ## Returns `True` if string ends with the given pattern.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.ends_with? "c" "abc"
+  ## True : Bool
+  ## ```
+  let ends_with? : Pattern -> String =
+    \str =>
+      todo "not implemented"
+
+  ## Returns `True` if string starts with the given pattern.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.starts_with? "a" "abc"
+  ## True : Bool
+  ## ```
+  let starts_with? : Pattern -> String -> Bool
+    \pattern str =>
+      todo "not implemented"
+
+  ## Replace all occurrences of some pattern.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.replace (Pattern "-") (Pattern "_") "foo-bar-baz"
+  ## "foo_bar_baz" : String
+  ## ```
+  let replace : Pattern -> Pattern -> String =
+    \pattern1 pattern2 str =>
+      todo "not implemented"
+
+  ## Remove whitespace from both sides of a string.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.trim "  foo  "
+  ## "foo" : String
+  ## ```
+  let trim : String -> String =
+    \str =>
+      todo "not implemented"
+
+  ## Remove whitespace from the left of a string.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.trim_left "  foo"
+  ## "foo" : String
+  ## ```
+  let trim_left : String -> String =
+    \str =>
+      todo "not implemented"
+
+  ## Remove whitespace from the right of a string.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.trim_right "foo  "
+  ## "foo" : String
+  ## ```
+  let trim_right : String -> String =
+    \str =>
+      todo "not implemented"
+
+  ## Pad a string on both sides until it has a given length.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.pad 10 _ "foobar"
+  ## "__foobar__" : String
+  ## ```
+  let pad : Int -> Char -> String -> String =
+    \n char str =>
+      todo "not implemented"
+
+  ## Pad a string from the left until it has a given length.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.pad_left 6 (Pattern " ") "foo"
+  ## "   foo" : String
+  ## ```
+  let pad_left : Int -> Pattern -> String -> String =
+    \count pattern str =>
+      todo "not implemented"
+
+  ## Pad a string from the right until it has a given length.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.pad_right 6 (Pattern " ") "foo"
+  ## "foo   " : String
+  ## ```
+  let pad_right : Int -> Pattern -> String -> String =
+    \count pattern str =>
+      todo "not implemented"
+
+  ## Returns `True` if string starts with the given pattern.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ String.indexes_of "i" "Mississippi"
+  ## [1, 4, 7, 10] : List Int
+  ## ```
+  let indexes_of : String -> String -> List Int =
+    \substr str =>
+      todo "not implemented"
+
+  let to_int : String -> Maybe Int =
+    \str =>
+      todo "not implemented"
+
+  let to_float : String -> Maybe Float =
+    \str =>
+      todo "not implemented"
+
+  let from_char : Char -> String =
+    \char =>
+      todo "not implemented"
+
+  ## Transform every character in a string
+  let map : (Char -> Char) -> String -> String =
+    \f str =>
+      todo "not implemented"
+
+  ## Keep only the characters that pass the test.
+  let keep : (Char -> Bool) -> String -> String =
+    \predicate str =>
+      todo "not implemented"
+
+  let reject : (Char -> Bool) -> String -> String =
+    \predicate str =>
+      todo "not implemented"
+
+  ## Reduce a string from the left.
+  let fold_left : (Char -> b -> b) -> b -> String -> b =
+    todo "not implemented"
+
+  ## Reduce a string from the right.
+  let fold_right : (Char -> b -> b) -> b -> String -> b =
+    todo "not implemented"
+
+  ## Determine whether *any* characters pass the test.
+  let any? : (Char -> Bool) -> String -> Bool =
+    todo "not implemented"
+
+  ## Determine whether *all* characters pass the test.
+  let all? : (Char -> Bool) -> String -> Bool =
+    todo "not implemented"
+
+  ## Get character at the given position.
+  let at : Int -> String -> Maybe Char =
+    \position str =>
+      todo "not implemented"
+
+  ## Determines if a string matches the given pattern.
+  let match? : Pattern -> String -> Bool =
+    \pattern str =>
+      todo "not implemented"
+end

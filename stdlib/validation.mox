@@ -1,0 +1,9 @@
+module Validation exposing
+  ( Validation(..)
+  )
+
+  ## Result type that accumulates errors
+  type Validation e a =
+    Validation e a
+
+end

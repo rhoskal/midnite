@@ -1,0 +1,299 @@
+module Prelude exposing
+  ( abs
+  , always
+  , even?
+  , gcd
+  , identity
+  , lcm
+  , max
+  , min
+  , negate
+  , odd?
+  , pow
+  , (|>)
+  , (<|)
+  , (||)
+  , (&&)
+  , (^)
+  , (==)
+  , (/=)
+  , (<)
+  , (>)
+  , (<=)
+  , (>=)
+  , (..)
+  , (<>)
+  , (::)
+  , (+)
+  , (-)
+  , (+.)
+  , (-.)
+  , (.|.)
+  , (.^.)
+  , (*)
+  , (/)
+  , (*.)
+  , (/.)
+  , (.&.)
+  , (.>>.)
+  , (.<<.)
+  , (^^)
+  , (**)
+  , (.~.)
+  , (<<)
+  , (>>)
+  )
+
+  include Boolean
+  include Compareable
+
+  foreign int_add : Int -> Int -> Int = "zig_int_add"
+  foreign int_sub : Int -> Int -> Int = "zig_int_sub"
+  foreign int_mul : Int -> Int -> Int = "zig_int_mul"
+  foreign int_div : Int -> Int -> Int = "zig_int_div"
+  foreign int_pow : Int -> Int -> Int = "zig_int_pow"
+  foreign int_min : Int -> Int -> Int = "zig_int_min"
+  foreign int_max : Int -> Int -> Int = "zig_int_max"
+
+  # HELPFUL FUNCTIONS
+
+  ## ??
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ identity 42
+  ## 42
+  ## ```
+  let identity : a -> a =
+    \a =>
+      a
+
+  ## ??
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ always 42 0
+  ## 42 : Int
+  ## ```
+  let always : a -> b -> a =
+    \a _ =>
+      a
+
+  ## Reverse-application operator: `x |> f |> g` is exactly equivalent to `g (f (x))`
+  let ap_right : a -> (a -> b) -> b =
+    \x f =>
+      f x
+
+  ## Application operator: `g <| f <| x` is exactly equivalent to `g (f (x))`
+  let ap_left : (a -> b) -> a -> b =
+    \f x =>
+      f x
+
+  let compose_left : (b -> c) -> (a -> b) -> (a -> c) =
+    \g f x =>
+      g (f x)
+
+  let compose_right : (a -> b) -> (b -> c) -> (a -> c) =
+    \f g x =>
+      g (f x)
+
+  # INTEGER ARITHMETIC
+
+  ## Calculates the addition of two integers.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ add 40 2
+  ## 42 : Int
+  ## ```
+  let add : Int -> Int -> Int = int_add
+
+  ## Calculates the subtraction of two integers.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ sub 44 2
+  ## 42 : Int
+  ## ```
+  let sub : Int -> Int -> Int = int_sub
+
+  ## Calculates the multiplication of two integers.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ mul 2 21
+  ## 42 : Int
+  ## ```
+  let mul : Int -> Int -> Int = int_mul
+
+  ## Calculates the division of two integers.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ div 2 84
+  ## 42 : Int
+  ## ```
+  let div : Int -> Int -> Int = int_div
+
+  ## Determines if a number is even.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ even? 4
+  ## True : Bool
+  ## ```
+  let even? : Int -> Bool =
+    \n =>
+      mod n 2 == 0
+
+  ## Determines if a number is odd.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ odd? 3
+  ## True : Bool
+  ## ```
+  let odd? : Int -> Bool =
+    \n =>
+      mod n 2 /= 0
+
+  ## Returns the greatest common divisor of the two integers.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ gcd 8 12
+  ## 4 : Int
+  ## ```
+  let gcd : Int -> Int -> Int =
+    \a b =>
+      if b == 0 then
+        a
+      else
+        gcd b (mod a b)
+
+  ## Determines the smallest positive integer that is divisible by both *a* and *b*
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ lcm 21 6
+  ## 42 : Int
+  ## ```
+  let lcm : Int -> Int -> Int =
+    \a b =>
+      abs (a * b) / gcd a b
+
+  ## Calculates the value of *a* to the power of *b*.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ pow 9 3
+  ## 729 : Int
+  ## ```
+  let pow : Int -> Int -> Int = int_pow
+
+  ## Integer remainder.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ mod 42 8
+  ## 2 : Int
+  ## ```
+  let mod : Int -> Int -> Int =
+    \a b =>
+      a - b * (a / b)
+
+  ## Negate a number.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ negate 42
+  ## -42 : Int
+  ## ```
+  let negate : Int -> Int =
+    \n =>
+      -n
+
+  ## Get the absolute value of a number.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ abs -42
+  ## 42 : Int
+  ## ```
+  let abs : Int -> Int =
+    \n =>
+      if x < 0 then
+        -n
+      else
+        n
+
+  ## Clamps a number within a given range.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ clamp 100 200 99
+  ## 100 : Int
+  ## ```
+  let clamp : Int -> Int -> Int -> Int =
+    \low high n =>
+      if n < low then
+        low
+      else if n > high then
+        high
+      else
+        n
+
+  let max : Int = int_max
+
+  let min : Int = int_min
+
+  # INFIX OPERATORS
+
+  infixr 0 (<|) = ap_left
+  infixl 0 (|>) = ap_right
+  infixr 2 (||) = or
+  infixr 3 (&&) = and
+  infixr 3 (^) = xor
+  infixn 4 (==) = eq
+  infixn 4 (/=) = neq
+  infixn 4 (<) = lt
+  infixn 4 (>) = gt
+  infixn 4 (<=) = lte
+  infixn 4 (>=) = gte
+  infixr 4 (..) = List.range
+  infixr 5 (<>) = append
+  infixr 5 (::) = List.cons
+  infixl 6 (+) = add
+  infixl 6 (-) = sub
+  infixl 6 (+.) = Float.add
+  infixl 6 (-.) = Float.sub
+  infixr 6 (.|.) = Bitwise.or
+  infixr 6 (.^.) = Bitwise.xor
+  infixl 7 (*) = mul
+  infixl 7 (/) = div
+  infixl 7 (*.) = Float.mul
+  infixl 7 (/.) = Float.div
+  infixr 7 (.&.) = Bitwise.and
+  infixr 7 (.>>.) = Bitwise.shift_right
+  infixr 7 (.<<.) = Bitwise.shift_left
+  infixr 8 (^^) = pow
+  infixl 8 (**) = Float.pow
+  infixn 8 (.~.) = Bitwise.not
+  infixl 9 (<<) = compose_left
+  infixr 9 (>>) = compose_right
+end

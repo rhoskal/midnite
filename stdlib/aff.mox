@@ -1,0 +1,112 @@
+module Aff exposing
+  ( Aff
+  , and_then
+  , fail
+  , from_result
+  , map
+  , map2
+  , map3
+  , map4
+  , run
+  , succeed
+  )
+
+  ## Model asynchroneous effects.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢
+  ## :
+  ## ```
+  type alias Aff e a =
+    AsyncEffect e a
+
+  ## Lifts an error into a failed `Aff`.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Aff.fail "foobar!" : Aff String String
+  ## : Aff String String
+  ## ```
+  let fail : e -> Aff e Unit =
+    \err =>
+      Scheduler.Async.fail err
+
+  ## Lifts a value into a successful `Aff`.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Aff.success "foobar" : Aff String String
+  ## : Aff String String
+  ## ```
+  let succeed : a -> Aff Unit a =
+    \value =>
+      Scheduler.Async.succeed value
+
+  let map : (a -> b) -> Aff e a -> Aff e b =
+    \f aff =>
+      match run aff_a on
+      | Err ea => fail ea
+      | Ok a => succeed (f a)
+
+  let map2 : (a -> b -> value) -> Aff e a -> Aff e b -> Aff e value =
+    \f aff_a aff_b =>
+      match run aff_a on
+      | Err ea => fail ea
+      | Ok a =>
+          match run aff_b on
+          | Err eb => fail eb
+          | Ok b => succeed (f a b)
+
+  let map3 : (a -> b -> c -> value) -> Aff e a -> Aff e b -> Aff e c -> Aff e value
+    \f aff_a aff_b aff_c =>
+      match run aff_a on
+      | Err ea => fail ea
+      | Ok a =>
+          match run aff_b on
+          | Err eb => fail eb
+          | Ok b =>
+              match run aff_c on
+              | Err ec => fail ec
+              | Ok c => succeed (f a b c)
+
+  let map4 : (a -> b -> c -> d -> value) -> Aff e a -> Aff e b -> Aff e c -> Aff e d -> Aff e value
+    \f aff_a aff_b aff_c aff_d =>
+      match run aff_a on
+      | Err ea => fail ea
+      | Ok a =>
+          match run aff_b on
+          | Err eb => fail eb
+          | Ok b =>
+              match run aff_c on
+              | Err ec => fail ec
+              | Ok c =>
+                  match run aff_d on
+                  | Err ed => fail ed
+                  | Ok d => succeed (f a b c d)
+
+  ## Equivalent of `>>=` from the `Monad` typeclass.
+  ##
+  ## @since 0.1.0
+  ##
+  ## ```
+  ## ➢ Aff.and_then ...
+  ## ...
+  ## ```
+  let and_then : (a -> Aff e b) -> Aff e a -> Aff e b =
+    \f aff =>
+      todo "not implemented"
+
+  let run : Aff e a -> Result e a =
+    \aff =>
+      todo "not implemented"
+
+  let from_result : Result e a -> Aff e a =
+    \result =>
+      match result on
+      | Err e => fail e
+      | Ok a => succeed a
+end
