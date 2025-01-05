@@ -1,24 +1,26 @@
 const std = @import("std");
+const lexer = @import("lexer.zig");
+const parser = @import("parser.zig");
 
 pub fn main() !void {
-    // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
+    const allocator = std.heap.page_allocator;
 
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
+    // Read source file
+    const source = try std.fs.cwd().readFileAlloc(allocator, "examples/keywords.mox", 1024 * 1024);
+    defer allocator.free(source);
 
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
+    // Debug print the file contents
+    // std.debug.print("File contents:\n{s}\n", .{source});
+    // std.debug.print("File length: {d} bytes\n", .{source.len});
 
-    try bw.flush(); // don't forget to flush!
-}
+    const tokens = try lexer.tokenize(source);
+    for (tokens) |token| {
+        std.debug.print("Token: {s} - {s}\n", .{
+            @tagName(token.kind),
+            token.lexeme,
+        });
+    }
 
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
+    // const ast = try parser.parse(tokens);
+    // std.debug.print("AST: {}\n", .{ast});
 }
