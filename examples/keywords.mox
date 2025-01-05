@@ -9,6 +9,6 @@ Unit
 True False
 infixn infixl infixr
 () {} [] : , . .. -> => | = _ \
-42 -42 1_000_000
+42 -42 1_000_000 0x4F 0b00011 0o61
 # line comment
 ## doc comment

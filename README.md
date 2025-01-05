@@ -60,7 +60,7 @@ A new language that combines elements from Elm, Elixir and Ocaml. Features inclu
 
 | Feature                | Example                             |
 |------------------------|:-----------------------------------:|
-| Integer                | `42`, `-42`                         |
+| Integer                | `42`, `-42`, `1_000_000`            |
 | Integer operations     | `14 + 1 - 6 * 2 / 3`                |
 | Integer modulo         | `42 mod 2`                          |
 | Integer exponentiation | `42 ^^ 2`, `pow 42 2`               |

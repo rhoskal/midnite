@@ -6,15 +6,15 @@ pub fn build(b: *std.Build) void {
 
     const exe = b.addExecutable(.{
         .name = "moxc",
-        .root_source_file = .{ .cwd_relative = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
 
     b.installArtifact(exe);
 
-    const run_step = b.step("run", "Build and run the compiler");
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(&exe.step);
-    run_step.dependOn(&run_cmd.step);
+    const run_exe = b.addRunArtifact(exe);
+
+    const run_step = b.step("run", "Run the compiler");
+    run_step.dependOn(&run_exe.step);
 }
