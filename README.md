@@ -78,7 +78,7 @@ A new language that combines elements from Elm, Elixir and Ocaml. Features inclu
 | Boolean Values          | `True`, `False`                          |
 | Comparison              | `>`, `<`, `>=`, `<=`                     |
 | Boolean operations      | `not`, `and`, `or`, `nand`, `nor`, `xor` |
-| Boolean infix operators | `\|\|`, `&&`, `^`                        |
+| Boolean infix operators | `\|\|`, `&&`                             |
 | Equality                | `==`, `/=`                               |
 
 ### If-Else Expressions
