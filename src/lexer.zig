@@ -178,14 +178,24 @@ pub const Lexer = struct {
         const start_column = self.column;
 
         const c = self.peek() orelse {
-            return Token.init(TokenKind.Eof, "", start_line, start_column);
+            return Token.init(
+                TokenKind.Eof,
+                "",
+                start_line,
+                start_column,
+            );
         };
 
         switch (c) {
             '?' => {
                 self.advance();
 
-                return Token.init(TokenKind.TypedHole, "?", start_line, start_column);
+                return Token.init(
+                    TokenKind.TypedHole,
+                    "?",
+                    start_line,
+                    start_column,
+                );
             },
             '#' => {
                 const mark = self.position;
@@ -215,7 +225,14 @@ pub const Lexer = struct {
                 }
 
                 const kind = if (is_doc) TokenKind.DocComment else TokenKind.Comment;
-                return Token.init(kind, self.source[mark..self.position], start_line, start_column);
+
+                return Token.init(
+                    kind,
+                    self.source[mark..self.position],
+                    start_line,
+                    start_column,
+                );
+            },
             },
             '+' => {
                 const mark = self.position;
@@ -225,11 +242,21 @@ pub const Lexer = struct {
                     if (next == '.') {
                         self.advance();
 
-                        return Token.init(TokenKind.OpFloatAdd, self.source[mark..self.position], start_line, start_column);
+                        return Token.init(
+                            TokenKind.OpFloatAdd,
+                            self.source[mark..self.position],
+                            start_line,
+                            start_column,
+                        );
                     }
                 }
 
-                return Token.init(TokenKind.OpIntAdd, self.source[mark..self.position], start_line, start_column);
+                return Token.init(
+                    TokenKind.OpIntAdd,
+                    self.source[mark..self.position],
+                    start_line,
+                    start_column,
+                );
             },
             '-' => {
                 const mark = self.position;
@@ -239,17 +266,32 @@ pub const Lexer = struct {
                     if (next == '>') {
                         self.advance();
 
-                        return Token.init(TokenKind.SymArrowRight, self.source[mark..self.position], start_line, start_column);
+                        return Token.init(
+                            TokenKind.SymArrowRight,
+                            self.source[mark..self.position],
+                            start_line,
+                            start_column,
+                        );
                     }
 
                     if (next == '.') {
                         self.advance();
 
-                        return Token.init(TokenKind.OpFloatSub, self.source[mark..self.position], start_line, start_column);
+                        return Token.init(
+                            TokenKind.OpFloatSub,
+                            self.source[mark..self.position],
+                            start_line,
+                            start_column,
+                        );
                     }
                 }
 
-                return Token.init(TokenKind.OpIntSub, self.source[mark..self.position], start_line, start_column);
+                return Token.init(
+                    TokenKind.OpIntSub,
+                    self.source[mark..self.position],
+                    start_line,
+                    start_column,
+                );
             },
             '*' => {
                 const mark = self.position;
@@ -259,17 +301,32 @@ pub const Lexer = struct {
                     if (next == '*') {
                         self.advance();
 
-                        return Token.init(TokenKind.OpExp, self.source[mark..self.position], start_line, start_column);
+                        return Token.init(
+                            TokenKind.OpExp,
+                            self.source[mark..self.position],
+                            start_line,
+                            start_column,
+                        );
                     }
 
                     if (next == '.') {
                         self.advance();
 
-                        return Token.init(TokenKind.OpFloatMul, self.source[mark..self.position], start_line, start_column);
+                        return Token.init(
+                            TokenKind.OpFloatMul,
+                            self.source[mark..self.position],
+                            start_line,
+                            start_column,
+                        );
                     }
                 }
 
-                return Token.init(TokenKind.OpIntMul, self.source[mark..self.position], start_line, start_column);
+                return Token.init(
+                    TokenKind.OpIntMul,
+                    self.source[mark..self.position],
+                    start_line,
+                    start_column,
+                );
             },
             '/' => {
                 const mark = self.position;
@@ -279,17 +336,32 @@ pub const Lexer = struct {
                     if (next == '=') {
                         self.advance();
 
-                        return Token.init(TokenKind.OpNotEqual, self.source[mark..self.position], start_line, start_column);
+                        return Token.init(
+                            TokenKind.OpNotEqual,
+                            self.source[mark..self.position],
+                            start_line,
+                            start_column,
+                        );
                     }
 
                     if (next == '.') {
                         self.advance();
 
-                        return Token.init(TokenKind.OpFloatDiv, self.source[mark..self.position], start_line, start_column);
+                        return Token.init(
+                            TokenKind.OpFloatDiv,
+                            self.source[mark..self.position],
+                            start_line,
+                            start_column,
+                        );
                     }
                 }
 
-                return Token.init(TokenKind.OpIntDiv, self.source[mark..self.position], start_line, start_column);
+                return Token.init(
+                    TokenKind.OpIntDiv,
+                    self.source[mark..self.position],
+                    start_line,
+                    start_column,
+                );
             },
             '<' => {
                 const mark = self.position;
@@ -299,17 +371,32 @@ pub const Lexer = struct {
                     if (next == '=') {
                         self.advance();
 
-                        return Token.init(TokenKind.OpLessThanEqual, self.source[mark..self.position], start_line, start_column);
+                        return Token.init(
+                            TokenKind.OpLessThanEqual,
+                            self.source[mark..self.position],
+                            start_line,
+                            start_column,
+                        );
                     }
 
                     if (next == '>') {
                         self.advance();
 
-                        return Token.init(TokenKind.OpAppend, self.source[mark..self.position], start_line, start_column);
+                        return Token.init(
+                            TokenKind.OpAppend,
+                            self.source[mark..self.position],
+                            start_line,
+                            start_column,
+                        );
                     }
                 }
 
-                return Token.init(TokenKind.OpLessThan, self.source[mark..self.position], start_line, start_column);
+                return Token.init(
+                    TokenKind.OpLessThan,
+                    self.source[mark..self.position],
+                    start_line,
+                    start_column,
+                );
             },
             '>' => {
                 const mark = self.position;
@@ -319,11 +406,21 @@ pub const Lexer = struct {
                     if (next == '=') {
                         self.advance();
 
-                        return Token.init(TokenKind.OpGreaterThanEqual, self.source[mark..self.position], start_line, start_column);
+                        return Token.init(
+                            TokenKind.OpGreaterThanEqual,
+                            self.source[mark..self.position],
+                            start_line,
+                            start_column,
+                        );
                     }
                 }
 
-                return Token.init(TokenKind.OpGreaterThan, self.source[mark..self.position], start_line, start_column);
+                return Token.init(
+                    TokenKind.OpGreaterThan,
+                    self.source[mark..self.position],
+                    start_line,
+                    start_column,
+                );
             },
             '&' => {
                 const mark = self.position;
@@ -333,11 +430,21 @@ pub const Lexer = struct {
                     if (next == '&') {
                         self.advance();
 
-                        return Token.init(TokenKind.OpLogicalAnd, self.source[mark..self.position], start_line, start_column);
+                        return Token.init(
+                            TokenKind.OpLogicalAnd,
+                            self.source[mark..self.position],
+                            start_line,
+                            start_column,
+                        );
                     }
                 }
 
-                return Token.init(TokenKind.Invalid, self.source[mark..self.position], start_line, start_column);
+                return Token.init(
+                    TokenKind.Invalid,
+                    self.source[mark..self.position],
+                    start_line,
+                    start_column,
+                );
             },
             '|' => {
                 const mark = self.position;
@@ -347,16 +454,31 @@ pub const Lexer = struct {
                     if (next == '|') {
                         self.advance();
 
-                        return Token.init(TokenKind.OpLogicalOr, self.source[mark..self.position], start_line, start_column);
+                        return Token.init(
+                            TokenKind.OpLogicalOr,
+                            self.source[mark..self.position],
+                            start_line,
+                            start_column,
+                        );
                     }
                 }
 
-                return Token.init(TokenKind.SymPipe, self.source[mark..self.position], start_line, start_column);
+                return Token.init(
+                    TokenKind.SymPipe,
+                    self.source[mark..self.position],
+                    start_line,
+                    start_column,
+                );
             },
             '\\' => {
                 self.advance();
 
-                return Token.init(TokenKind.OpLambda, "\\", start_line, start_column);
+                return Token.init(
+                    TokenKind.OpLambda,
+                    "\\",
+                    start_line,
+                    start_column,
+                );
             },
             ':' => {
                 const mark = self.position;
@@ -366,21 +488,41 @@ pub const Lexer = struct {
                     if (next == ':') {
                         self.advance();
 
-                        return Token.init(TokenKind.OpCons, self.source[mark..self.position], start_line, start_column);
+                        return Token.init(
+                            TokenKind.OpCons,
+                            self.source[mark..self.position],
+                            start_line,
+                            start_column,
+                        );
                     }
                 }
 
-                return Token.init(TokenKind.Colon, self.source[mark..self.position], start_line, start_column);
+                return Token.init(
+                    TokenKind.Colon,
+                    self.source[mark..self.position],
+                    start_line,
+                    start_column,
+                );
             },
             ',' => {
                 self.advance();
 
-                return Token.init(TokenKind.Comma, ",", start_line, start_column);
+                return Token.init(
+                    TokenKind.Comma,
+                    ",",
+                    start_line,
+                    start_column,
+                );
             },
             '$' => {
                 self.advance();
 
-                return Token.init(TokenKind.SymDollarSign, "$", start_line, start_column);
+                return Token.init(
+                    TokenKind.SymDollarSign,
+                    "$",
+                    start_line,
+                    start_column,
+                );
             },
             '.' => {
                 const mark = self.position;
@@ -390,21 +532,41 @@ pub const Lexer = struct {
                     if (next == '.') {
                         self.advance();
 
-                        return Token.init(TokenKind.OpRange, self.source[mark..self.position], start_line, start_column);
+                        return Token.init(
+                            TokenKind.OpRange,
+                            self.source[mark..self.position],
+                            start_line,
+                            start_column,
+                        );
                     }
                 }
 
-                return Token.init(TokenKind.Dot, self.source[mark..self.position], start_line, start_column);
+                return Token.init(
+                    TokenKind.Dot,
+                    self.source[mark..self.position],
+                    start_line,
+                    start_column,
+                );
             },
             '{' => {
                 self.advance();
 
-                return Token.init(TokenKind.LCurly, "{", start_line, start_column);
+                return Token.init(
+                    TokenKind.LCurly,
+                    "{",
+                    start_line,
+                    start_column,
+                );
             },
             '}' => {
                 self.advance();
 
-                return Token.init(TokenKind.RCurly, "}", start_line, start_column);
+                return Token.init(
+                    TokenKind.RCurly,
+                    "}",
+                    start_line,
+                    start_column,
+                );
             },
             '=' => {
                 const mark = self.position;
@@ -414,37 +576,72 @@ pub const Lexer = struct {
                     if (next == '>') {
                         self.advance();
 
-                        return Token.init(TokenKind.SymDoubleArrowRight, self.source[mark..self.position], start_line, start_column);
+                        return Token.init(
+                            TokenKind.SymDoubleArrowRight,
+                            self.source[mark..self.position],
+                            start_line,
+                            start_column,
+                        );
                     }
 
                     if (next == '=') {
                         self.advance();
 
-                        return Token.init(TokenKind.OpEquality, self.source[mark..self.position], start_line, start_column);
+                        return Token.init(
+                            TokenKind.OpEquality,
+                            self.source[mark..self.position],
+                            start_line,
+                            start_column,
+                        );
                     }
                 }
 
-                return Token.init(TokenKind.OpAssign, self.source[mark..self.position], start_line, start_column);
+                return Token.init(
+                    TokenKind.OpAssign,
+                    self.source[mark..self.position],
+                    start_line,
+                    start_column,
+                );
             },
             '(' => {
                 self.advance();
 
-                return Token.init(TokenKind.LParen, "(", start_line, start_column);
+                return Token.init(
+                    TokenKind.LParen,
+                    "(",
+                    start_line,
+                    start_column,
+                );
             },
             ')' => {
                 self.advance();
 
-                return Token.init(TokenKind.RParen, ")", start_line, start_column);
+                return Token.init(
+                    TokenKind.RParen,
+                    ")",
+                    start_line,
+                    start_column,
+                );
             },
             '[' => {
                 self.advance();
 
-                return Token.init(TokenKind.LBrack, "[", start_line, start_column);
+                return Token.init(
+                    TokenKind.LBrack,
+                    "[",
+                    start_line,
+                    start_column,
+                );
             },
             ']' => {
                 self.advance();
 
-                return Token.init(TokenKind.RBrack, "]", start_line, start_column);
+                return Token.init(
+                    TokenKind.RBrack,
+                    "]",
+                    start_line,
+                    start_column,
+                );
             },
             'a'...'z', 'A'...'Z', '_' => {
                 // Handle identifiers and keywords
@@ -479,12 +676,22 @@ pub const Lexer = struct {
                 if (self.checkExactMatch(start, "using", TokenKind.KwUsing)) |token| return token;
                 if (self.checkExactMatch(start, "when", TokenKind.KwWhen)) |token| return token;
 
-                return Token.init(TokenKind.Invalid, self.source[start..self.position], start_line, start_column);
+                return Token.init(
+                    TokenKind.Invalid,
+                    self.source[start..self.position],
+                    start_line,
+                    start_column,
+                );
             },
             else => {
                 self.advance();
 
-                return Token.init(TokenKind.Invalid, self.source[start..self.position], start_line, start_column);
+                return Token.init(
+                    TokenKind.Invalid,
+                    self.source[start..self.position],
+                    start_line,
+                    start_column,
+                );
             },
         }
     }
@@ -604,7 +811,15 @@ test "comparison (relational) operators" {
     const source = "== > >= < <= /=";
     var lexer = Lexer.init(source);
 
-    const expected = [_]TokenKind{ .OpEquality, .OpGreaterThan, .OpGreaterThanEqual, .OpLessThan, .OpLessThanEqual, .OpNotEqual, .Eof };
+    const expected = [_]TokenKind{
+        .OpEquality,
+        .OpGreaterThan,
+        .OpGreaterThanEqual,
+        .OpLessThan,
+        .OpLessThanEqual,
+        .OpNotEqual,
+        .Eof,
+    };
 
     for (expected) |expected_kind| {
         const token = try lexer.nextToken();
