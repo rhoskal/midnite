@@ -83,6 +83,7 @@ pub const TokenKind = enum {
     LitFloat,
     LitInt,
     LitString,
+    LitMultilineString,
 
     // Identifiers
     LowerIdent,
@@ -112,7 +113,7 @@ pub const Token = struct {
 
 pub const LexerError = error{
     InvalidCharacter,
-    // UnterminatedString,
+    UnterminatedString,
 };
 
 pub const Lexer = struct {
@@ -233,6 +234,85 @@ pub const Lexer = struct {
                     start_column,
                 );
             },
+            '"' => {
+                const mark = self.position;
+                self.advance();
+
+                if (self.peek()) |next1| {
+                    if (next1 == '"') {
+                        self.advance();
+
+                        if (self.peek()) |next2| {
+                            if (next2 == '"') {
+                                self.advance();
+
+                                var found_end = false;
+                                while (self.peek()) |next| {
+                                    if (next == '"') {
+                                        self.advance();
+
+                                        if (self.peek()) |quote2| {
+                                            if (quote2 == '"') {
+                                                self.advance();
+
+                                                if (self.peek()) |quote3| {
+                                                    if (quote3 == '"') {
+                                                        self.advance();
+                                                        found_end = true;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if (!found_end) {
+                                            const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
+                                                continue;
+                                            };
+
+                                            var i: usize = 1;
+                                            while (i < utf8_len) : (i += 1) {
+                                                self.advance();
+                                            }
+                                        }
+                                    } else {
+                                        const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
+                                            self.advance();
+                                            continue;
+                                        };
+
+                                        var i: usize = 0;
+                                        while (i < utf8_len) : (i += 1) {
+                                            self.advance();
+                                        }
+                                    }
+                                }
+
+                                if (!found_end) {
+                                    return LexerError.UnterminatedString;
+                                }
+
+                                return Token.init(
+                                    TokenKind.LitMultilineString,
+                                    self.source[mark..self.position],
+                                    start_line,
+                                    start_column,
+                                );
+                            }
+                        }
+                    }
+                }
+
+                // Not a multiline string, handle as invalid for now
+                // (add support for regular strings here)
+                self.advance();
+
+                return Token.init(
+                    TokenKind.Invalid,
+                    self.source[mark..self.position],
+                    start_line,
+                    start_column,
+                );
             },
             '+' => {
                 const mark = self.position;
@@ -738,7 +818,18 @@ test "delimiters" {
     const source = ": , . [ { ( ] } )";
     var lexer = Lexer.init(source);
 
-    const expected = [_]TokenKind{ .Colon, .Comma, .Dot, .LBrack, .LCurly, .LParen, .RBrack, .RCurly, .RParen, .Eof };
+    const expected = [_]TokenKind{
+        .Colon,
+        .Comma,
+        .Dot,
+        .LBrack,
+        .LCurly,
+        .LParen,
+        .RBrack,
+        .RCurly,
+        .RParen,
+        .Eof,
+    };
 
     for (expected) |expected_kind| {
         const token = try lexer.nextToken();
@@ -874,6 +965,26 @@ test "comments" {
         .Comment,
         .DocComment,
         .Comment,
+        .Eof,
+    };
+
+    for (expected) |expected_kind| {
+        const token = try lexer.nextToken();
+        std.debug.assert(token.kind == expected_kind);
+    }
+}
+
+test "multiline string" {
+    const source =
+        \\""" This is a
+        \\multiline string with
+        \\unicode: 你好, こんにちは
+        \\"""
+    ;
+    var lexer = Lexer.init(source);
+
+    const expected = [_]TokenKind{
+        .LitMultilineString,
         .Eof,
     };
 

@@ -56,6 +56,8 @@ A new language that combines elements from Elm, Elixir and Ocaml. Features inclu
 | Character            | `'c'`                  |
 | String interpolation | `"foo $(bar)"`         |
 
+* Note: Multiline string literals have no escapes and can span across multiple lines. 
+
 ### Numbers
 
 | Feature                | Example                             |
