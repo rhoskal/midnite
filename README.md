@@ -26,14 +26,14 @@ A new language that combines elements from Elm, Elixir and Ocaml. Features inclu
 ### Comments
 
 | Feature               | Example                                                          |
-|-----------------------|:----------------------------------------------------------------:|
+|-----------------------|------------------------------------------------------------------|
 | Documentation Comment | `## Used for generating documentation - interpreted as Markdown` |
 | Single line Comment   | `# Normal comment`                                               |
 
 ### Built In Types
 
 | Feature   | Example                                       |
-|-----------|:---------------------------------------------:|
+|-----------|-----------------------------------------------|
 | Int       | `let x : Int = 42`                            |
 | Float     | `let x : Float = 42.0`                        |
 | Boolean   | `let x : Bool = True`                         |
@@ -49,7 +49,7 @@ A new language that combines elements from Elm, Elixir and Ocaml. Features inclu
 ### Strings
 
 | Feature              | Example                |
-|----------------------|:----------------------:|
+|----------------------|------------------------|
 | String               | `"foo"`                |
 | Multiline String     | `"""foo"""`            |
 | String concatenation | `"foo" <> "bar"`       |
@@ -61,11 +61,11 @@ A new language that combines elements from Elm, Elixir and Ocaml. Features inclu
 ### Numbers
 
 | Feature                | Example                             |
-|------------------------|:-----------------------------------:|
+|------------------------|-------------------------------------|
 | Integer                | `42`, `-42`, `1_000_000`            |
 | Integer operations     | `14 + 1 - 6 * 2 / 3`                |
-| Integer modulo         | `42 mod 2`                          |
-| Integer exponentiation | `42 ^^ 2`, `pow 42 2`               |
+| Integer modulo         | ```42 `mod` 2```, `mod 42 2`        |
+| Integer exponentiation | `pow 42 2`                          |
 | Float                  | `42.0`, `-42.0`                     |
 | Float operations       | `14.0 +. 1.0 -. 6.0 *. 2.0 /. 3.0`  |
 | Float exponentiation   | `42.0 ** 2.0`, `Float.pow 42.0 2.0` |
@@ -76,7 +76,7 @@ A new language that combines elements from Elm, Elixir and Ocaml. Features inclu
 ### Booleans and Logical Operators
 
 | Feature                 | Example                                  |
-|-------------------------|:----------------------------------------:|
+|-------------------------|------------------------------------------|
 | Boolean Values          | `True`, `False`                          |
 | Comparison              | `>`, `<`, `>=`, `<=`                     |
 | Boolean operations      | `not`, `and`, `or`, `nand`, `nor`, `xor` |
@@ -86,7 +86,7 @@ A new language that combines elements from Elm, Elixir and Ocaml. Features inclu
 ### If-Else Expressions
 
 | Feature                 | Example                                  |
-|-------------------------|:----------------------------------------:|
+|-------------------------|------------------------------------------|
 | If-Else expressions     | `if condition then a else b`             |
 
 * Note: These are expressions and can be assigned to a variable: `let x = if condition then a else b`
@@ -94,7 +94,7 @@ A new language that combines elements from Elm, Elixir and Ocaml. Features inclu
 ### Functions
 
 | Feature                    | Example                                       |
-|----------------------------|:---------------------------------------------:|
+|----------------------------|-----------------------------------------------|
 | Function definition        | `let add = \x y => x + y`                     |
 | Function types             | `let add : Int -> Int -> Int = \x y => x + y` |
 | Function calls             | `add 21 21`                                   |
@@ -110,14 +110,14 @@ A new language that combines elements from Elm, Elixir and Ocaml. Features inclu
 ### Maps and Sets
 
 | Feature                    | Example                                       |
-|----------------------------|:---------------------------------------------:|
+|----------------------------|-----------------------------------------------|
 | Map                        | `let x = Map ...`                             |
 | Set                        | `let x = Set ...`                             |
 
 ### Records
 
 | Feature                    | Example                                              |
-|----------------------------|:----------------------------------------------------:|
+|----------------------------|------------------------------------------------------|
 | Record definition          | `type FooBar = { foo : Int, bar : String }`          |
 | Record creation            | `let x : FooBar = { foo = 10, bar = "hello" }`       |
 | Record access              | `x.foo`                                              |
@@ -131,7 +131,7 @@ A new language that combines elements from Elm, Elixir and Ocaml. Features inclu
 Variant types (aka sum types or enums in other languages) model values that may assume one of many known variations.
 
 | Feature                    | Example                                              |
-|----------------------------|:----------------------------------------------------:|
+|----------------------------|------------------------------------------------------|
 | Variant definition         | `type FooBar = \| Foo \| Bar;`                       |
 | Variants with args         | `type FooBar = \| Foo String \| Bar Int`             |
 | With type parameters       | `type FooBar a = \| Foo a \| Bar a`                  |
@@ -141,7 +141,7 @@ Variant types (aka sum types or enums in other languages) model values that may 
 Mox does not allow null values. Instead, the `Maybe` type is a built-in variant that represents the presence or absence of a value.
 
 | Feature                      | Example                            |
-|------------------------------|:----------------------------------:|
+|------------------------------|------------------------------------|
 | Definition (already defined) | `type Maybe a = \| None \| Some a` |
 | Value that is present        | `let x = Some 42`                  |
 | Value that is absent         | `let x = None`                     |
@@ -151,7 +151,7 @@ Mox does not allow null values. Instead, the `Maybe` type is a built-in variant 
 When operations can both succeed or fail, a `Result` type is used to model such cases. Use the `Validation` type when you need to accumulate errors.
 
 | Feature                      | Example                              |
-|------------------------------|:------------------------------------:|
+|------------------------------|--------------------------------------|
 | Definition (already defined) | `type Result e a = \| Err e \| Ok a` |
 | Value that is an error       | `let x = Err "foo!"`                 |
 | Value that is a success      | `let x = Ok "bar"`                   |
@@ -167,7 +167,7 @@ match foo on
 ```
 
 | Feature                    | Example                                               |
-|----------------------------|:-----------------------------------------------------:|
+|----------------------------|-------------------------------------------------------|
 | Basic case                 | `\| Some value  => do_something value`                |
 | When conditions            | `\| Some value when value > 10 => do_something value` |
 | Catch-all case             | `\| _ => do_something`                                |
@@ -181,7 +181,7 @@ match foo on
 The special "Unit" value (written Unit) represents something that never has any meaningful value.
 
 | Feature                    | Example         |
-|----------------------------|:---------------:|
+|----------------------------|-----------------|
 | Creating a unit            | `let x = Unit`  |
 
 ### Modules
@@ -189,7 +189,7 @@ The special "Unit" value (written Unit) represents something that never has any 
 Modules are a way to group functions around a type(s). Functions are private by default and therefore must be added to the export list to be made public.
 
 | Feature                             | Example                            |
-|-------------------------------------|:----------------------------------:|
+|-------------------------------------|------------------------------------|
 | Module creation                     | `module Foo exposing (..) ... end` |
 | Module member access                | `Foo.bar`                          |
 | Import fuctions into current module | `open Foo`                         |
@@ -202,7 +202,7 @@ Modules are a way to group functions around a type(s). Functions are private by 
 ### Types
 
 | Feature                    | Example                                                  |
-|----------------------------|:--------------------------------------------------------:|
+|----------------------------|----------------------------------------------------------|
 | Annotations                | `let answer : Int = 42`                                  |
 | Type aliases               | `type alias Seconds = Int`                               |
 | Opaque Types               | `type FooBar = \| Foo \| Bar`, `module X exposing (Foo)` |
@@ -210,38 +210,38 @@ Modules are a way to group functions around a type(s). Functions are private by 
 ### Partials
 
 | Feature                    | Example                                    |
-|----------------------------|:------------------------------------------:|
+|----------------------------|--------------------------------------------|
 | Panic!                     | `Partials.panic "roll over and play dead"` |
 | Todo                       | `Partials.todo "feelin' lazy"`             |
 
 ### Special Operators
 
 | Feature                 | Example                 |
-|-------------------------|:-----------------------:|
+|-------------------------|-------------------------|
 | Range operator          | `1 .. 6`                |
 | Cons operator           | `3 :: [1, 2]`           |
 
 ### Bitwise Operations
 
-| Feature      | Example                               |
-|--------------|:-------------------------------------:|
-| and          | `9 .&. 3`, `Bitwise.and 9 3`          |
-| or           | `9 .\|. 3`, `Bitwise.or 9 3`          |
-| xor          | `9 .^. 3`, `Bitwise.xor 9 3`          |
-| not          | `.~. 2`, `Bitwise.not 2`              |
-| shift left   | `1 .>>. 2`, `Bitwise.shift_left 1 2`  |
-| shift right  | `1 .<<. 2`, `Bitwise.shift_right 1 2` |
+| Feature      | Example                   |
+|--------------|---------------------------|
+| and          | `Bitwise.and 9 3`         |
+| or           | `Bitwise.or 9 3`          |
+| xor          | `Bitwise.xor 9 3`         |
+| not          | `Bitwise.not 2`           |
+| shift left   | `Bitwise.shift_left 1 2`  |
+| shift right  | `Bitwise.shift_right 1 2` |
 
 ### Side Effects
 
 | Feature                            | Example                                  |
-|------------------------------------|:----------------------------------------:|
+|------------------------------------|------------------------------------------|
 | Sync Definition (already defined)  | `let log : Eff () String = ...`          |
 | Async Definition (already defined) | `let fetch : Aff HttpErr Response = ...` |
 
 ### Foreign Function Interface (FFI)
 
 | Feature             | Example                                                     |
-|---------------------|:-----------------------------------------------------------:|
+|---------------------|-------------------------------------------------------------|
 | Function Definition | `foreign bitwise_and : Int -> Int -> Int = "c_bitwise_and"` |
 | Function wrapper    | `let and : Int -> Int -> Int = bitwise_and`                 |
