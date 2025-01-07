@@ -53,7 +53,7 @@ pub const TokenKind = enum {
     OpAssign,
     OpCons,
     OpLambda,
-    OpRange,
+    OpDoubleDot,
 
     // Arithmetic Operators
     OpExp,
@@ -613,7 +613,7 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpRange,
+                            TokenKind.OpDoubleDot,
                             self.source[mark..self.position],
                             start_line,
                             start_column,
@@ -724,7 +724,6 @@ pub const Lexer = struct {
                 );
             },
             'a'...'z', 'A'...'Z', '_' => {
-                // Handle identifiers and keywords
                 while (self.peek()) |next| {
                     switch (next) {
                         'a'...'z', 'A'...'Z', '_', '0'...'9' => self.advance(),
@@ -777,234 +776,249 @@ pub const Lexer = struct {
     }
 };
 
-test "keywords" {
-    const source = "alias as else end exposing foreign hiding if include infixl infixn infixr let match module on open renaming then to type using when";
-    var lexer = Lexer.init(source);
+const TestCase = struct {
+    source: []const u8,
+    kind: TokenKind,
+    lexeme: []const u8,
+};
 
-    const expected = [_]TokenKind{
-        .KwAlias,
-        .KwAs,
-        .KwElse,
-        .KwEnd,
-        .KwExposing,
-        .KwForeign,
-        .KwHiding,
-        .KwIf,
-        .KwInclude,
-        .KwInfixLeft,
-        .KwInfixNon,
-        .KwInfixRight,
-        .KwLet,
-        .KwMatch,
-        .KwModule,
-        .KwOn,
-        .KwOpen,
-        .KwRenaming,
-        .KwThen,
-        .KwTo,
-        .KwType,
-        .KwUsing,
-        .KwWhen,
-        .Eof,
+test "keywords" {
+    const cases = [_]TestCase{
+        .{ .source = "alias", .kind = .KwAlias, .lexeme = "alias" },
+        .{ .source = "as", .kind = .KwAs, .lexeme = "as" },
+        .{ .source = "else", .kind = .KwElse, .lexeme = "else" },
+        .{ .source = "end", .kind = .KwEnd, .lexeme = "end" },
+        .{ .source = "exposing", .kind = .KwExposing, .lexeme = "exposing" },
+        .{ .source = "foreign", .kind = .KwForeign, .lexeme = "foreign" },
+        .{ .source = "hiding", .kind = .KwHiding, .lexeme = "hiding" },
+        .{ .source = "if", .kind = .KwIf, .lexeme = "if" },
+        .{ .source = "include", .kind = .KwInclude, .lexeme = "include" },
+        .{ .source = "infixl", .kind = .KwInfixLeft, .lexeme = "infixl" },
+        .{ .source = "infixn", .kind = .KwInfixNon, .lexeme = "infixn" },
+        .{ .source = "infixr", .kind = .KwInfixRight, .lexeme = "infixr" },
+        .{ .source = "let", .kind = .KwLet, .lexeme = "let" },
+        .{ .source = "match", .kind = .KwMatch, .lexeme = "match" },
+        .{ .source = "module", .kind = .KwModule, .lexeme = "module" },
+        .{ .source = "on", .kind = .KwOn, .lexeme = "on" },
+        .{ .source = "open", .kind = .KwOpen, .lexeme = "open" },
+        .{ .source = "renaming", .kind = .KwRenaming, .lexeme = "renaming" },
+        .{ .source = "then", .kind = .KwThen, .lexeme = "then" },
+        .{ .source = "to", .kind = .KwTo, .lexeme = "to" },
+        .{ .source = "type", .kind = .KwType, .lexeme = "type" },
+        .{ .source = "using", .kind = .KwUsing, .lexeme = "using" },
+        .{ .source = "when", .kind = .KwWhen, .lexeme = "when" },
     };
 
-    for (expected) |expected_kind| {
+    for (cases) |case| {
+        var lexer = Lexer.init(case.source);
         const token = try lexer.nextToken();
-        std.debug.assert(token.kind == expected_kind);
+        try std.testing.expectEqual(case.kind, token.kind);
+        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+
+        const eof = try lexer.nextToken();
+        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
 test "delimiters" {
-    const source = ": , . [ { ( ] } )";
-    var lexer = Lexer.init(source);
-
-    const expected = [_]TokenKind{
-        .Colon,
-        .Comma,
-        .Dot,
-        .LBrack,
-        .LCurly,
-        .LParen,
-        .RBrack,
-        .RCurly,
-        .RParen,
-        .Eof,
+    const cases = [_]TestCase{
+        .{ .source = ":", .kind = .Colon, .lexeme = ":" },
+        .{ .source = ",", .kind = .Comma, .lexeme = "," },
+        .{ .source = ".", .kind = .Dot, .lexeme = "." },
+        .{ .source = "[", .kind = .LBrack, .lexeme = "[" },
+        .{ .source = "{", .kind = .LCurly, .lexeme = "{" },
+        .{ .source = "(", .kind = .LParen, .lexeme = "(" },
+        .{ .source = "]", .kind = .RBrack, .lexeme = "]" },
+        .{ .source = "}", .kind = .RCurly, .lexeme = "}" },
+        .{ .source = ")", .kind = .RParen, .lexeme = ")" },
     };
 
-    for (expected) |expected_kind| {
+    for (cases) |case| {
+        var lexer = Lexer.init(case.source);
         const token = try lexer.nextToken();
-        std.debug.assert(token.kind == expected_kind);
+        try std.testing.expectEqual(case.kind, token.kind);
+        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+
+        const eof = try lexer.nextToken();
+        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
 test "symbols" {
-    const source = "-> $ => |";
-    var lexer = Lexer.init(source);
-
-    const expected = [_]TokenKind{
-        .SymArrowRight,
-        .SymDollarSign,
-        .SymDoubleArrowRight,
-        .SymPipe,
-        // .Underscore,
-        .Eof,
+    const cases = [_]TestCase{
+        .{ .source = "->", .kind = .SymArrowRight, .lexeme = "->" },
+        .{ .source = "$", .kind = .SymDollarSign, .lexeme = "$" },
+        .{ .source = "=>", .kind = .SymDoubleArrowRight, .lexeme = "=>" },
+        .{ .source = "|", .kind = .SymPipe, .lexeme = "|" },
+        // .{ .source = "_", .kind = .SymUnderscore, .lexeme = "_" },
     };
 
-    for (expected) |expected_kind| {
+    for (cases) |case| {
+        var lexer = Lexer.init(case.source);
         const token = try lexer.nextToken();
-        std.debug.assert(token.kind == expected_kind);
+        try std.testing.expectEqual(case.kind, token.kind);
+        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+
+        const eof = try lexer.nextToken();
+        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
 test "operators" {
-    const source = "<> = :: \\ ..";
-    var lexer = Lexer.init(source);
-
-    const expected = [_]TokenKind{
-        .OpAppend,
-        .OpAssign,
-        .OpCons,
-        .OpLambda,
-        .OpRange,
-        .Eof,
+    const cases = [_]TestCase{
+        .{ .source = "<>", .kind = .OpAppend, .lexeme = "<>" },
+        .{ .source = "=", .kind = .OpAssign, .lexeme = "=" },
+        .{ .source = "::", .kind = .OpCons, .lexeme = "::" },
+        .{ .source = "\\", .kind = .OpLambda, .lexeme = "\\" },
+        .{ .source = "..", .kind = .OpDoubleDot, .lexeme = ".." },
     };
 
-    for (expected) |expected_kind| {
+    for (cases) |case| {
+        var lexer = Lexer.init(case.source);
         const token = try lexer.nextToken();
-        std.debug.assert(token.kind == expected_kind);
+        try std.testing.expectEqual(case.kind, token.kind);
+        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+
+        const eof = try lexer.nextToken();
+        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
 test "arithmetic operators" {
-    const source = "** +. /. *. -. + / * -";
-    var lexer = Lexer.init(source);
-
-    const expected = [_]TokenKind{
-        .OpExp,
-        .OpFloatAdd,
-        .OpFloatDiv,
-        .OpFloatMul,
-        .OpFloatSub,
-        .OpIntAdd,
-        .OpIntDiv,
-        .OpIntMul,
-        .OpIntSub,
-        .Eof,
+    const cases = [_]TestCase{
+        .{ .source = "**", .kind = .OpExp, .lexeme = "**" },
+        .{ .source = "+.", .kind = .OpFloatAdd, .lexeme = "+." },
+        .{ .source = "/.", .kind = .OpFloatDiv, .lexeme = "/." },
+        .{ .source = "*.", .kind = .OpFloatMul, .lexeme = "*." },
+        .{ .source = "-.", .kind = .OpFloatSub, .lexeme = "-." },
+        .{ .source = "+", .kind = .OpIntAdd, .lexeme = "+" },
+        .{ .source = "/", .kind = .OpIntDiv, .lexeme = "/" },
+        .{ .source = "*", .kind = .OpIntMul, .lexeme = "*" },
+        .{ .source = "-", .kind = .OpIntSub, .lexeme = "-" },
     };
 
-    for (expected) |expected_kind| {
+    for (cases) |case| {
+        var lexer = Lexer.init(case.source);
         const token = try lexer.nextToken();
-        std.debug.assert(token.kind == expected_kind);
+        try std.testing.expectEqual(case.kind, token.kind);
+        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+
+        const eof = try lexer.nextToken();
+        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
 test "comparison (relational) operators" {
-    const source = "== > >= < <= /=";
-    var lexer = Lexer.init(source);
-
-    const expected = [_]TokenKind{
-        .OpEquality,
-        .OpGreaterThan,
-        .OpGreaterThanEqual,
-        .OpLessThan,
-        .OpLessThanEqual,
-        .OpNotEqual,
-        .Eof,
+    const cases = [_]TestCase{
+        .{ .source = "==", .kind = .OpEquality, .lexeme = "==" },
+        .{ .source = ">", .kind = .OpGreaterThan, .lexeme = ">" },
+        .{ .source = ">=", .kind = .OpGreaterThanEqual, .lexeme = ">=" },
+        .{ .source = "<", .kind = .OpLessThan, .lexeme = "<" },
+        .{ .source = "<=", .kind = .OpLessThanEqual, .lexeme = "<=" },
+        .{ .source = "/=", .kind = .OpNotEqual, .lexeme = "/=" },
     };
 
-    for (expected) |expected_kind| {
+    for (cases) |case| {
+        var lexer = Lexer.init(case.source);
         const token = try lexer.nextToken();
-        std.debug.assert(token.kind == expected_kind);
+        try std.testing.expectEqual(case.kind, token.kind);
+        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+
+        const eof = try lexer.nextToken();
+        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
 test "logical (boolean) operators" {
-    const source = "&& ||";
-    var lexer = Lexer.init(source);
-
-    const expected = [_]TokenKind{
-        .OpLogicalAnd,
-        .OpLogicalOr,
-        .Eof,
+    const cases = [_]TestCase{
+        .{ .source = "&&", .kind = .OpLogicalAnd, .lexeme = "&&" },
+        .{ .source = "||", .kind = .OpLogicalOr, .lexeme = "||" },
     };
 
-    for (expected) |expected_kind| {
+    for (cases) |case| {
+        var lexer = Lexer.init(case.source);
         const token = try lexer.nextToken();
-        std.debug.assert(token.kind == expected_kind);
+        try std.testing.expectEqual(case.kind, token.kind);
+        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+
+        const eof = try lexer.nextToken();
+        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
 test "special" {
-    const source = "?";
-    var lexer = Lexer.init(source);
-
-    const expected = [_]TokenKind{
-        .TypedHole,
-        .Eof,
+    const cases = [_]TestCase{
+        .{ .source = "?", .kind = .TypedHole, .lexeme = "?" },
     };
 
-    for (expected) |expected_kind| {
+    for (cases) |case| {
+        var lexer = Lexer.init(case.source);
         const token = try lexer.nextToken();
-        std.debug.assert(token.kind == expected_kind);
+        try std.testing.expectEqual(case.kind, token.kind);
+        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+
+        const eof = try lexer.nextToken();
+        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
 test "comments" {
-    const source =
-        \\# this is a comment
-        \\## this is a doc comment
-        \\# 你好，世界
-        \\## こんにちは
-        \\# 🚀 👽 💣
-    ;
-    var lexer = Lexer.init(source);
-
-    const expected = [_]TokenKind{
-        .Comment,
-        .DocComment,
-        .Comment,
-        .DocComment,
-        .Comment,
-        .Eof,
+    const cases = [_]TestCase{
+        .{ .source = "# this is a comment", .kind = .Comment, .lexeme = "# this is a comment" },
+        .{ .source = "## this is a doc comment", .kind = .DocComment, .lexeme = "## this is a doc comment" },
+        .{ .source = "# 你好，世界", .kind = .Comment, .lexeme = "# 你好，世界" },
+        .{ .source = "## こんにちは", .kind = .DocComment, .lexeme = "## こんにちは" },
+        .{ .source = "# 🚀 👽 💣", .kind = .Comment, .lexeme = "# 🚀 👽 💣" },
     };
 
-    for (expected) |expected_kind| {
+    for (cases) |case| {
+        var lexer = Lexer.init(case.source);
         const token = try lexer.nextToken();
-        std.debug.assert(token.kind == expected_kind);
+        try std.testing.expectEqual(case.kind, token.kind);
+        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+
+        const eof = try lexer.nextToken();
+        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
 test "multiline string" {
-    const source =
+    const cases = [_]TestCase{
+        .{ .source = 
         \\""" This is a
         \\multiline string with
         \\unicode: 你好, こんにちは
         \\"""
-    ;
-    var lexer = Lexer.init(source);
-
-    const expected = [_]TokenKind{
-        .LitMultilineString,
-        .Eof,
+        , .kind = .LitMultilineString, .lexeme = 
+        \\""" This is a
+        \\multiline string with
+        \\unicode: 你好, こんにちは
+        \\"""
+        },
     };
 
-    for (expected) |expected_kind| {
+    for (cases) |case| {
+        var lexer = Lexer.init(case.source);
         const token = try lexer.nextToken();
-        std.debug.assert(token.kind == expected_kind);
+        try std.testing.expectEqual(case.kind, token.kind);
+        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+
+        const eof = try lexer.nextToken();
+        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
-test "invalid" {
-    const source = "%";
-    var lexer = Lexer.init(source);
-
-    const expected = [_]TokenKind{
-        .Invalid,
-        .Eof,
+test "unterminated multiline string" {
+    const invalid_cases = [_][]const u8{
+        \\""" This is an
+        \\unterminated multiline string with
+        \\unicode: 你好, こんにちは
+        \\
     };
 
-    for (expected) |expected_kind| {
-        const token = try lexer.nextToken();
-        std.debug.assert(token.kind == expected_kind);
+    for (invalid_cases) |source| {
+        var lexer = Lexer.init(source);
+        const result = lexer.nextToken();
+        try std.testing.expectError(error.UnterminatedString, result);
     }
 }
