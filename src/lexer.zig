@@ -967,6 +967,7 @@ test "keywords" {
 
     for (cases) |case| {
         var lexer = Lexer.init(case.source);
+
         const token = try lexer.nextToken();
         try std.testing.expectEqual(case.kind, token.kind);
         try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
@@ -991,6 +992,7 @@ test "delimiters" {
 
     for (cases) |case| {
         var lexer = Lexer.init(case.source);
+
         const token = try lexer.nextToken();
         try std.testing.expectEqual(case.kind, token.kind);
         try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
@@ -1011,6 +1013,7 @@ test "symbols" {
 
     for (cases) |case| {
         var lexer = Lexer.init(case.source);
+
         const token = try lexer.nextToken();
         try std.testing.expectEqual(case.kind, token.kind);
         try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
@@ -1031,6 +1034,7 @@ test "operators" {
 
     for (cases) |case| {
         var lexer = Lexer.init(case.source);
+
         const token = try lexer.nextToken();
         try std.testing.expectEqual(case.kind, token.kind);
         try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
@@ -1055,6 +1059,7 @@ test "arithmetic operators" {
 
     for (cases) |case| {
         var lexer = Lexer.init(case.source);
+
         const token = try lexer.nextToken();
         try std.testing.expectEqual(case.kind, token.kind);
         try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
@@ -1076,6 +1081,7 @@ test "comparison (relational) operators" {
 
     for (cases) |case| {
         var lexer = Lexer.init(case.source);
+
         const token = try lexer.nextToken();
         try std.testing.expectEqual(case.kind, token.kind);
         try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
@@ -1093,6 +1099,7 @@ test "logical (boolean) operators" {
 
     for (cases) |case| {
         var lexer = Lexer.init(case.source);
+
         const token = try lexer.nextToken();
         try std.testing.expectEqual(case.kind, token.kind);
         try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
@@ -1109,6 +1116,7 @@ test "special" {
 
     for (cases) |case| {
         var lexer = Lexer.init(case.source);
+
         const token = try lexer.nextToken();
         try std.testing.expectEqual(case.kind, token.kind);
         try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
@@ -1129,6 +1137,7 @@ test "comments" {
 
     for (cases) |case| {
         var lexer = Lexer.init(case.source);
+
         const token = try lexer.nextToken();
         try std.testing.expectEqual(case.kind, token.kind);
         try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
@@ -1155,6 +1164,7 @@ test "multiline string" {
 
     for (cases) |case| {
         var lexer = Lexer.init(case.source);
+
         const token = try lexer.nextToken();
         try std.testing.expectEqual(case.kind, token.kind);
         try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
@@ -1174,6 +1184,7 @@ test "unterminated multiline string" {
 
     for (invalid_cases) |source| {
         var lexer = Lexer.init(source);
+
         const result = lexer.nextToken();
         try std.testing.expectError(error.UnterminatedString, result);
     }
@@ -1193,6 +1204,7 @@ test "integer literals" {
 
     for (cases) |case| {
         var lexer = Lexer.init(case.source);
+
         const token = try lexer.nextToken();
         try std.testing.expectEqual(case.kind, token.kind);
         try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
@@ -1212,6 +1224,7 @@ test "invalid integer literals" {
 
     for (invalid_cases) |source| {
         var lexer = Lexer.init(source);
+
         const result = lexer.nextToken();
         try std.testing.expectError(error.InvalidInteger, result);
     }
