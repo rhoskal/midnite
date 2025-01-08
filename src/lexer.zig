@@ -32,15 +32,15 @@ pub const TokenKind = enum {
     KwWhen,
 
     // Delimiters
-    Colon,
-    Comma,
-    Dot,
-    LBrack,
-    LCurly,
-    LParen,
-    RBrack,
-    RCurly,
-    RParen,
+    DelColon,
+    DelComma,
+    DelDot,
+    DelLBrack,
+    DelLCurly,
+    DelLParen,
+    DelRBrack,
+    DelRCurly,
+    DelRParen,
 
     // Symbols
     SymArrowRight,
@@ -674,7 +674,7 @@ pub const Lexer = struct {
                 }
 
                 return Token.init(
-                    TokenKind.Colon,
+                    TokenKind.DelColon,
                     ":",
                     start_line,
                     start_column,
@@ -684,7 +684,7 @@ pub const Lexer = struct {
                 self.advance();
 
                 return Token.init(
-                    TokenKind.Comma,
+                    TokenKind.DelComma,
                     ",",
                     start_line,
                     start_column,
@@ -717,7 +717,7 @@ pub const Lexer = struct {
                 }
 
                 return Token.init(
-                    TokenKind.Dot,
+                    TokenKind.DelDot,
                     ".",
                     start_line,
                     start_column,
@@ -727,7 +727,7 @@ pub const Lexer = struct {
                 self.advance();
 
                 return Token.init(
-                    TokenKind.LCurly,
+                    TokenKind.DelLCurly,
                     "{",
                     start_line,
                     start_column,
@@ -737,7 +737,7 @@ pub const Lexer = struct {
                 self.advance();
 
                 return Token.init(
-                    TokenKind.RCurly,
+                    TokenKind.DelRCurly,
                     "}",
                     start_line,
                     start_column,
@@ -781,7 +781,7 @@ pub const Lexer = struct {
                 self.advance();
 
                 return Token.init(
-                    TokenKind.LParen,
+                    TokenKind.DelLParen,
                     "(",
                     start_line,
                     start_column,
@@ -791,7 +791,7 @@ pub const Lexer = struct {
                 self.advance();
 
                 return Token.init(
-                    TokenKind.RParen,
+                    TokenKind.DelRParen,
                     ")",
                     start_line,
                     start_column,
@@ -801,7 +801,7 @@ pub const Lexer = struct {
                 self.advance();
 
                 return Token.init(
-                    TokenKind.LBrack,
+                    TokenKind.DelLBrack,
                     "[",
                     start_line,
                     start_column,
@@ -811,7 +811,7 @@ pub const Lexer = struct {
                 self.advance();
 
                 return Token.init(
-                    TokenKind.RBrack,
+                    TokenKind.DelRBrack,
                     "]",
                     start_line,
                     start_column,
@@ -1024,15 +1024,15 @@ test "keywords" {
 
 test "delimiters" {
     const cases = [_]TestCase{
-        .{ .source = ":", .kind = .Colon, .lexeme = ":" },
-        .{ .source = ",", .kind = .Comma, .lexeme = "," },
-        .{ .source = ".", .kind = .Dot, .lexeme = "." },
-        .{ .source = "[", .kind = .LBrack, .lexeme = "[" },
-        .{ .source = "{", .kind = .LCurly, .lexeme = "{" },
-        .{ .source = "(", .kind = .LParen, .lexeme = "(" },
-        .{ .source = "]", .kind = .RBrack, .lexeme = "]" },
-        .{ .source = "}", .kind = .RCurly, .lexeme = "}" },
-        .{ .source = ")", .kind = .RParen, .lexeme = ")" },
+        .{ .source = ":", .kind = .DelColon, .lexeme = ":" },
+        .{ .source = ",", .kind = .DelComma, .lexeme = "," },
+        .{ .source = ".", .kind = .DelDot, .lexeme = "." },
+        .{ .source = "[", .kind = .DelLBrack, .lexeme = "[" },
+        .{ .source = "{", .kind = .DelLCurly, .lexeme = "{" },
+        .{ .source = "(", .kind = .DelLParen, .lexeme = "(" },
+        .{ .source = "]", .kind = .DelRBrack, .lexeme = "]" },
+        .{ .source = "}", .kind = .DelRCurly, .lexeme = "}" },
+        .{ .source = ")", .kind = .DelRParen, .lexeme = ")" },
     };
 
     for (cases) |case| {
@@ -1378,15 +1378,15 @@ test "record type" {
         Token.init(.KwType, "type", 1, 1),
         Token.init(.UpperIdent, "FooBar", 1, 6),
         Token.init(.OpAssign, "=", 1, 13),
-        Token.init(.LCurly, "{", 1, 15),
+        Token.init(.DelLCurly, "{", 1, 15),
         Token.init(.LowerIdent, "foo", 1, 17),
-        Token.init(.Colon, ":", 1, 21),
+        Token.init(.DelColon, ":", 1, 21),
         Token.init(.UpperIdent, "Int", 1, 23),
-        Token.init(.Comma, ",", 1, 26),
+        Token.init(.DelComma, ",", 1, 26),
         Token.init(.LowerIdent, "bar", 1, 28),
-        Token.init(.Colon, ":", 1, 32),
+        Token.init(.DelColon, ":", 1, 32),
         Token.init(.UpperIdent, "String", 1, 34),
-        Token.init(.RCurly, "}", 1, 41),
+        Token.init(.DelRCurly, "}", 1, 41),
         Token.init(.Eof, "", 1, 42),
     };
 
@@ -1409,14 +1409,14 @@ test "module definition" {
         Token.init(.KwModule, "module", 1, 1),
         Token.init(.UpperIdent, "Foo", 1, 8),
         Token.init(.KwExposing, "exposing", 1, 12),
-        Token.init(.LParen, "(", 1, 21),
+        Token.init(.DelLParen, "(", 1, 21),
         Token.init(.UpperIdent, "Foo", 1, 22),
-        Token.init(.LParen, "(", 1, 25),
+        Token.init(.DelLParen, "(", 1, 25),
         Token.init(.OpDoubleDot, "..", 1, 26),
-        Token.init(.RParen, ")", 1, 28),
-        Token.init(.Comma, ",", 1, 29),
+        Token.init(.DelRParen, ")", 1, 28),
+        Token.init(.DelComma, ",", 1, 29),
         Token.init(.LowerIdent, "bar", 1, 31),
-        Token.init(.RParen, ")", 1, 34),
+        Token.init(.DelRParen, ")", 1, 34),
         Token.init(.KwEnd, "end", 1, 36),
         Token.init(.Eof, "", 1, 39),
     };
@@ -1439,7 +1439,7 @@ test "top level function defintion" {
     const expected_tokens = [_]Token{
         Token.init(.KwLet, "let", 1, 1),
         Token.init(.LowerIdent, "add", 1, 5),
-        Token.init(.Colon, ":", 1, 9),
+        Token.init(.DelColon, ":", 1, 9),
         Token.init(.UpperIdent, "Int", 1, 11),
         Token.init(.SymArrowRight, "->", 1, 15),
         Token.init(.UpperIdent, "Int", 1, 18),
@@ -1507,7 +1507,7 @@ test "let/in block" {
     const expected_tokens = [_]Token{
         Token.init(.KwLet, "let", 1, 1),
         Token.init(.LowerIdent, "x", 1, 5),
-        Token.init(.Colon, ":", 1, 7),
+        Token.init(.DelColon, ":", 1, 7),
         Token.init(.UpperIdent, "Int", 1, 9),
         Token.init(.OpAssign, "=", 1, 13),
         Token.init(.LitInt, "42", 1, 15),
