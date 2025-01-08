@@ -14,6 +14,7 @@ pub const TokenKind = enum {
     KwForeign,
     KwHiding,
     KwIf,
+    KwIn,
     KwInclude,
     KwInfixLeft,
     KwInfixNon,
@@ -893,6 +894,7 @@ pub const Lexer = struct {
                 if (self.checkExactMatch(start, "foreign", TokenKind.KwForeign)) |token| return token;
                 if (self.checkExactMatch(start, "hiding", TokenKind.KwHiding)) |token| return token;
                 if (self.checkExactMatch(start, "if", TokenKind.KwIf)) |token| return token;
+                if (self.checkExactMatch(start, "in", TokenKind.KwIn)) |token| return token;
                 if (self.checkExactMatch(start, "include", TokenKind.KwInclude)) |token| return token;
                 if (self.checkExactMatch(start, "infixl", TokenKind.KwInfixLeft)) |token| return token;
                 if (self.checkExactMatch(start, "infixn", TokenKind.KwInfixNon)) |token| return token;
