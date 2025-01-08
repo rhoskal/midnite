@@ -95,12 +95,19 @@ pub const TokenKind = enum {
     TypedHole,
 };
 
+/// A structure representing a token with a specific kind, lexeme, and position in the source code.
 pub const Token = struct {
     kind: TokenKind,
     lexeme: []const u8,
     line: usize,
     column: usize,
 
+    /// Initializes a new token with the given properties.
+    ///
+    /// - `kind`: The kind of token (e.g., literal, keyword).
+    /// - `lexeme`: The string representation of the token.
+    /// - `line`: The line number where the token is found.
+    /// - `column`: The column number where the token is found.
     pub fn init(kind: TokenKind, lexeme: []const u8, line: usize, column: usize) Token {
         return Token{
             .kind = kind,
@@ -117,12 +124,18 @@ pub const LexerError = error{
     UnterminatedString,
 };
 
+/// A structure representing a lexer which processes source code and generates tokens.
+/// It keeps track of the position in the source code, the current line and column, and performs
+/// operations to extract tokens from the source.
 pub const Lexer = struct {
     source: []const u8,
     position: usize,
     line: usize,
     column: usize,
 
+    /// Initializes a new lexer with the given source code.
+    ///
+    /// - `source`: The source code to be lexed.
     pub fn init(source: []const u8) Lexer {
         return Lexer{
             .source = source,
@@ -132,12 +145,17 @@ pub const Lexer = struct {
         };
     }
 
+    /// Peeks at the next character in the source code without advancing the position.
+    ///
+    /// Returns `null` if the end of the source is reached.
     fn peek(self: *Lexer) ?u8 {
         if (self.position >= self.source.len) return null;
 
         return self.source[self.position];
     }
 
+    /// Advances the lexer by one position in the source code.
+    /// Updates the current line and column numbers accordingly.
     fn advance(self: *Lexer) void {
         if (self.position >= self.source.len) return;
 
@@ -160,6 +178,13 @@ pub const Lexer = struct {
         }
     }
 
+    /// Checks if there is an exact match for a keyword starting at a given position.
+    ///
+    /// - `start`: The starting position of the match in the source code.
+    /// - `keyword`: The keyword to check for.
+    /// - `kind`: The token kind that corresponds to the keyword.
+    ///
+    /// Returns a token if there is a match, or `null` if there is no match.
     fn checkExactMatch(self: *Lexer, start: usize, keyword: []const u8, kind: TokenKind) ?Token {
         const len = keyword.len;
 
@@ -246,6 +271,9 @@ pub const Lexer = struct {
         );
     }
 
+    /// Retrieves the next token from the source code, advancing the lexer.
+    ///
+    /// - Returns: A token object corresponding to the next recognized token.
     pub fn nextToken(self: *Lexer) !Token {
         self.skipWhitespace();
 
