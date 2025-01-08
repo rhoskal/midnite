@@ -108,6 +108,7 @@ Note: Integer literals (Int, Hex, Oct, Bin) cannot have leading, trailing or con
 
 * Note: Functions have implicit returns. The last expression in a block or function definition is the returned value.
 * Note: Functions are "data last" so take that into note when using the pipe operators.
+* Note: Function names must start with a lowercased letter. They can contain digits 0-9, other alpha characters, as well as underscores. However, they cannot start with a number.
 
 ### Maps and Sets
 

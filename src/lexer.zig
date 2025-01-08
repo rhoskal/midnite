@@ -87,8 +87,8 @@ pub const TokenKind = enum {
     LitMultilineString,
 
     // Identifiers
-    // LowerIdent,
-    // UpperIdent,
+    LowerIdent,
+    UpperIdent,
 
     // Special
     Eof,
@@ -121,6 +121,7 @@ pub const Token = struct {
 
 pub const LexerError = error{
     InvalidCharacter,
+    InvalidIdentifier,
     InvalidInteger,
     UnterminatedString,
 };
@@ -865,9 +866,48 @@ pub const Lexer = struct {
                 if (c == '_') {
                     self.advance();
 
+                    if (self.peek() == null) {
+                        return Token.init(
+                            TokenKind.SymUnderscore,
+                            self.source[start..self.position],
+                            start_line,
+                            start_column,
+                        );
+                    }
+
                     if (self.peek()) |next| {
+                        if (next >= 'A' and next <= 'Z') {
+                            return error.InvalidIdentifier;
+                        }
+
                         if (isDigit(next)) {
                             return error.InvalidInteger;
+                        }
+
+                        switch (next) {
+                            'a'...'z', '_' => {
+                                while (self.peek()) |next_char| {
+                                    switch (next_char) {
+                                        'a'...'z', 'A'...'Z', '_', '0'...'9' => self.advance(),
+                                        else => break,
+                                    }
+                                }
+
+                                return Token.init(
+                                    TokenKind.LowerIdent,
+                                    self.source[start..self.position],
+                                    start_line,
+                                    start_column,
+                                );
+                            },
+                            else => {
+                                return Token.init(
+                                    TokenKind.SymUnderscore,
+                                    "_",
+                                    start_line,
+                                    start_column,
+                                );
+                            },
                         }
                     }
 
@@ -911,12 +951,28 @@ pub const Lexer = struct {
                 if (self.checkExactMatch(start, "using", TokenKind.KwUsing)) |token| return token;
                 if (self.checkExactMatch(start, "when", TokenKind.KwWhen)) |token| return token;
 
-                return Token.init(
-                    TokenKind.Invalid,
-                    self.source[start..self.position],
-                    start_line,
-                    start_column,
-                );
+                const first_char = self.source[start];
+
+                switch (first_char) {
+                    'A'...'Z' => return Token.init(
+                        TokenKind.UpperIdent,
+                        self.source[start..self.position],
+                        start_line,
+                        start_column,
+                    ),
+                    'a'...'z', '_' => return Token.init(
+                        TokenKind.LowerIdent,
+                        self.source[start..self.position],
+                        start_line,
+                        start_column,
+                    ),
+                    else => return Token.init(
+                        TokenKind.Invalid,
+                        self.source[start..self.position],
+                        start_line,
+                        start_column,
+                    ),
+                }
             },
             else => {
                 self.advance();
@@ -1227,5 +1283,284 @@ test "invalid integer literals" {
 
         const result = lexer.nextToken();
         try std.testing.expectError(error.InvalidInteger, result);
+    }
+}
+
+test "identifiers" {
+    const cases = [_]TestCase{
+        .{ .source = "Int", .kind = .UpperIdent, .lexeme = "Int" },
+        .{ .source = "Float", .kind = .UpperIdent, .lexeme = "Float" },
+        .{ .source = "Bool", .kind = .UpperIdent, .lexeme = "Bool" },
+        .{ .source = "True", .kind = .UpperIdent, .lexeme = "True" },
+        .{ .source = "False", .kind = .UpperIdent, .lexeme = "False" },
+        .{ .source = "Unit", .kind = .UpperIdent, .lexeme = "Unit" },
+        .{ .source = "foo", .kind = .LowerIdent, .lexeme = "foo" },
+        .{ .source = "foo_bar", .kind = .LowerIdent, .lexeme = "foo_bar" },
+        .{ .source = "_foo", .kind = .LowerIdent, .lexeme = "_foo" },
+        .{ .source = "A", .kind = .UpperIdent, .lexeme = "A" },
+        .{ .source = "a", .kind = .LowerIdent, .lexeme = "a" },
+        .{ .source = "_", .kind = .SymUnderscore, .lexeme = "_" },
+        .{ .source = "ABC123", .kind = .UpperIdent, .lexeme = "ABC123" },
+        .{ .source = "abc123", .kind = .LowerIdent, .lexeme = "abc123" },
+        .{ .source = "Foo_Bar", .kind = .UpperIdent, .lexeme = "Foo_Bar" },
+        .{ .source = "_foo_BAR_123", .kind = .LowerIdent, .lexeme = "_foo_BAR_123" },
+        .{ .source = "__foo", .kind = .LowerIdent, .lexeme = "__foo" },
+    };
+
+    for (cases) |case| {
+        var lexer = Lexer.init(case.source);
+
+        const token = try lexer.nextToken();
+        try std.testing.expectEqual(case.kind, token.kind);
+        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+
+        const eof = try lexer.nextToken();
+        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
+    }
+}
+
+test "invalid identifiers" {
+    const invalid_cases = [_][]const u8{
+        "_Foo",
+        "_Bar",
+    };
+
+    for (invalid_cases) |source| {
+        var lexer = Lexer.init(source);
+
+        try std.testing.expectError(error.InvalidIdentifier, lexer.nextToken());
+    }
+}
+
+test "type variant" {
+    const source = "type FooBar = | Foo | Bar";
+
+    const expected_tokens = [_]Token{
+        Token.init(.KwType, "type", 1, 1),
+        Token.init(.UpperIdent, "FooBar", 1, 6),
+        Token.init(.OpAssign, "=", 1, 13),
+        Token.init(.SymPipe, "|", 1, 15),
+        Token.init(.UpperIdent, "Foo", 1, 17),
+        Token.init(.SymPipe, "|", 1, 21),
+        Token.init(.UpperIdent, "Bar", 1, 23),
+        Token.init(.Eof, "", 1, 26),
+    };
+
+    var lexer = Lexer.init(source);
+
+    for (expected_tokens) |expected| {
+        const token = try lexer.nextToken();
+
+        try std.testing.expectEqual(expected.kind, token.kind);
+        try std.testing.expectEqualStrings(expected.lexeme, token.lexeme);
+        try std.testing.expectEqual(expected.line, token.line);
+        try std.testing.expectEqual(expected.column, token.column);
+    }
+}
+
+test "type alias" {
+    const source = "type alias Seconds = Int";
+
+    const expected_tokens = [_]Token{
+        Token.init(.KwType, "type", 1, 1),
+        Token.init(.KwAlias, "alias", 1, 6),
+        Token.init(.UpperIdent, "Seconds", 1, 12),
+        Token.init(.OpAssign, "=", 1, 20),
+        Token.init(.UpperIdent, "Int", 1, 22),
+        Token.init(.Eof, "", 1, 25),
+    };
+
+    var lexer = Lexer.init(source);
+
+    for (expected_tokens) |expected| {
+        const token = try lexer.nextToken();
+
+        try std.testing.expectEqual(expected.kind, token.kind);
+        try std.testing.expectEqualStrings(expected.lexeme, token.lexeme);
+        try std.testing.expectEqual(expected.line, token.line);
+        try std.testing.expectEqual(expected.column, token.column);
+    }
+}
+
+test "record type" {
+    const source = "type FooBar = { foo : Int, bar : String }";
+
+    const expected_tokens = [_]Token{
+        Token.init(.KwType, "type", 1, 1),
+        Token.init(.UpperIdent, "FooBar", 1, 6),
+        Token.init(.OpAssign, "=", 1, 13),
+        Token.init(.LCurly, "{", 1, 15),
+        Token.init(.LowerIdent, "foo", 1, 17),
+        Token.init(.Colon, ":", 1, 21),
+        Token.init(.UpperIdent, "Int", 1, 23),
+        Token.init(.Comma, ",", 1, 26),
+        Token.init(.LowerIdent, "bar", 1, 28),
+        Token.init(.Colon, ":", 1, 32),
+        Token.init(.UpperIdent, "String", 1, 34),
+        Token.init(.RCurly, "}", 1, 41),
+        Token.init(.Eof, "", 1, 42),
+    };
+
+    var lexer = Lexer.init(source);
+
+    for (expected_tokens) |expected| {
+        const token = try lexer.nextToken();
+
+        try std.testing.expectEqual(expected.kind, token.kind);
+        try std.testing.expectEqualStrings(expected.lexeme, token.lexeme);
+        try std.testing.expectEqual(expected.line, token.line);
+        try std.testing.expectEqual(expected.column, token.column);
+    }
+}
+
+test "module definition" {
+    const source = "module Foo exposing (Foo(..), bar) end";
+
+    const expected_tokens = [_]Token{
+        Token.init(.KwModule, "module", 1, 1),
+        Token.init(.UpperIdent, "Foo", 1, 8),
+        Token.init(.KwExposing, "exposing", 1, 12),
+        Token.init(.LParen, "(", 1, 21),
+        Token.init(.UpperIdent, "Foo", 1, 22),
+        Token.init(.LParen, "(", 1, 25),
+        Token.init(.OpDoubleDot, "..", 1, 26),
+        Token.init(.RParen, ")", 1, 28),
+        Token.init(.Comma, ",", 1, 29),
+        Token.init(.LowerIdent, "bar", 1, 31),
+        Token.init(.RParen, ")", 1, 34),
+        Token.init(.KwEnd, "end", 1, 36),
+        Token.init(.Eof, "", 1, 39),
+    };
+
+    var lexer = Lexer.init(source);
+
+    for (expected_tokens) |expected| {
+        const token = try lexer.nextToken();
+
+        try std.testing.expectEqual(expected.kind, token.kind);
+        try std.testing.expectEqualStrings(expected.lexeme, token.lexeme);
+        try std.testing.expectEqual(expected.line, token.line);
+        try std.testing.expectEqual(expected.column, token.column);
+    }
+}
+
+test "top level function defintion" {
+    const source = "let add : Int -> Int -> Int = \\x y => x + y";
+
+    const expected_tokens = [_]Token{
+        Token.init(.KwLet, "let", 1, 1),
+        Token.init(.LowerIdent, "add", 1, 5),
+        Token.init(.Colon, ":", 1, 9),
+        Token.init(.UpperIdent, "Int", 1, 11),
+        Token.init(.SymArrowRight, "->", 1, 15),
+        Token.init(.UpperIdent, "Int", 1, 18),
+        Token.init(.SymArrowRight, "->", 1, 22),
+        Token.init(.UpperIdent, "Int", 1, 25),
+        Token.init(.OpAssign, "=", 1, 29),
+        Token.init(.OpLambda, "\\", 1, 31),
+        Token.init(.LowerIdent, "x", 1, 32),
+        Token.init(.LowerIdent, "y", 1, 34),
+        Token.init(.SymDoubleArrowRight, "=>", 1, 36),
+        Token.init(.LowerIdent, "x", 1, 39),
+        Token.init(.OpIntAdd, "+", 1, 41),
+        Token.init(.LowerIdent, "y", 1, 43),
+        Token.init(.Eof, "", 1, 44),
+    };
+
+    var lexer = Lexer.init(source);
+
+    for (expected_tokens) |expected| {
+        const token = try lexer.nextToken();
+
+        try std.testing.expectEqual(expected.kind, token.kind);
+        try std.testing.expectEqualStrings(expected.lexeme, token.lexeme);
+        try std.testing.expectEqual(expected.line, token.line);
+        try std.testing.expectEqual(expected.column, token.column);
+    }
+}
+
+test "pattern matching" {
+    const source = "match x on | Foo => 1 | Bar => 2 _ => 3";
+
+    const expected_tokens = [_]Token{
+        Token.init(.KwMatch, "match", 1, 1),
+        Token.init(.LowerIdent, "x", 1, 7),
+        Token.init(.KwOn, "on", 1, 9),
+        Token.init(.SymPipe, "|", 1, 12),
+        Token.init(.UpperIdent, "Foo", 1, 14),
+        Token.init(.SymDoubleArrowRight, "=>", 1, 18),
+        Token.init(.LitInt, "1", 1, 21),
+        Token.init(.SymPipe, "|", 1, 23),
+        Token.init(.UpperIdent, "Bar", 1, 25),
+        Token.init(.SymDoubleArrowRight, "=>", 1, 29),
+        Token.init(.LitInt, "2", 1, 32),
+        Token.init(.SymUnderscore, "_", 1, 34),
+        Token.init(.SymDoubleArrowRight, "=>", 1, 36),
+        Token.init(.LitInt, "3", 1, 39),
+        Token.init(.Eof, "", 1, 40),
+    };
+
+    var lexer = Lexer.init(source);
+
+    for (expected_tokens) |expected| {
+        const token = try lexer.nextToken();
+
+        try std.testing.expectEqual(expected.kind, token.kind);
+        try std.testing.expectEqualStrings(expected.lexeme, token.lexeme);
+        try std.testing.expectEqual(expected.line, token.line);
+        try std.testing.expectEqual(expected.column, token.column);
+    }
+}
+
+test "let/in block" {
+    const source = "let x : Int = 42 in";
+
+    const expected_tokens = [_]Token{
+        Token.init(.KwLet, "let", 1, 1),
+        Token.init(.LowerIdent, "x", 1, 5),
+        Token.init(.Colon, ":", 1, 7),
+        Token.init(.UpperIdent, "Int", 1, 9),
+        Token.init(.OpAssign, "=", 1, 13),
+        Token.init(.LitInt, "42", 1, 15),
+        Token.init(.KwIn, "in", 1, 18),
+        Token.init(.Eof, "", 1, 20),
+    };
+
+    var lexer = Lexer.init(source);
+
+    for (expected_tokens) |expected| {
+        const token = try lexer.nextToken();
+
+        try std.testing.expectEqual(expected.kind, token.kind);
+        try std.testing.expectEqualStrings(expected.lexeme, token.lexeme);
+        try std.testing.expectEqual(expected.line, token.line);
+        try std.testing.expectEqual(expected.column, token.column);
+    }
+}
+
+test "if/then/else expression" {
+    const source = "if x == 1 then True else False";
+
+    const expected_tokens = [_]Token{
+        Token.init(.KwIf, "if", 1, 1),
+        Token.init(.LowerIdent, "x", 1, 4),
+        Token.init(.OpEquality, "==", 1, 6),
+        Token.init(.LitInt, "1", 1, 9),
+        Token.init(.KwThen, "then", 1, 11),
+        Token.init(.UpperIdent, "True", 1, 16),
+        Token.init(.KwElse, "else", 1, 21),
+        Token.init(.UpperIdent, "False", 1, 26),
+        Token.init(.Eof, "", 1, 31),
+    };
+
+    var lexer = Lexer.init(source);
+
+    for (expected_tokens) |expected| {
+        const token = try lexer.nextToken();
+
+        try std.testing.expectEqual(expected.kind, token.kind);
+        try std.testing.expectEqualStrings(expected.lexeme, token.lexeme);
+        try std.testing.expectEqual(expected.line, token.line);
+        try std.testing.expectEqual(expected.column, token.column);
     }
 }
