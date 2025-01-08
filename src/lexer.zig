@@ -79,15 +79,15 @@ pub const TokenKind = enum {
     OpLogicalOr,
 
     // Literals
-    LitChar,
-    LitFloat,
+    // LitChar,
+    // LitFloat,
     LitInt,
     LitString,
     LitMultilineString,
 
     // Identifiers
-    LowerIdent,
-    UpperIdent,
+    // LowerIdent,
+    // UpperIdent,
 
     // Special
     Eof,
@@ -113,6 +113,7 @@ pub const Token = struct {
 
 pub const LexerError = error{
     InvalidCharacter,
+    InvalidInteger,
     UnterminatedString,
 };
 
@@ -169,6 +170,80 @@ pub const Lexer = struct {
         }
 
         return null;
+    }
+
+    fn isDigit(c: u8) bool {
+        return c >= '0' and c <= '9';
+    }
+
+    fn isHexDigit(c: u8) bool {
+        return isDigit(c) or (c >= 'a' and c <= 'f') or (c >= 'A' and c <= 'F');
+    }
+
+    fn isBinDigit(c: u8) bool {
+        return c == '0' or c == '1';
+    }
+
+    fn isOctDigit(c: u8) bool {
+        return c >= '0' and c <= '7';
+    }
+
+    fn lexInteger(self: *Lexer, base: enum { Decimal, Hex, Octal, Binary }) !Token {
+        const offset = if (base == .Decimal) @as(usize, 0) else 2;
+        const start = self.position - offset;
+        const start_line = self.line;
+        const start_column = self.column - offset;
+
+        // For other bases, prefix (0x, 0b, 0o) was already consumed
+        if (base == .Decimal) {
+            self.advance();
+        }
+
+        if (base != .Decimal) {
+            if (self.peek()) |next| {
+                if (next == '_') {
+                    return error.InvalidInteger;
+                }
+            }
+        }
+
+        var found_valid_digit = true;
+        var last_was_underscore = false;
+
+        while (self.peek()) |c| {
+            const is_valid_digit = switch (base) {
+                .Decimal => isDigit(c),
+                .Hex => isHexDigit(c),
+                .Binary => isBinDigit(c),
+                .Octal => isOctDigit(c),
+            };
+
+            if (is_valid_digit) {
+                found_valid_digit = true;
+                last_was_underscore = false;
+                self.advance();
+            } else if (c == '_') {
+                if (!found_valid_digit or last_was_underscore) {
+                    return error.InvalidInteger;
+                }
+
+                last_was_underscore = true;
+                self.advance();
+            } else {
+                break;
+            }
+        }
+
+        if (last_was_underscore) {
+            return error.InvalidInteger;
+        }
+
+        return Token.init(
+            TokenKind.LitInt,
+            self.source[start..self.position],
+            start_line,
+            start_column,
+        );
     }
 
     pub fn nextToken(self: *Lexer) !Token {
@@ -723,7 +798,58 @@ pub const Lexer = struct {
                     start_column,
                 );
             },
+            '0' => {
+                self.advance();
+
+                if (self.peek()) |next| {
+                    switch (next) {
+                        'b' => {
+                            self.advance();
+
+                            return self.lexInteger(.Binary);
+                        },
+                        'o' => {
+                            self.advance();
+
+                            return self.lexInteger(.Octal);
+                        },
+                        'x' => {
+                            self.advance();
+
+                            return self.lexInteger(.Hex);
+                        },
+                        else => return self.lexInteger(.Decimal),
+                    }
+                }
+
+                return Token.init(
+                    TokenKind.LitInt,
+                    self.source[start..self.position],
+                    start_line,
+                    start_column,
+                );
+            },
+            '1'...'9' => {
+                return self.lexInteger(.Decimal);
+            },
             'a'...'z', 'A'...'Z', '_' => {
+                if (c == '_') {
+                    self.advance();
+
+                    if (self.peek()) |next| {
+                        if (isDigit(next)) {
+                            return error.InvalidInteger;
+                        }
+                    }
+
+                    return Token.init(
+                        TokenKind.SymUnderscore,
+                        self.source[start..self.position],
+                        start_line,
+                        start_column,
+                    );
+                }
+
                 while (self.peek()) |next| {
                     switch (next) {
                         'a'...'z', 'A'...'Z', '_', '0'...'9' => self.advance(),
@@ -850,7 +976,7 @@ test "symbols" {
         .{ .source = "$", .kind = .SymDollarSign, .lexeme = "$" },
         .{ .source = "=>", .kind = .SymDoubleArrowRight, .lexeme = "=>" },
         .{ .source = "|", .kind = .SymPipe, .lexeme = "|" },
-        // .{ .source = "_", .kind = .SymUnderscore, .lexeme = "_" },
+        .{ .source = "_", .kind = .SymUnderscore, .lexeme = "_" },
     };
 
     for (cases) |case| {
@@ -1020,5 +1146,43 @@ test "unterminated multiline string" {
         var lexer = Lexer.init(source);
         const result = lexer.nextToken();
         try std.testing.expectError(error.UnterminatedString, result);
+    }
+}
+
+test "integer literals" {
+    const cases = [_]TestCase{
+        .{ .source = "42", .kind = .LitInt, .lexeme = "42" },
+        .{ .source = "42_000_000", .kind = .LitInt, .lexeme = "42_000_000" },
+        .{ .source = "0b101010", .kind = .LitInt, .lexeme = "0b101010" },
+        .{ .source = "0b10_1010", .kind = .LitInt, .lexeme = "0b10_1010" },
+        .{ .source = "0o52", .kind = .LitInt, .lexeme = "0o52" },
+        .{ .source = "0o52_52", .kind = .LitInt, .lexeme = "0o52_52" },
+        .{ .source = "0x2A", .kind = .LitInt, .lexeme = "0x2A" },
+        .{ .source = "0x2A_2A", .kind = .LitInt, .lexeme = "0x2A_2A" },
+    };
+
+    for (cases) |case| {
+        var lexer = Lexer.init(case.source);
+        const token = try lexer.nextToken();
+        try std.testing.expectEqual(case.kind, token.kind);
+        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+
+        const eof = try lexer.nextToken();
+        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
+    }
+}
+
+test "invalid integer literals" {
+    const invalid_cases = [_][]const u8{
+        "10__000", // consecutive underscores
+        "_1000", // leading underscore
+        "1000_", // trailing underscore
+        "0x_1F", // underscore after prefix
+    };
+
+    for (invalid_cases) |source| {
+        var lexer = Lexer.init(source);
+        const result = lexer.nextToken();
+        try std.testing.expectError(error.InvalidInteger, result);
     }
 }

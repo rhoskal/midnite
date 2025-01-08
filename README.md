@@ -73,6 +73,8 @@ A new language that combines elements from Elm, Elixir and Ocaml. Features inclu
 | Octal                  | `0o16`                              |
 | Binary                 | `0b01110`                           |
 
+Note: Integer literals (Int, Hex, Oct, Bin) cannot have leading, trailing or consecutive underscores. Moreover, they effectively make large numbers easier to parse visually.
+
 ### Booleans and Logical Operators
 
 | Feature                 | Example                                  |
