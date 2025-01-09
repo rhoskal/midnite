@@ -121,10 +121,12 @@ pub const Token = struct {
 
 pub const LexerError = error{
     InvalidCharacter,
+    InvalidCharLiteral,
     InvalidIdentifier,
-    InvalidInteger,
+    InvalidIntLiteral,
     InvalidUnicodeEscape,
-    UnterminatedString,
+    UnterminatedCharLiteral,
+    UnterminatedStrLiteral,
 };
 
 /// A structure representing a lexer which processes source code and generates tokens.
@@ -230,7 +232,7 @@ pub const Lexer = struct {
         if (base != .Decimal) {
             if (self.peek()) |next| {
                 if (next == '_') {
-                    return error.InvalidInteger;
+                    return error.InvalidIntLiteral;
                 }
             }
         }
@@ -252,7 +254,7 @@ pub const Lexer = struct {
                 self.advance();
             } else if (c == '_') {
                 if (!found_valid_digit or last_was_underscore) {
-                    return error.InvalidInteger;
+                    return error.InvalidIntLiteral;
                 }
 
                 last_was_underscore = true;
@@ -263,7 +265,7 @@ pub const Lexer = struct {
         }
 
         if (last_was_underscore) {
-            return error.InvalidInteger;
+            return error.InvalidIntLiteral;
         }
 
         return Token.init(
@@ -395,7 +397,7 @@ pub const Lexer = struct {
                                 }
 
                                 if (!found_end) {
-                                    return LexerError.UnterminatedString;
+                                    return error.UnterminatedStrLiteral;
                                 }
 
                                 return Token.init(
@@ -424,7 +426,7 @@ pub const Lexer = struct {
                     if (next == '\\') {
                         self.advance();
 
-                        const escaped_char = self.peek() orelse return LexerError.UnterminatedString;
+                        const escaped_char = self.peek() orelse return error.UnterminatedStrLiteral;
 
                         switch (escaped_char) {
                             '\\', '"', 'n', 't', 'r', 'b' => {
@@ -435,10 +437,10 @@ pub const Lexer = struct {
 
                                 var i: usize = 0;
                                 while (i < 4) : (i += 1) {
-                                    const hex = self.peek() orelse return LexerError.UnterminatedString;
+                                    const hex = self.peek() orelse return error.UnterminatedStrLiteral;
 
                                     if (!std.ascii.isHex(hex)) {
-                                        return LexerError.InvalidUnicodeEscape;
+                                        return error.InvalidUnicodeEscape;
                                     }
 
                                     self.advance();
@@ -446,11 +448,11 @@ pub const Lexer = struct {
 
                                 if (self.peek()) |n| {
                                     if (std.ascii.isHex(n)) {
-                                        return LexerError.InvalidUnicodeEscape;
+                                        return error.InvalidUnicodeEscape;
                                     }
                                 }
                             },
-                            else => return LexerError.InvalidUnicodeEscape,
+                            else => return error.InvalidUnicodeEscape,
                         }
 
                         continue;
@@ -467,7 +469,7 @@ pub const Lexer = struct {
                     }
                 }
 
-                return LexerError.UnterminatedString;
+                return error.UnterminatedStrLiteral;
             },
             '+' => {
                 self.advance();
@@ -920,7 +922,7 @@ pub const Lexer = struct {
                         }
 
                         if (isDigit(next)) {
-                            return error.InvalidInteger;
+                            return error.InvalidIntLiteral;
                         }
 
                         switch (next) {
@@ -1281,7 +1283,7 @@ test "unterminated multiline string" {
         var lexer = Lexer.init(source);
 
         const result = lexer.nextToken();
-        try std.testing.expectError(error.UnterminatedString, result);
+        try std.testing.expectError(error.UnterminatedStrLiteral, result);
     }
 }
 
@@ -1339,7 +1341,7 @@ test "unterminated strings" {
         var lexer = Lexer.init(source);
 
         const result = lexer.nextToken();
-        try std.testing.expectError(error.UnterminatedString, result);
+        try std.testing.expectError(error.UnterminatedStrLiteral, result);
     }
 }
 
@@ -1379,7 +1381,7 @@ test "invalid integer literals" {
         var lexer = Lexer.init(source);
 
         const result = lexer.nextToken();
-        try std.testing.expectError(error.InvalidInteger, result);
+        try std.testing.expectError(error.InvalidIntLiteral, result);
     }
 }
 
