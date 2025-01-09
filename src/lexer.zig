@@ -123,6 +123,7 @@ pub const LexerError = error{
     InvalidCharacter,
     InvalidIdentifier,
     InvalidInteger,
+    InvalidUnicodeEscape,
     UnterminatedString,
 };
 
@@ -408,16 +409,65 @@ pub const Lexer = struct {
                     }
                 }
 
-                // Not a multiline string, handle as invalid for now
-                // (add support for regular strings here)
-                self.advance();
+                while (self.peek()) |next| {
+                    if (next == '"') {
+                        self.advance();
 
-                return Token.init(
-                    TokenKind.Invalid,
-                    self.source[mark..self.position],
-                    start_line,
-                    start_column,
-                );
+                        return Token.init(
+                            TokenKind.LitString,
+                            self.source[start..self.position],
+                            start_line,
+                            start_column,
+                        );
+                    }
+
+                    if (next == '\\') {
+                        self.advance();
+
+                        const escaped_char = self.peek() orelse return LexerError.UnterminatedString;
+
+                        switch (escaped_char) {
+                            '\\', '"', 'n', 't', 'r', 'b' => {
+                                self.advance();
+                            },
+                            'u' => {
+                                self.advance();
+
+                                var i: usize = 0;
+                                while (i < 4) : (i += 1) {
+                                    const hex = self.peek() orelse return LexerError.UnterminatedString;
+
+                                    if (!std.ascii.isHex(hex)) {
+                                        return LexerError.InvalidUnicodeEscape;
+                                    }
+
+                                    self.advance();
+                                }
+
+                                if (self.peek()) |n| {
+                                    if (std.ascii.isHex(n)) {
+                                        return LexerError.InvalidUnicodeEscape;
+                                    }
+                                }
+                            },
+                            else => return LexerError.InvalidUnicodeEscape,
+                        }
+
+                        continue;
+                    }
+
+                    const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
+                        self.advance();
+                        continue;
+                    };
+
+                    var i: usize = 0;
+                    while (i < utf8_len) : (i += 1) {
+                        self.advance();
+                    }
+                }
+
+                return LexerError.UnterminatedString;
             },
             '+' => {
                 self.advance();
@@ -1225,6 +1275,64 @@ test "unterminated multiline string" {
         \\unterminated multiline string with
         \\unicode: 你好, こんにちは
         \\
+    };
+
+    for (invalid_cases) |source| {
+        var lexer = Lexer.init(source);
+
+        const result = lexer.nextToken();
+        try std.testing.expectError(error.UnterminatedString, result);
+    }
+}
+
+test "strings" {
+    const cases = [_]TestCase{
+        .{ .source = "\"foo\"", .kind = .LitString, .lexeme = "\"foo\"" },
+        .{ .source = "\"Backslash: \\\\\"", .kind = .LitString, .lexeme = "\"Backslash: \\\\\"" },
+        .{ .source = "\"Double quote: \\\"Hello!\\\"\"", .kind = .LitString, .lexeme = "\"Double quote: \\\"Hello!\\\"\"" },
+        .{ .source = "\"First line\\nSecond line\"", .kind = .LitString, .lexeme = "\"First line\\nSecond line\"" },
+        .{ .source = "\"Column1\\tColumn2\\tColumn3\"", .kind = .LitString, .lexeme = "\"Column1\\tColumn2\\tColumn3\"" },
+        .{ .source = "\"Carriage return\\rOverwritten text\"", .kind = .LitString, .lexeme = "\"Carriage return\\rOverwritten text\"" },
+        .{ .source = "\"Backspace test: abc\\bdef\"", .kind = .LitString, .lexeme = "\"Backspace test: abc\\bdef\"" },
+        .{ .source = "\"Unicode test: \\u03A9\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u03A9\"" },
+        .{ .source = "\"Unicode with extra: \\u1234Hello\"", .kind = .LitString, .lexeme = "\"Unicode with extra: \\u1234Hello\"" },
+        .{ .source = "\"✅\"", .kind = .LitString, .lexeme = "\"✅\"" },
+    };
+
+    for (cases) |case| {
+        var lexer = Lexer.init(case.source);
+
+        const token = try lexer.nextToken();
+        try std.testing.expectEqual(case.kind, token.kind);
+        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+
+        const eof = try lexer.nextToken();
+        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
+    }
+}
+
+test "invalid string escapes" {
+    const invalid_cases = [_][]const u8{
+        "\"invalid escape: \\k\"", // Invalid escape character
+        "\"invalid escape: \\x\"", // Invalid escape character
+        "\"unicode too short: \\u123\"", // Unicode escape needs exactly 4 hex digits
+        "\"unicode too long: \\u12345\"", // Unicode escape needs exactly 4 hex digits
+        "\"invalid unicode: \\uGHIJ\"", // Unicode escape must only contain hex digits
+    };
+
+    for (invalid_cases) |source| {
+        var lexer = Lexer.init(source);
+
+        const result = lexer.nextToken();
+        try std.testing.expectError(error.InvalidUnicodeEscape, result);
+    }
+}
+
+test "unterminated strings" {
+    const invalid_cases = [_][]const u8{
+        "\"no closing quote",
+        "\"escape at end\\",
+        "\"unicode escape at end\\u123",
     };
 
     for (invalid_cases) |source| {
