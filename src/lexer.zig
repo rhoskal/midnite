@@ -53,9 +53,13 @@ pub const TokenKind = enum {
     // Operators
     OpAppend,
     OpAssign,
+    OpComposeLeft,
+    OpComposeRight,
     OpCons,
-    OpLambda,
     OpDoubleDot,
+    OpLambda,
+    OpPipeLeft,
+    OpPipeRight,
 
     // Arithmetic Operators
     OpExp,
@@ -707,6 +711,28 @@ pub const Lexer = struct {
                             start_column,
                         );
                     }
+
+                    if (next == '|') {
+                        self.advance();
+
+                        return Token.init(
+                            TokenKind.OpPipeLeft,
+                            "<|",
+                            start_line,
+                            start_column,
+                        );
+                    }
+
+                    if (next == '<') {
+                        self.advance();
+
+                        return Token.init(
+                            TokenKind.OpComposeLeft,
+                            "<<",
+                            start_line,
+                            start_column,
+                        );
+                    }
                 }
 
                 return Token.init(
@@ -726,6 +752,17 @@ pub const Lexer = struct {
                         return Token.init(
                             TokenKind.OpGreaterThanEqual,
                             ">=",
+                            start_line,
+                            start_column,
+                        );
+                    }
+
+                    if (next == '>') {
+                        self.advance();
+
+                        return Token.init(
+                            TokenKind.OpComposeRight,
+                            ">>",
                             start_line,
                             start_column,
                         );
@@ -772,6 +809,17 @@ pub const Lexer = struct {
                         return Token.init(
                             TokenKind.OpLogicalOr,
                             "||",
+                            start_line,
+                            start_column,
+                        );
+                    }
+
+                    if (next == '>') {
+                        self.advance();
+
+                        return Token.init(
+                            TokenKind.OpPipeRight,
+                            "|>",
                             start_line,
                             start_column,
                         );
@@ -1211,9 +1259,13 @@ test "[operator]" {
     const cases = [_]TestCase{
         .{ .source = "<>", .kind = .OpAppend, .lexeme = "<>" },
         .{ .source = "=", .kind = .OpAssign, .lexeme = "=" },
+        .{ .source = "<<", .kind = .OpComposeLeft, .lexeme = "<<" },
+        .{ .source = ">>", .kind = .OpComposeRight, .lexeme = ">>" },
         .{ .source = "::", .kind = .OpCons, .lexeme = "::" },
-        .{ .source = "\\", .kind = .OpLambda, .lexeme = "\\" },
         .{ .source = "..", .kind = .OpDoubleDot, .lexeme = ".." },
+        .{ .source = "\\", .kind = .OpLambda, .lexeme = "\\" },
+        .{ .source = "<|", .kind = .OpPipeLeft, .lexeme = "<|" },
+        .{ .source = "|>", .kind = .OpPipeRight, .lexeme = "|>" },
     };
 
     for (cases) |case| {
