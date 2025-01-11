@@ -1,4 +1,5 @@
 const std = @import("std");
+const ascii = std.ascii;
 const testing = std.testing;
 
 pub const TokenKind = enum {
@@ -183,7 +184,7 @@ pub const Lexer = struct {
 
     fn skipWhitespace(self: *Lexer) void {
         while (self.peek()) |c| {
-            if (isWhitespace(c)) self.advance() else break;
+            if (ascii.isWhitespace(c)) self.advance() else break;
         }
     }
 
@@ -204,21 +205,6 @@ pub const Lexer = struct {
         }
 
         return null;
-    }
-
-    fn isWhitespace(c: u8) bool {
-        return switch (c) {
-            ' ', '\t', '\r', '\n' => true,
-            else => false,
-        };
-    }
-
-    fn isDigit(c: u8) bool {
-        return c >= '0' and c <= '9';
-    }
-
-    fn isHexDigit(c: u8) bool {
-        return isDigit(c) or (c >= 'a' and c <= 'f') or (c >= 'A' and c <= 'F');
     }
 
     fn isBinDigit(c: u8) bool {
@@ -262,8 +248,8 @@ pub const Lexer = struct {
 
         while (self.peek()) |c| {
             const is_valid_digit = switch (base) {
-                .Decimal => isDigit(c),
-                .Hex => isHexDigit(c),
+                .Decimal => ascii.isDigit(c),
+                .Hex => ascii.isHex(c),
                 .Binary => isBinDigit(c),
                 .Octal => isOctDigit(c),
             };
@@ -464,7 +450,7 @@ pub const Lexer = struct {
                                 var digit_count: usize = 0;
                                 while (digit_count < 6) : (digit_count += 1) {
                                     const hex = self.peek() orelse break;
-                                    if (!std.ascii.isHex(hex)) break;
+                                    if (!ascii.isHex(hex)) break;
 
                                     const digit_value = hexDigitToValue(hex);
                                     unicode_value = (unicode_value << 4) | digit_value;
@@ -533,7 +519,7 @@ pub const Lexer = struct {
                                 var digit_count: usize = 0;
                                 while (digit_count < 6) : (digit_count += 1) {
                                     const hex = self.peek() orelse break;
-                                    if (!std.ascii.isHex(hex)) break;
+                                    if (!ascii.isHex(hex)) break;
 
                                     const digit_value = hexDigitToValue(hex);
                                     unicode_value = (unicode_value << 4) | digit_value;
@@ -1061,11 +1047,11 @@ pub const Lexer = struct {
                     }
 
                     if (self.peek()) |next| {
-                        if (next >= 'A' and next <= 'Z') {
+                        if (ascii.isUpper(next)) {
                             return error.InvalidIdentifier;
                         }
 
-                        if (isDigit(next)) {
+                        if (ascii.isDigit(next)) {
                             return error.InvalidIntLiteral;
                         }
 
@@ -1078,7 +1064,7 @@ pub const Lexer = struct {
                                             self.advance();
 
                                             if (self.peek()) |x| {
-                                                if (!isWhitespace(x)) return error.InvalidIdentifier;
+                                                if (!ascii.isWhitespace(x)) return error.InvalidIdentifier;
                                             }
 
                                             break;
@@ -1120,7 +1106,7 @@ pub const Lexer = struct {
                             self.advance();
 
                             if (self.peek()) |x| {
-                                if (!isWhitespace(x)) return error.InvalidIdentifier;
+                                if (!ascii.isWhitespace(x)) return error.InvalidIdentifier;
                             }
 
                             break;
