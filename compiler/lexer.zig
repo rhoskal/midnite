@@ -127,7 +127,6 @@ pub const Token = struct {
 pub const LexerError = error{
     CodePointOutOfRange,
     EmptyCharLiteral,
-    InvalidCharacter,
     InvalidIdentifier,
     InvalidIntLiteral,
     InvalidUnicodeEscapeSequence,

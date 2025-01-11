@@ -60,13 +60,7 @@ pub fn main() !void {
     while (true) {
         const token = tokenizer.nextToken() catch |err| {
             switch (err) {
-                error.InvalidCharacter => {
-                    std.debug.print("\nError: Invalid character at line {d}, column {d}\n", .{ tokenizer.line, tokenizer.column });
-                    showErrorContext(source, tokenizer.line, tokenizer.column);
-
-                    return err;
-                },
-                error.UnterminatedString => {
+                error.UnterminatedStrLiteral => {
                     std.debug.print("\nError: Unterminated string starting at line {d}, column {d}\n", .{ tokenizer.line, tokenizer.column });
                     showErrorContext(source, tokenizer.line, tokenizer.column);
 
