@@ -1121,7 +1121,7 @@ const TestCase = struct {
     lexeme: []const u8,
 };
 
-test "keywords" {
+test "[keyword]" {
     const cases = [_]TestCase{
         .{ .source = "alias", .kind = .KwAlias, .lexeme = "alias" },
         .{ .source = "as", .kind = .KwAs, .lexeme = "as" },
@@ -1161,7 +1161,7 @@ test "keywords" {
     }
 }
 
-test "delimiters" {
+test "[delimiter]" {
     const cases = [_]TestCase{
         .{ .source = ":", .kind = .DelColon, .lexeme = ":" },
         .{ .source = ",", .kind = .DelComma, .lexeme = "," },
@@ -1186,7 +1186,7 @@ test "delimiters" {
     }
 }
 
-test "symbols" {
+test "[symbol]" {
     const cases = [_]TestCase{
         .{ .source = "->", .kind = .SymArrowRight, .lexeme = "->" },
         .{ .source = "$", .kind = .SymDollarSign, .lexeme = "$" },
@@ -1207,7 +1207,7 @@ test "symbols" {
     }
 }
 
-test "operators" {
+test "[operator]" {
     const cases = [_]TestCase{
         .{ .source = "<>", .kind = .OpAppend, .lexeme = "<>" },
         .{ .source = "=", .kind = .OpAssign, .lexeme = "=" },
@@ -1228,7 +1228,7 @@ test "operators" {
     }
 }
 
-test "arithmetic operators" {
+test "[arithmetic operator]" {
     const cases = [_]TestCase{
         .{ .source = "**", .kind = .OpExp, .lexeme = "**" },
         .{ .source = "+.", .kind = .OpFloatAdd, .lexeme = "+." },
@@ -1253,7 +1253,7 @@ test "arithmetic operators" {
     }
 }
 
-test "comparison (relational) operators" {
+test "[comparison operator] (relational)" {
     const cases = [_]TestCase{
         .{ .source = "==", .kind = .OpEquality, .lexeme = "==" },
         .{ .source = ">", .kind = .OpGreaterThan, .lexeme = ">" },
@@ -1275,7 +1275,7 @@ test "comparison (relational) operators" {
     }
 }
 
-test "logical (boolean) operators" {
+test "[logical operator] (boolean)" {
     const cases = [_]TestCase{
         .{ .source = "&&", .kind = .OpLogicalAnd, .lexeme = "&&" },
         .{ .source = "||", .kind = .OpLogicalOr, .lexeme = "||" },
@@ -1293,7 +1293,7 @@ test "logical (boolean) operators" {
     }
 }
 
-test "special" {
+test "[special]" {
     const cases = [_]TestCase{
         .{ .source = "?", .kind = .TypedHole, .lexeme = "?" },
     };
@@ -1310,7 +1310,7 @@ test "special" {
     }
 }
 
-test "comments" {
+test "[comment]" {
     const cases = [_]TestCase{
         .{ .source = "# this is a comment", .kind = .Comment, .lexeme = "# this is a comment" },
         .{ .source = "## this is a doc comment", .kind = .DocComment, .lexeme = "## this is a doc comment" },
@@ -1331,7 +1331,7 @@ test "comments" {
     }
 }
 
-test "multiline string" {
+test "[multiline string]" {
     const cases = [_]TestCase{
         .{ .source = 
         \\""" This is a
@@ -1358,7 +1358,7 @@ test "multiline string" {
     }
 }
 
-test "unterminated multiline string" {
+test "[multiline string] error.UnterminatedStrLiteral" {
     const invalid_cases = [_][]const u8{
         \\""" This is an
         \\unterminated multiline string with
@@ -1374,7 +1374,7 @@ test "unterminated multiline string" {
     }
 }
 
-test "strings" {
+test "[string]" {
     const cases = [_]TestCase{
         .{ .source = "\"foo\"", .kind = .LitString, .lexeme = "\"foo\"" },
         .{ .source = "\"Backslash: \\\\\"", .kind = .LitString, .lexeme = "\"Backslash: \\\\\"" },
@@ -1400,7 +1400,7 @@ test "strings" {
     }
 }
 
-test "invalid string escapes" {
+test "[string escape] error.InvalidUnicodeEscapeSequence" {
     const invalid_cases = [_][]const u8{
         "\"invalid escape: \\k\"", // Invalid escape character
         "\"invalid escape: \\x\"", // Invalid escape character
@@ -1417,7 +1417,7 @@ test "invalid string escapes" {
     }
 }
 
-test "unterminated strings" {
+test "[string] error.UnterminatedStrLiteral" {
     const invalid_cases = [_][]const u8{
         "\"no closing quote",
         "\"escape at end\\",
@@ -1557,7 +1557,7 @@ test "[char literal] error.InvalidUnicodeEscapeSequence" {
     }
 }
 
-test "integer literals" {
+test "[integer literal]" {
     const cases = [_]TestCase{
         .{ .source = "42", .kind = .LitInt, .lexeme = "42" },
         .{ .source = "42_000_000", .kind = .LitInt, .lexeme = "42_000_000" },
@@ -1581,7 +1581,7 @@ test "integer literals" {
     }
 }
 
-test "invalid integer literals" {
+test "[integer literal] error.InvalidIntLiteral" {
     const invalid_cases = [_][]const u8{
         "10__000", // consecutive underscores
         "_1000", // leading underscore
@@ -1597,7 +1597,7 @@ test "invalid integer literals" {
     }
 }
 
-test "identifiers" {
+test "[identifier]" {
     const cases = [_]TestCase{
         .{ .source = "Int", .kind = .UpperIdent, .lexeme = "Int" },
         .{ .source = "Float", .kind = .UpperIdent, .lexeme = "Float" },
@@ -1630,7 +1630,7 @@ test "identifiers" {
     }
 }
 
-test "invalid identifiers" {
+test "[identifier] error.InvalidIdentifier" {
     const invalid_cases = [_][]const u8{
         "_Foo",
         "_Bar",
