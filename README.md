@@ -57,6 +57,21 @@ A new language that combines elements from Elm, Elixir and Ocaml. Features inclu
 | String interpolation | `"foo $(bar)"`         |
 
 * Note: Multiline string literals have no escapes and can span across multiple lines. 
+* Note: Allowed escape sequences for strings are 
+- `\\` (backslash)
+- `\"` (double quote)
+- `\n` (newline)
+- `\t` (tab)
+- `\r` (carriage return)
+- `\b` (backspace)
+- `\uNNNN` (unicode) where N is a hexadecimal value
+* Note: Allowed escape sequences for characters are
+- `\\` (backslash)
+- `\'` (single quote)
+- `\n` (newline)
+- `\t` (tab)
+- `\r` (carriage return)
+- `\uNNNNNN` (unicode) where N is a hexadecimal value
 
 ### Numbers
 

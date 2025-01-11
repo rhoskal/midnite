@@ -399,6 +399,7 @@ pub const Lexer = struct {
 
                                         if (!found_end) {
                                             const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
+                                                // fail silently with invalid sequence
                                                 continue;
                                             };
 
@@ -409,6 +410,7 @@ pub const Lexer = struct {
                                         }
                                     } else {
                                         const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
+                                            // fail silently with invalid sequence
                                             self.advance();
                                             continue;
                                         };
@@ -451,7 +453,6 @@ pub const Lexer = struct {
                         self.advance();
 
                         const escaped_char = self.peek() orelse return error.UnterminatedStrLiteral;
-
                         switch (escaped_char) {
                             '\\', '"', 'n', 't', 'r', 'b' => {
                                 self.advance();
@@ -483,6 +484,7 @@ pub const Lexer = struct {
                     }
 
                     const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
+                        // fail silently with invalid sequence
                         self.advance();
                         continue;
                     };
