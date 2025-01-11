@@ -183,10 +183,7 @@ pub const Lexer = struct {
 
     fn skipWhitespace(self: *Lexer) void {
         while (self.peek()) |c| {
-            switch (c) {
-                ' ', '\t', '\r', '\n' => self.advance(),
-                else => break,
-            }
+            if (isWhitespace(c)) self.advance() else break;
         }
     }
 
@@ -207,6 +204,13 @@ pub const Lexer = struct {
         }
 
         return null;
+    }
+
+    fn isWhitespace(c: u8) bool {
+        return switch (c) {
+            ' ', '\t', '\r', '\n' => true,
+            else => false,
+        };
     }
 
     fn isDigit(c: u8) bool {
@@ -315,12 +319,16 @@ pub const Lexer = struct {
             '?' => {
                 self.advance();
 
-                return Token.init(
-                    TokenKind.TypedHole,
-                    "?",
-                    start_line,
-                    start_column,
-                );
+                if (self.peek() == null) {
+                    return Token.init(
+                        TokenKind.TypedHole,
+                        "?",
+                        start_line,
+                        start_column,
+                    );
+                }
+
+                return error.InvalidIdentifier;
             },
             '#' => {
                 const mark = self.position;
@@ -1063,6 +1071,15 @@ pub const Lexer = struct {
                                 while (self.peek()) |next_char| {
                                     switch (next_char) {
                                         'a'...'z', 'A'...'Z', '_', '0'...'9' => self.advance(),
+                                        '?' => {
+                                            self.advance();
+
+                                            if (self.peek()) |x| {
+                                                if (!isWhitespace(x)) return error.InvalidIdentifier;
+                                            }
+
+                                            break;
+                                        },
                                         else => break,
                                     }
                                 }
@@ -1096,6 +1113,15 @@ pub const Lexer = struct {
                 while (self.peek()) |next| {
                     switch (next) {
                         'a'...'z', 'A'...'Z', '_', '0'...'9' => self.advance(),
+                        '?' => {
+                            self.advance();
+
+                            if (self.peek()) |x| {
+                                if (!isWhitespace(x)) return error.InvalidIdentifier;
+                            }
+
+                            break;
+                        },
                         else => break,
                     }
                 }
@@ -1667,6 +1693,7 @@ test "[identifier]" {
         .{ .source = "Foo_Bar", .kind = .UpperIdent, .lexeme = "Foo_Bar" },
         .{ .source = "_foo_BAR_123", .kind = .LowerIdent, .lexeme = "_foo_BAR_123" },
         .{ .source = "__foo", .kind = .LowerIdent, .lexeme = "__foo" },
+        .{ .source = "foo?", .kind = .LowerIdent, .lexeme = "foo?" },
     };
 
     for (cases) |case| {
@@ -1685,6 +1712,8 @@ test "[identifier] error.InvalidIdentifier" {
     const invalid_cases = [_][]const u8{
         "_Foo",
         "_Bar",
+        "?foo",
+        "fo?o",
     };
 
     for (invalid_cases) |source| {
