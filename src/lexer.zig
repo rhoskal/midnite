@@ -1,4 +1,5 @@
 const std = @import("std");
+const testing = std.testing;
 
 pub const TokenKind = enum {
     // Comments
@@ -80,7 +81,7 @@ pub const TokenKind = enum {
     OpLogicalOr,
 
     // Literals
-    // LitChar,
+    LitChar,
     // LitFloat,
     LitInt,
     LitString,
@@ -120,11 +121,14 @@ pub const Token = struct {
 };
 
 pub const LexerError = error{
+    CodePointOutOfRange,
+    EmptyCharLiteral,
     InvalidCharacter,
-    InvalidCharLiteral,
     InvalidIdentifier,
     InvalidIntLiteral,
-    InvalidUnicodeEscape,
+    InvalidUnicodeEscapeSequence,
+    MultipleCharsInLiteral,
+    UnrecognizedEscapeSequence,
     UnterminatedCharLiteral,
     UnterminatedStrLiteral,
 };
@@ -216,6 +220,15 @@ pub const Lexer = struct {
 
     fn isOctDigit(c: u8) bool {
         return c >= '0' and c <= '7';
+    }
+
+    fn hexDigitToValue(digit: u8) u4 {
+        return switch (digit) {
+            '0'...'9' => @intCast(digit - '0'),
+            'a'...'f' => @intCast(digit - 'a' + 10),
+            'A'...'F' => @intCast(digit - 'A' + 10),
+            else => unreachable,
+        };
     }
 
     fn lexInteger(self: *Lexer, base: enum { Decimal, Hex, Octal, Binary }) !Token {
@@ -440,7 +453,7 @@ pub const Lexer = struct {
                                     const hex = self.peek() orelse return error.UnterminatedStrLiteral;
 
                                     if (!std.ascii.isHex(hex)) {
-                                        return error.InvalidUnicodeEscape;
+                                        return error.InvalidUnicodeEscapeSequence;
                                     }
 
                                     self.advance();
@@ -448,11 +461,11 @@ pub const Lexer = struct {
 
                                 if (self.peek()) |n| {
                                     if (std.ascii.isHex(n)) {
-                                        return error.InvalidUnicodeEscape;
+                                        return error.InvalidUnicodeEscapeSequence;
                                     }
                                 }
                             },
-                            else => return error.InvalidUnicodeEscape,
+                            else => return error.InvalidUnicodeEscapeSequence,
                         }
 
                         continue;
@@ -470,6 +483,79 @@ pub const Lexer = struct {
                 }
 
                 return error.UnterminatedStrLiteral;
+            },
+            '\'' => {
+                const mark = self.position;
+                self.advance();
+
+                if (self.peek() == '\'') return error.EmptyCharLiteral;
+
+                var char_count: usize = 0;
+                while (self.peek()) |next| {
+                    if (next == '\'') {
+                        self.advance();
+
+                        return Token.init(
+                            .LitChar,
+                            self.source[mark..self.position],
+                            start_line,
+                            start_column,
+                        );
+                    }
+
+                    if (next == '\\') {
+                        self.advance();
+                        char_count += 1;
+
+                        const escaped_char = self.peek() orelse return error.UnterminatedCharLiteral;
+                        switch (escaped_char) {
+                            '\\', '\'', 'n', 't', 'r' => {
+                                self.advance();
+                            },
+                            'u' => {
+                                self.advance();
+
+                                var unicode_value: u21 = 0;
+                                var digit_count: usize = 0;
+                                while (digit_count < 6) : (digit_count += 1) {
+                                    const hex = self.peek() orelse break;
+                                    if (!std.ascii.isHex(hex)) break;
+
+                                    const digit_value = hexDigitToValue(hex);
+                                    unicode_value = (unicode_value << 4) | digit_value;
+
+                                    self.advance();
+                                }
+
+                                if (digit_count == 0) return error.InvalidUnicodeEscapeSequence;
+
+                                if (unicode_value > 0x10FFFF or
+                                    (unicode_value >= 0xD800 and unicode_value <= 0xDFFF))
+                                {
+                                    return error.CodePointOutOfRange;
+                                }
+                            },
+                            else => return error.UnrecognizedEscapeSequence,
+                        }
+                    } else {
+                        char_count += 1;
+
+                        const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
+                            // fail silently with invalid sequence
+                            self.advance();
+                            continue;
+                        };
+
+                        var i: usize = 0;
+                        while (i < utf8_len) : (i += 1) {
+                            self.advance();
+                        }
+                    }
+
+                    if (char_count > 1) return error.MultipleCharsInLiteral;
+                }
+
+                return error.UnterminatedCharLiteral;
             },
             '+' => {
                 self.advance();
@@ -1045,6 +1131,7 @@ test "keywords" {
         .{ .source = "foreign", .kind = .KwForeign, .lexeme = "foreign" },
         .{ .source = "hiding", .kind = .KwHiding, .lexeme = "hiding" },
         .{ .source = "if", .kind = .KwIf, .lexeme = "if" },
+        .{ .source = "in", .kind = .KwIn, .lexeme = "in" },
         .{ .source = "include", .kind = .KwInclude, .lexeme = "include" },
         .{ .source = "infixl", .kind = .KwInfixLeft, .lexeme = "infixl" },
         .{ .source = "infixn", .kind = .KwInfixNon, .lexeme = "infixn" },
@@ -1066,11 +1153,11 @@ test "keywords" {
         var lexer = Lexer.init(case.source);
 
         const token = try lexer.nextToken();
-        try std.testing.expectEqual(case.kind, token.kind);
-        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+        try testing.expectEqual(case.kind, token.kind);
+        try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
@@ -1091,11 +1178,11 @@ test "delimiters" {
         var lexer = Lexer.init(case.source);
 
         const token = try lexer.nextToken();
-        try std.testing.expectEqual(case.kind, token.kind);
-        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+        try testing.expectEqual(case.kind, token.kind);
+        try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
@@ -1112,11 +1199,11 @@ test "symbols" {
         var lexer = Lexer.init(case.source);
 
         const token = try lexer.nextToken();
-        try std.testing.expectEqual(case.kind, token.kind);
-        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+        try testing.expectEqual(case.kind, token.kind);
+        try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
@@ -1133,11 +1220,11 @@ test "operators" {
         var lexer = Lexer.init(case.source);
 
         const token = try lexer.nextToken();
-        try std.testing.expectEqual(case.kind, token.kind);
-        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+        try testing.expectEqual(case.kind, token.kind);
+        try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
@@ -1158,11 +1245,11 @@ test "arithmetic operators" {
         var lexer = Lexer.init(case.source);
 
         const token = try lexer.nextToken();
-        try std.testing.expectEqual(case.kind, token.kind);
-        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+        try testing.expectEqual(case.kind, token.kind);
+        try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
@@ -1180,11 +1267,11 @@ test "comparison (relational) operators" {
         var lexer = Lexer.init(case.source);
 
         const token = try lexer.nextToken();
-        try std.testing.expectEqual(case.kind, token.kind);
-        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+        try testing.expectEqual(case.kind, token.kind);
+        try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
@@ -1198,11 +1285,11 @@ test "logical (boolean) operators" {
         var lexer = Lexer.init(case.source);
 
         const token = try lexer.nextToken();
-        try std.testing.expectEqual(case.kind, token.kind);
-        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+        try testing.expectEqual(case.kind, token.kind);
+        try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
@@ -1215,11 +1302,11 @@ test "special" {
         var lexer = Lexer.init(case.source);
 
         const token = try lexer.nextToken();
-        try std.testing.expectEqual(case.kind, token.kind);
-        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+        try testing.expectEqual(case.kind, token.kind);
+        try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
@@ -1236,11 +1323,11 @@ test "comments" {
         var lexer = Lexer.init(case.source);
 
         const token = try lexer.nextToken();
-        try std.testing.expectEqual(case.kind, token.kind);
-        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+        try testing.expectEqual(case.kind, token.kind);
+        try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
@@ -1263,11 +1350,11 @@ test "multiline string" {
         var lexer = Lexer.init(case.source);
 
         const token = try lexer.nextToken();
-        try std.testing.expectEqual(case.kind, token.kind);
-        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+        try testing.expectEqual(case.kind, token.kind);
+        try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
@@ -1283,7 +1370,7 @@ test "unterminated multiline string" {
         var lexer = Lexer.init(source);
 
         const result = lexer.nextToken();
-        try std.testing.expectError(error.UnterminatedStrLiteral, result);
+        try testing.expectError(error.UnterminatedStrLiteral, result);
     }
 }
 
@@ -1305,11 +1392,11 @@ test "strings" {
         var lexer = Lexer.init(case.source);
 
         const token = try lexer.nextToken();
-        try std.testing.expectEqual(case.kind, token.kind);
-        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+        try testing.expectEqual(case.kind, token.kind);
+        try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
@@ -1326,7 +1413,7 @@ test "invalid string escapes" {
         var lexer = Lexer.init(source);
 
         const result = lexer.nextToken();
-        try std.testing.expectError(error.InvalidUnicodeEscape, result);
+        try testing.expectError(error.InvalidUnicodeEscapeSequence, result);
     }
 }
 
@@ -1341,7 +1428,132 @@ test "unterminated strings" {
         var lexer = Lexer.init(source);
 
         const result = lexer.nextToken();
-        try std.testing.expectError(error.UnterminatedStrLiteral, result);
+        try testing.expectError(error.UnterminatedStrLiteral, result);
+    }
+}
+
+test "[char literal]" {
+    const cases = [_]TestCase{
+        .{ .source = "'a'", .kind = .LitChar, .lexeme = "'a'" },
+        .{ .source = "'1'", .kind = .LitChar, .lexeme = "'1'" },
+        .{ .source = "'$'", .kind = .LitChar, .lexeme = "'$'" },
+        .{ .source = "'\\n'", .kind = .LitChar, .lexeme = "'\\n'" },
+        .{ .source = "'\\t'", .kind = .LitChar, .lexeme = "'\\t'" },
+        .{ .source = "'\\r'", .kind = .LitChar, .lexeme = "'\\r'" },
+        .{ .source = "'\\''", .kind = .LitChar, .lexeme = "'\\''" },
+        .{ .source = "'\\\\'", .kind = .LitChar, .lexeme = "'\\\\'" },
+        .{ .source = "'\\u1'", .kind = .LitChar, .lexeme = "'\\u1'" },
+        .{ .source = "'\\u10'", .kind = .LitChar, .lexeme = "'\\u10'" },
+        .{ .source = "'\\u100'", .kind = .LitChar, .lexeme = "'\\u100'" },
+        .{ .source = "'\\u1000'", .kind = .LitChar, .lexeme = "'\\u1000'" },
+        .{ .source = "'\\u10000'", .kind = .LitChar, .lexeme = "'\\u10000'" },
+        .{ .source = "'\\u100000'", .kind = .LitChar, .lexeme = "'\\u100000'" },
+        .{ .source = "'\\u10FFFF'", .kind = .LitChar, .lexeme = "'\\u10FFFF'" },
+        .{ .source = "'\\u0000'", .kind = .LitChar, .lexeme = "'\\u0000'" }, // edge case
+        .{ .source = "'\\u0020'", .kind = .LitChar, .lexeme = "'\\u0020'" }, // edge case
+        .{ .source = "'\\u007F'", .kind = .LitChar, .lexeme = "'\\u007F'" }, // edge case
+    };
+
+    for (cases) |case| {
+        var lexer = Lexer.init(case.source);
+
+        const token = try lexer.nextToken();
+        try testing.expectEqual(case.kind, token.kind);
+        try testing.expectEqualStrings(case.lexeme, token.lexeme);
+
+        const eof = try lexer.nextToken();
+        try testing.expectEqual(TokenKind.Eof, eof.kind);
+    }
+}
+
+test "[char literal] error.EmptyCharLiteral" {
+    const source = "''";
+
+    var lexer = Lexer.init(source);
+
+    const result = lexer.nextToken();
+    try testing.expectError(error.EmptyCharLiteral, result);
+}
+
+test "[char literal] error.CodePointOutOfRange" {
+    const invalid_cases = [_][]const u8{
+        "'\\u110000'",
+        "'\\uD800'", // high surrogate
+        "'\\uDFFF'", // low surrogate
+    };
+
+    for (invalid_cases) |source| {
+        var lexer = Lexer.init(source);
+
+        const result = lexer.nextToken();
+        try testing.expectError(error.CodePointOutOfRange, result);
+    }
+}
+
+test "[char literal] error.UnrecognizedEscapeSequence" {
+    const invalid_cases = [_][]const u8{
+        "'\\q'",
+        "'\\k'",
+    };
+
+    for (invalid_cases) |source| {
+        var lexer = Lexer.init(source);
+
+        const result = lexer.nextToken();
+        try testing.expectError(error.UnrecognizedEscapeSequence, result);
+    }
+}
+
+test "[char literal] error.MultipleCharsInLiteral" {
+    const invalid_cases = [_][]const u8{
+        "'ab'",
+        "'foo'",
+        "'\\n\n'",
+        "'a\\n'",
+        "'\\na'",
+        "'\\u123k'",
+        "'\\u000000a'",
+    };
+
+    for (invalid_cases) |source| {
+        var lexer = Lexer.init(source);
+
+        const result = lexer.nextToken();
+        try testing.expectError(error.MultipleCharsInLiteral, result);
+    }
+}
+
+test "[char literal] error.UnterminatedCharLiteral" {
+    const invalid_cases = [_][]const u8{
+        "'a",
+        "'1",
+        "'$",
+        "'\\n",
+        "'\\t",
+        "'\\r",
+        "'\\'",
+        "'\\\\",
+    };
+
+    for (invalid_cases) |source| {
+        var lexer = Lexer.init(source);
+
+        const result = lexer.nextToken();
+        try testing.expectError(error.UnterminatedCharLiteral, result);
+    }
+}
+
+test "[char literal] error.InvalidUnicodeEscapeSequence" {
+    const invalid_cases = [_][]const u8{
+        "'\\u'",
+        "'\\ug'",
+    };
+
+    for (invalid_cases) |source| {
+        var lexer = Lexer.init(source);
+
+        const result = lexer.nextToken();
+        try testing.expectError(error.InvalidUnicodeEscapeSequence, result);
     }
 }
 
@@ -1361,11 +1573,11 @@ test "integer literals" {
         var lexer = Lexer.init(case.source);
 
         const token = try lexer.nextToken();
-        try std.testing.expectEqual(case.kind, token.kind);
-        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+        try testing.expectEqual(case.kind, token.kind);
+        try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
@@ -1381,7 +1593,7 @@ test "invalid integer literals" {
         var lexer = Lexer.init(source);
 
         const result = lexer.nextToken();
-        try std.testing.expectError(error.InvalidIntLiteral, result);
+        try testing.expectError(error.InvalidIntLiteral, result);
     }
 }
 
@@ -1410,11 +1622,11 @@ test "identifiers" {
         var lexer = Lexer.init(case.source);
 
         const token = try lexer.nextToken();
-        try std.testing.expectEqual(case.kind, token.kind);
-        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+        try testing.expectEqual(case.kind, token.kind);
+        try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(TokenKind.Eof, eof.kind);
     }
 }
 
@@ -1427,7 +1639,7 @@ test "invalid identifiers" {
     for (invalid_cases) |source| {
         var lexer = Lexer.init(source);
 
-        try std.testing.expectError(error.InvalidIdentifier, lexer.nextToken());
+        try testing.expectError(error.InvalidIdentifier, lexer.nextToken());
     }
 }
 
@@ -1450,10 +1662,10 @@ test "type variant" {
     for (expected_tokens) |expected| {
         const token = try lexer.nextToken();
 
-        try std.testing.expectEqual(expected.kind, token.kind);
-        try std.testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try std.testing.expectEqual(expected.line, token.line);
-        try std.testing.expectEqual(expected.column, token.column);
+        try testing.expectEqual(expected.kind, token.kind);
+        try testing.expectEqualStrings(expected.lexeme, token.lexeme);
+        try testing.expectEqual(expected.line, token.line);
+        try testing.expectEqual(expected.column, token.column);
     }
 }
 
@@ -1474,10 +1686,10 @@ test "type alias" {
     for (expected_tokens) |expected| {
         const token = try lexer.nextToken();
 
-        try std.testing.expectEqual(expected.kind, token.kind);
-        try std.testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try std.testing.expectEqual(expected.line, token.line);
-        try std.testing.expectEqual(expected.column, token.column);
+        try testing.expectEqual(expected.kind, token.kind);
+        try testing.expectEqualStrings(expected.lexeme, token.lexeme);
+        try testing.expectEqual(expected.line, token.line);
+        try testing.expectEqual(expected.column, token.column);
     }
 }
 
@@ -1505,10 +1717,10 @@ test "record type" {
     for (expected_tokens) |expected| {
         const token = try lexer.nextToken();
 
-        try std.testing.expectEqual(expected.kind, token.kind);
-        try std.testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try std.testing.expectEqual(expected.line, token.line);
-        try std.testing.expectEqual(expected.column, token.column);
+        try testing.expectEqual(expected.kind, token.kind);
+        try testing.expectEqualStrings(expected.lexeme, token.lexeme);
+        try testing.expectEqual(expected.line, token.line);
+        try testing.expectEqual(expected.column, token.column);
     }
 }
 
@@ -1536,10 +1748,10 @@ test "module definition" {
     for (expected_tokens) |expected| {
         const token = try lexer.nextToken();
 
-        try std.testing.expectEqual(expected.kind, token.kind);
-        try std.testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try std.testing.expectEqual(expected.line, token.line);
-        try std.testing.expectEqual(expected.column, token.column);
+        try testing.expectEqual(expected.kind, token.kind);
+        try testing.expectEqualStrings(expected.lexeme, token.lexeme);
+        try testing.expectEqual(expected.line, token.line);
+        try testing.expectEqual(expected.column, token.column);
     }
 }
 
@@ -1571,10 +1783,10 @@ test "top level function defintion" {
     for (expected_tokens) |expected| {
         const token = try lexer.nextToken();
 
-        try std.testing.expectEqual(expected.kind, token.kind);
-        try std.testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try std.testing.expectEqual(expected.line, token.line);
-        try std.testing.expectEqual(expected.column, token.column);
+        try testing.expectEqual(expected.kind, token.kind);
+        try testing.expectEqualStrings(expected.lexeme, token.lexeme);
+        try testing.expectEqual(expected.line, token.line);
+        try testing.expectEqual(expected.column, token.column);
     }
 }
 
@@ -1604,10 +1816,10 @@ test "pattern matching" {
     for (expected_tokens) |expected| {
         const token = try lexer.nextToken();
 
-        try std.testing.expectEqual(expected.kind, token.kind);
-        try std.testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try std.testing.expectEqual(expected.line, token.line);
-        try std.testing.expectEqual(expected.column, token.column);
+        try testing.expectEqual(expected.kind, token.kind);
+        try testing.expectEqualStrings(expected.lexeme, token.lexeme);
+        try testing.expectEqual(expected.line, token.line);
+        try testing.expectEqual(expected.column, token.column);
     }
 }
 
@@ -1630,10 +1842,10 @@ test "let/in block" {
     for (expected_tokens) |expected| {
         const token = try lexer.nextToken();
 
-        try std.testing.expectEqual(expected.kind, token.kind);
-        try std.testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try std.testing.expectEqual(expected.line, token.line);
-        try std.testing.expectEqual(expected.column, token.column);
+        try testing.expectEqual(expected.kind, token.kind);
+        try testing.expectEqualStrings(expected.lexeme, token.lexeme);
+        try testing.expectEqual(expected.line, token.line);
+        try testing.expectEqual(expected.column, token.column);
     }
 }
 
@@ -1657,9 +1869,9 @@ test "if/then/else expression" {
     for (expected_tokens) |expected| {
         const token = try lexer.nextToken();
 
-        try std.testing.expectEqual(expected.kind, token.kind);
-        try std.testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try std.testing.expectEqual(expected.line, token.line);
-        try std.testing.expectEqual(expected.column, token.column);
+        try testing.expectEqual(expected.kind, token.kind);
+        try testing.expectEqualStrings(expected.lexeme, token.lexeme);
+        try testing.expectEqual(expected.line, token.line);
+        try testing.expectEqual(expected.column, token.column);
     }
 }

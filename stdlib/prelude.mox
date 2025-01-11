@@ -268,7 +268,6 @@ module Prelude exposing
   infixl 0 (|>) = ap_right
   infixr 2 (||) = or
   infixr 3 (&&) = and
-  infixr 3 (^) = xor
   infixn 4 (==) = eq
   infixn 4 (/=) = neq
   infixn 4 (<) = lt
@@ -282,18 +281,11 @@ module Prelude exposing
   infixl 6 (-) = sub
   infixl 6 (+.) = Float.add
   infixl 6 (-.) = Float.sub
-  infixr 6 (.|.) = Bitwise.or
-  infixr 6 (.^.) = Bitwise.xor
   infixl 7 (*) = mul
   infixl 7 (/) = div
   infixl 7 (*.) = Float.mul
   infixl 7 (/.) = Float.div
-  infixr 7 (.&.) = Bitwise.and
-  infixr 7 (.>>.) = Bitwise.shift_right
-  infixr 7 (.<<.) = Bitwise.shift_left
-  infixr 8 (^^) = pow
   infixl 8 (**) = Float.pow
-  infixn 8 (.~.) = Bitwise.not
   infixl 9 (<<) = compose_left
   infixr 9 (>>) = compose_right
 end
