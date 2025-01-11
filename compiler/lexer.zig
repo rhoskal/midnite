@@ -460,38 +460,39 @@ pub const Lexer = struct {
                             'u' => {
                                 self.advance();
 
-                                var i: usize = 0;
-                                while (i < 4) : (i += 1) {
-                                    const hex = self.peek() orelse return error.UnterminatedStrLiteral;
+                                var unicode_value: u21 = 0;
+                                var digit_count: usize = 0;
+                                while (digit_count < 6) : (digit_count += 1) {
+                                    const hex = self.peek() orelse break;
+                                    if (!std.ascii.isHex(hex)) break;
 
-                                    if (!std.ascii.isHex(hex)) {
-                                        return error.InvalidUnicodeEscapeSequence;
-                                    }
+                                    const digit_value = hexDigitToValue(hex);
+                                    unicode_value = (unicode_value << 4) | digit_value;
 
                                     self.advance();
                                 }
 
-                                if (self.peek()) |n| {
-                                    if (std.ascii.isHex(n)) {
-                                        return error.InvalidUnicodeEscapeSequence;
-                                    }
+                                if (digit_count == 0) return error.InvalidUnicodeEscapeSequence;
+
+                                if (unicode_value > 0x10FFFF or
+                                    (unicode_value >= 0xD800 and unicode_value <= 0xDFFF))
+                                {
+                                    return error.CodePointOutOfRange;
                                 }
                             },
-                            else => return error.InvalidUnicodeEscapeSequence,
+                            else => return error.UnrecognizedEscapeSequence,
                         }
+                    } else {
+                        const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
+                            // fail silently with invalid sequence
+                            self.advance();
+                            continue;
+                        };
 
-                        continue;
-                    }
-
-                    const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
-                        // fail silently with invalid sequence
-                        self.advance();
-                        continue;
-                    };
-
-                    var i: usize = 0;
-                    while (i < utf8_len) : (i += 1) {
-                        self.advance();
+                        var i: usize = 0;
+                        while (i < utf8_len) : (i += 1) {
+                            self.advance();
+                        }
                     }
                 }
 
@@ -1453,16 +1454,27 @@ test "[multiline string] error.UnterminatedStrLiteral" {
     }
 }
 
-test "[string]" {
+test "[string literal]" {
     const cases = [_]TestCase{
         .{ .source = "\"foo\"", .kind = .LitString, .lexeme = "\"foo\"" },
+        .{ .source = "\"1\"", .kind = .LitString, .lexeme = "\"1\"" },
+        .{ .source = "\"$\"", .kind = .LitString, .lexeme = "\"$\"" },
         .{ .source = "\"Backslash: \\\\\"", .kind = .LitString, .lexeme = "\"Backslash: \\\\\"" },
         .{ .source = "\"Double quote: \\\"Hello!\\\"\"", .kind = .LitString, .lexeme = "\"Double quote: \\\"Hello!\\\"\"" },
         .{ .source = "\"First line\\nSecond line\"", .kind = .LitString, .lexeme = "\"First line\\nSecond line\"" },
         .{ .source = "\"Column1\\tColumn2\\tColumn3\"", .kind = .LitString, .lexeme = "\"Column1\\tColumn2\\tColumn3\"" },
         .{ .source = "\"Carriage return\\rOverwritten text\"", .kind = .LitString, .lexeme = "\"Carriage return\\rOverwritten text\"" },
         .{ .source = "\"Backspace test: abc\\bdef\"", .kind = .LitString, .lexeme = "\"Backspace test: abc\\bdef\"" },
-        .{ .source = "\"Unicode test: \\u03A9\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u03A9\"" },
+        .{ .source = "\"Unicode test: \\u1\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u1\"" },
+        .{ .source = "\"Unicode test: \\u10\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u10\"" },
+        .{ .source = "\"Unicode test: \\u100\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u100\"" },
+        .{ .source = "\"Unicode test: \\u1000\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u1000\"" },
+        .{ .source = "\"Unicode test: \\u10000\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u10000\"" },
+        .{ .source = "\"Unicode test: \\u100000\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u100000\"" },
+        .{ .source = "\"Unicode test: \\u10FFFF\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u10FFFF\"" },
+        .{ .source = "\"Unicode test: \\u0000\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u0000\"" }, // edge case
+        .{ .source = "\"Unicode test: \\u0020\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u0020\"" }, // edge case
+        .{ .source = "\"Unicode test: \\u007F\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u007F\"" }, // edge case
         .{ .source = "\"Unicode with extra: \\u1234Hello\"", .kind = .LitString, .lexeme = "\"Unicode with extra: \\u1234Hello\"" },
         .{ .source = "\"✅\"", .kind = .LitString, .lexeme = "\"✅\"" },
     };
@@ -1479,12 +1491,38 @@ test "[string]" {
     }
 }
 
-test "[string escape] error.InvalidUnicodeEscapeSequence" {
+test "[string literal] error.CodePointOutOfRange" {
     const invalid_cases = [_][]const u8{
-        "\"invalid escape: \\k\"", // Invalid escape character
-        "\"invalid escape: \\x\"", // Invalid escape character
-        "\"unicode too short: \\u123\"", // Unicode escape needs exactly 4 hex digits
-        "\"unicode too long: \\u12345\"", // Unicode escape needs exactly 4 hex digits
+        "\"\\u110000\"",
+        "\"\\uD800\"", // high surrogate
+        "\"\\uDFFF\"", // low surrogate
+    };
+
+    for (invalid_cases) |source| {
+        var lexer = Lexer.init(source);
+
+        const result = lexer.nextToken();
+        try testing.expectError(error.CodePointOutOfRange, result);
+    }
+}
+
+test "[string literal] error.UnrecognizedEscapeSequence" {
+    const invalid_cases = [_][]const u8{
+        "\"\\q\"",
+        "\"\\k\"",
+    };
+
+    for (invalid_cases) |source| {
+        var lexer = Lexer.init(source);
+
+        const result = lexer.nextToken();
+        try testing.expectError(error.UnrecognizedEscapeSequence, result);
+    }
+}
+
+test "[string literal] error.InvalidUnicodeEscapeSequence" {
+    const invalid_cases = [_][]const u8{
+        "\"unicode missing digits: \\u\"", // Unicode escape needs at least 1 hex digit
         "\"invalid unicode: \\uGHIJ\"", // Unicode escape must only contain hex digits
     };
 
@@ -1496,7 +1534,7 @@ test "[string escape] error.InvalidUnicodeEscapeSequence" {
     }
 }
 
-test "[string] error.UnterminatedStrLiteral" {
+test "[string literal] error.UnterminatedStrLiteral" {
     const invalid_cases = [_][]const u8{
         "\"no closing quote",
         "\"escape at end\\",
