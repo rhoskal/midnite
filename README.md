@@ -64,7 +64,7 @@ A new language that combines elements from Elm, Elixir and Ocaml. Features inclu
 - `\t` (tab)
 - `\r` (carriage return)
 - `\b` (backspace)
-- `\uNNNN` (unicode) where N is a hexadecimal value
+- `\uNNNNNN` (unicode) where N is a hexadecimal value
 * Note: Allowed escape sequences for characters are
 - `\\` (backslash)
 - `\'` (single quote)
