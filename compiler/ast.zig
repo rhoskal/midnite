@@ -1,6 +1,6 @@
 const std = @import("std");
+
 const lexer = @import("lexer.zig");
-const testing = std.testing;
 const Token = lexer.Token;
 
 /// Represents a regular, single line comment.
@@ -247,6 +247,8 @@ pub const Node = union(enum) {
         }
     }
 };
+
+const testing = std.testing;
 
 test "BinaryExprNode memory management" {
     var arena = std.heap.ArenaAllocator.init(testing.allocator);

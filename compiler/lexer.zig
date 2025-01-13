@@ -1,6 +1,5 @@
 const std = @import("std");
 const ascii = std.ascii;
-const testing = std.testing;
 
 pub const TokenKind = enum {
     // Comments
@@ -1176,6 +1175,8 @@ pub const Lexer = struct {
         }
     }
 };
+
+const testing = std.testing;
 
 const TestCase = struct {
     source: []const u8,
