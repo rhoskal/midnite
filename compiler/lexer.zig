@@ -2,9 +2,18 @@ const std = @import("std");
 const ascii = std.ascii;
 
 pub const TokenKind = enum {
+    // Special
+    Eof,
+    Unrecognized,
+    TypedHole,
+
     // Comments
     Comment,
     DocComment,
+
+    // Identifiers
+    LowerIdent,
+    UpperIdent,
 
     // Keywords
     KwAlias,
@@ -85,41 +94,81 @@ pub const TokenKind = enum {
     OpLogicalOr,
 
     // Literals
-    LitChar,
-    // LitFloat,
     LitInt,
+    LitFloat,
+    LitChar,
     LitString,
     LitMultilineString,
+};
 
-    // Identifiers
-    LowerIdent,
-    UpperIdent,
+/// Represents a location in the source buffer using raw byte indices.
+pub const BufferLoc = struct {
+    /// The start index of the lexeme in the source buffer (inclusive).
+    start: usize,
 
-    // Special
-    Eof,
-    Invalid,
-    TypedHole,
+    /// The end index of the lexeme in the source buffer (exclusive).
+    end: usize,
+};
+
+/// Represents a human-readable location in the source file.
+pub const SourceLoc = struct {
+    /// The line number in the source file (1-based).
+    line: usize,
+
+    /// The column number in the source file (1-based).
+    col: usize,
+};
+
+/// Represents the complete location of a token, combining buffer and source information.
+pub const TokenLoc = struct {
+    /// The name of the source file where the token originated.
+    filename: []const u8,
+
+    /// The raw buffer location of the token.
+    buf: BufferLoc,
+
+    /// The human-readable source location of the token.
+    src: SourceLoc,
 };
 
 /// A structure representing a token with a specific kind, lexeme, and position in the source code.
 pub const Token = struct {
     kind: TokenKind,
     lexeme: []const u8,
-    line: usize,
-    column: usize,
+    loc: TokenLoc,
 
     /// Initializes a new token with the given properties.
     ///
     /// - `kind`: The kind of token (e.g., literal, keyword).
     /// - `lexeme`: The string representation of the token.
-    /// - `line`: The line number where the token is found.
-    /// - `column`: The column number where the token is found.
-    pub fn init(kind: TokenKind, lexeme: []const u8, line: usize, column: usize) Token {
+    /// - `filename`: The name of the source file where the token is located.
+    /// - `buf_start`: The start index of the token in the source buffer (inclusive).
+    /// - `buf_end`: The end index of the token in the source buffer (exclusive).
+    /// - `src_line`: The line number where the token is found (1-based).
+    /// - `src_col`: The column number where the token is found (1-based).
+    pub fn init(
+        kind: TokenKind,
+        lexeme: []const u8,
+        filename: []const u8,
+        buf_start: usize,
+        buf_end: usize,
+        src_line: usize,
+        src_col: usize,
+    ) Token {
         return Token{
             .kind = kind,
             .lexeme = lexeme,
-            .line = line,
-            .column = column,
+            .loc = .{
+                .filename = filename,
+                .buf = .{
+                    .start = buf_start,
+                    .end = buf_end,
+                },
+                .src = .{
+                    .line = src_line,
+                    .col = src_col,
+                },
+            },
         };
     }
 };
@@ -141,19 +190,22 @@ pub const LexerError = error{
 /// operations to extract tokens from the source.
 pub const Lexer = struct {
     source: []const u8,
-    position: usize,
-    line: usize,
-    column: usize,
+    filename: []const u8,
+    buf_pos: usize,
+    src_line: usize,
+    src_col: usize,
 
     /// Initializes a new lexer with the given source code.
     ///
     /// - `source`: The source code to be lexed.
-    pub fn init(source: []const u8) Lexer {
+    /// - `filename`: The name of the source file where the token is located.
+    pub fn init(source: []const u8, filename: []const u8) Lexer {
         return Lexer{
             .source = source,
-            .position = 0,
-            .line = 1,
-            .column = 1,
+            .filename = filename,
+            .buf_pos = 0,
+            .src_line = 1,
+            .src_col = 1,
         };
     }
 
@@ -161,29 +213,31 @@ pub const Lexer = struct {
     ///
     /// Returns `null` if the end of the source is reached.
     fn peek(self: *Lexer) ?u8 {
-        if (self.position >= self.source.len) return null;
+        if (self.buf_pos >= self.source.len) return null;
 
-        return self.source[self.position];
+        return self.source[self.buf_pos];
     }
 
     /// Advances the lexer by one position in the source code.
     /// Updates the current line and column numbers accordingly.
     fn advance(self: *Lexer) void {
-        if (self.position >= self.source.len) return;
+        if (self.buf_pos >= self.source.len) return;
 
-        if (self.source[self.position] == '\n') {
-            self.line += 1;
-            self.column = 1;
+        if (self.source[self.buf_pos] == '\n') {
+            self.src_line += 1;
+            self.src_col = 1;
         } else {
-            self.column += 1;
+            self.src_col += 1;
         }
 
-        self.position += 1;
+        self.buf_pos += 1;
     }
 
     fn skipWhitespace(self: *Lexer) void {
         while (self.peek()) |c| {
-            if (ascii.isWhitespace(c)) self.advance() else break;
+            if (!ascii.isWhitespace(c)) break;
+
+            self.advance();
         }
     }
 
@@ -196,14 +250,22 @@ pub const Lexer = struct {
     /// Returns a token if there is a match, or `null` if there is no match.
     fn checkExactMatch(self: *Lexer, start: usize, keyword: []const u8, kind: TokenKind) ?Token {
         const len = keyword.len;
+        const lexeme = self.source[start..self.buf_pos];
 
-        if (self.position - start == len and
-            std.mem.eql(u8, self.source[start..self.position], keyword))
-        {
-            return Token.init(kind, self.source[start..self.position], self.line, self.column - len);
-        }
+        const is_exact_match = self.buf_pos - start == len and
+            std.mem.eql(u8, lexeme, keyword);
 
-        return null;
+        if (!is_exact_match) return null;
+
+        return Token.init(
+            kind,
+            lexeme,
+            self.filename,
+            start,
+            self.buf_pos,
+            self.src_line,
+            self.src_col - len,
+        );
     }
 
     fn isBinDigit(c: u8) bool {
@@ -225,9 +287,9 @@ pub const Lexer = struct {
 
     fn lexInteger(self: *Lexer, base: enum { Decimal, Hex, Octal, Binary }) !Token {
         const offset = if (base == .Decimal) @as(usize, 0) else 2;
-        const start = self.position - offset;
-        const start_line = self.line;
-        const start_column = self.column - offset;
+        const start = self.buf_pos - offset;
+        const start_line = self.src_line;
+        const start_col = self.src_col - offset;
 
         // For other bases, prefix (0x, 0b, 0o) was already consumed
         if (base == .Decimal) {
@@ -274,10 +336,13 @@ pub const Lexer = struct {
         }
 
         return Token.init(
-            TokenKind.LitInt,
-            self.source[start..self.position],
+            .LitInt,
+            self.source[start..self.buf_pos],
+            self.filename,
+            start,
+            self.buf_pos,
             start_line,
-            start_column,
+            start_col,
         );
     }
 
@@ -287,16 +352,19 @@ pub const Lexer = struct {
     pub fn nextToken(self: *Lexer) !Token {
         self.skipWhitespace();
 
-        const start = self.position;
-        const start_line = self.line;
-        const start_column = self.column;
+        const start = self.buf_pos;
+        const start_line = self.src_line;
+        const start_col = self.src_col;
 
         const c = self.peek() orelse {
             return Token.init(
-                TokenKind.Eof,
+                .Eof,
                 "",
+                self.filename,
+                start,
+                start, // EOF has no length
                 start_line,
-                start_column,
+                start_col,
             );
         };
 
@@ -306,23 +374,27 @@ pub const Lexer = struct {
 
                 if (self.peek() == null) {
                     return Token.init(
-                        TokenKind.TypedHole,
+                        .TypedHole,
                         "?",
+                        self.filename,
+                        start,
+                        self.buf_pos,
                         start_line,
-                        start_column,
+                        start_col,
                     );
                 }
 
                 return error.InvalidIdentifier;
             },
             '#' => {
-                const mark = self.position;
+                const mark = self.buf_pos;
                 self.advance();
 
                 var is_doc = false;
                 if (self.peek()) |next| {
                     if (next == '#') {
                         self.advance();
+
                         is_doc = true;
                     }
                 }
@@ -333,6 +405,7 @@ pub const Lexer = struct {
                     const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
                         // Invalid UTF-8 sequence, treat as single byte
                         self.advance();
+
                         continue;
                     };
 
@@ -346,13 +419,16 @@ pub const Lexer = struct {
 
                 return Token.init(
                     kind,
-                    self.source[mark..self.position],
+                    self.source[mark..self.buf_pos],
+                    self.filename,
+                    mark,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             '"' => {
-                const mark = self.position;
+                const mark = self.buf_pos;
                 self.advance();
 
                 if (self.peek()) |next1| {
@@ -375,6 +451,7 @@ pub const Lexer = struct {
                                                 if (self.peek()) |quote3| {
                                                     if (quote3 == '"') {
                                                         self.advance();
+
                                                         found_end = true;
                                                         break;
                                                     }
@@ -397,6 +474,7 @@ pub const Lexer = struct {
                                         const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
                                             // fail silently with invalid sequence
                                             self.advance();
+
                                             continue;
                                         };
 
@@ -413,9 +491,12 @@ pub const Lexer = struct {
 
                                 return Token.init(
                                     TokenKind.LitMultilineString,
-                                    self.source[mark..self.position],
+                                    self.source[mark..self.buf_pos],
+                                    self.filename,
+                                    start,
+                                    self.buf_pos,
                                     start_line,
-                                    start_column,
+                                    start_col,
                                 );
                             }
                         }
@@ -428,9 +509,12 @@ pub const Lexer = struct {
 
                         return Token.init(
                             TokenKind.LitString,
-                            self.source[start..self.position],
+                            self.source[start..self.buf_pos],
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
 
@@ -471,6 +555,7 @@ pub const Lexer = struct {
                         const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
                             // fail silently with invalid sequence
                             self.advance();
+
                             continue;
                         };
 
@@ -484,7 +569,7 @@ pub const Lexer = struct {
                 return error.UnterminatedStrLiteral;
             },
             '\'' => {
-                const mark = self.position;
+                const mark = self.buf_pos;
                 self.advance();
 
                 if (self.peek() == '\'') return error.EmptyCharLiteral;
@@ -496,9 +581,12 @@ pub const Lexer = struct {
 
                         return Token.init(
                             .LitChar,
-                            self.source[mark..self.position],
+                            self.source[mark..self.buf_pos],
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
 
@@ -564,19 +652,25 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpFloatAdd,
+                            .OpFloatAdd,
                             "+.",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
                 }
 
                 return Token.init(
-                    TokenKind.OpIntAdd,
+                    .OpIntAdd,
                     "+",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             '-' => {
@@ -587,10 +681,13 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.SymArrowRight,
+                            .SymArrowRight,
                             "->",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
 
@@ -598,19 +695,25 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpFloatSub,
+                            .OpFloatSub,
                             "-.",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
                 }
 
                 return Token.init(
-                    TokenKind.OpIntSub,
+                    .OpIntSub,
                     "-",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             '*' => {
@@ -621,10 +724,13 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpExp,
+                            .OpExp,
                             "**",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
 
@@ -632,19 +738,25 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpFloatMul,
+                            .OpFloatMul,
                             "*.",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
                 }
 
                 return Token.init(
-                    TokenKind.OpIntMul,
+                    .OpIntMul,
                     "*",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             '/' => {
@@ -655,10 +767,13 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpNotEqual,
+                            .OpNotEqual,
                             "/=",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
 
@@ -666,19 +781,25 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpFloatDiv,
+                            .OpFloatDiv,
                             "/.",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
                 }
 
                 return Token.init(
-                    TokenKind.OpIntDiv,
+                    .OpIntDiv,
                     "/",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             '<' => {
@@ -689,10 +810,13 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpLessThanEqual,
+                            .OpLessThanEqual,
                             "<=",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
 
@@ -700,10 +824,13 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpAppend,
+                            .OpAppend,
                             "<>",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
 
@@ -711,10 +838,13 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpPipeLeft,
+                            .OpPipeLeft,
                             "<|",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
 
@@ -722,19 +852,25 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpComposeLeft,
+                            .OpComposeLeft,
                             "<<",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
                 }
 
                 return Token.init(
-                    TokenKind.OpLessThan,
+                    .OpLessThan,
                     "<",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             '>' => {
@@ -745,10 +881,13 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpGreaterThanEqual,
+                            .OpGreaterThanEqual,
                             ">=",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
 
@@ -756,19 +895,25 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpComposeRight,
+                            .OpComposeRight,
                             ">>",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
                 }
 
                 return Token.init(
-                    TokenKind.OpGreaterThan,
+                    .OpGreaterThan,
                     ">",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             '&' => {
@@ -779,19 +924,25 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpLogicalAnd,
+                            .OpLogicalAnd,
                             "&&",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
                 }
 
                 return Token.init(
-                    TokenKind.Invalid,
+                    .Unrecognized,
                     "&",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             '|' => {
@@ -802,10 +953,13 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpLogicalOr,
+                            .OpLogicalOr,
                             "||",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
 
@@ -813,29 +967,38 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpPipeRight,
+                            .OpPipeRight,
                             "|>",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
                 }
 
                 return Token.init(
-                    TokenKind.SymPipe,
+                    .SymPipe,
                     "|",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             '\\' => {
                 self.advance();
 
                 return Token.init(
-                    TokenKind.OpLambda,
+                    .OpLambda,
                     "\\",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             ':' => {
@@ -846,39 +1009,51 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpCons,
+                            .OpCons,
                             "::",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
                 }
 
                 return Token.init(
-                    TokenKind.DelColon,
+                    .DelColon,
                     ":",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             ',' => {
                 self.advance();
 
                 return Token.init(
-                    TokenKind.DelComma,
+                    .DelComma,
                     ",",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             '$' => {
                 self.advance();
 
                 return Token.init(
-                    TokenKind.SymDollarSign,
+                    .SymDollarSign,
                     "$",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             '.' => {
@@ -889,39 +1064,51 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpDoubleDot,
+                            .OpDoubleDot,
                             "..",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
                 }
 
                 return Token.init(
-                    TokenKind.DelDot,
+                    .DelDot,
                     ".",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             '{' => {
                 self.advance();
 
                 return Token.init(
-                    TokenKind.DelLCurly,
+                    .DelLCurly,
                     "{",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             '}' => {
                 self.advance();
 
                 return Token.init(
-                    TokenKind.DelRCurly,
+                    .DelRCurly,
                     "}",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             '=' => {
@@ -932,10 +1119,13 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.SymDoubleArrowRight,
+                            .SymDoubleArrowRight,
                             "=>",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
 
@@ -943,59 +1133,77 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(
-                            TokenKind.OpEquality,
+                            .OpEquality,
                             "==",
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
                 }
 
                 return Token.init(
-                    TokenKind.OpAssign,
+                    .OpAssign,
                     "=",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             '(' => {
                 self.advance();
 
                 return Token.init(
-                    TokenKind.DelLParen,
+                    .DelLParen,
                     "(",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             ')' => {
                 self.advance();
 
                 return Token.init(
-                    TokenKind.DelRParen,
+                    .DelRParen,
                     ")",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             '[' => {
                 self.advance();
 
                 return Token.init(
-                    TokenKind.DelLBrack,
+                    .DelLBrack,
                     "[",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             ']' => {
                 self.advance();
 
                 return Token.init(
-                    TokenKind.DelRBrack,
+                    .DelRBrack,
                     "]",
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             '0' => {
@@ -1023,10 +1231,13 @@ pub const Lexer = struct {
                 }
 
                 return Token.init(
-                    TokenKind.LitInt,
-                    self.source[start..self.position],
+                    .LitInt,
+                    self.source[start..self.buf_pos],
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
             '1'...'9' => {
@@ -1038,21 +1249,20 @@ pub const Lexer = struct {
 
                     if (self.peek() == null) {
                         return Token.init(
-                            TokenKind.SymUnderscore,
-                            self.source[start..self.position],
+                            .SymUnderscore,
+                            self.source[start..self.buf_pos],
+                            self.filename,
+                            start,
+                            self.buf_pos,
                             start_line,
-                            start_column,
+                            start_col,
                         );
                     }
 
                     if (self.peek()) |next| {
-                        if (ascii.isUpper(next)) {
-                            return error.InvalidIdentifier;
-                        }
+                        if (ascii.isUpper(next)) return error.InvalidIdentifier;
 
-                        if (ascii.isDigit(next)) {
-                            return error.InvalidIntLiteral;
-                        }
+                        if (ascii.isDigit(next)) return error.InvalidIntLiteral;
 
                         switch (next) {
                             'a'...'z', '_' => {
@@ -1073,28 +1283,37 @@ pub const Lexer = struct {
                                 }
 
                                 return Token.init(
-                                    TokenKind.LowerIdent,
-                                    self.source[start..self.position],
+                                    .LowerIdent,
+                                    self.source[start..self.buf_pos],
+                                    self.filename,
+                                    start,
+                                    self.buf_pos,
                                     start_line,
-                                    start_column,
+                                    start_col,
                                 );
                             },
                             else => {
                                 return Token.init(
-                                    TokenKind.SymUnderscore,
+                                    .SymUnderscore,
                                     "_",
+                                    self.filename,
+                                    start,
+                                    self.buf_pos,
                                     start_line,
-                                    start_column,
+                                    start_col,
                                 );
                             },
                         }
                     }
 
                     return Token.init(
-                        TokenKind.SymUnderscore,
+                        .SymUnderscore,
                         "_",
+                        self.filename,
+                        start,
+                        self.buf_pos,
                         start_line,
-                        start_column,
+                        start_col,
                     );
                 }
 
@@ -1114,51 +1333,60 @@ pub const Lexer = struct {
                     }
                 }
 
-                if (self.checkExactMatch(start, "alias", TokenKind.KwAlias)) |token| return token;
-                if (self.checkExactMatch(start, "as", TokenKind.KwAs)) |token| return token;
-                if (self.checkExactMatch(start, "else", TokenKind.KwElse)) |token| return token;
-                if (self.checkExactMatch(start, "end", TokenKind.KwEnd)) |token| return token;
-                if (self.checkExactMatch(start, "exposing", TokenKind.KwExposing)) |token| return token;
-                if (self.checkExactMatch(start, "foreign", TokenKind.KwForeign)) |token| return token;
-                if (self.checkExactMatch(start, "hiding", TokenKind.KwHiding)) |token| return token;
-                if (self.checkExactMatch(start, "if", TokenKind.KwIf)) |token| return token;
-                if (self.checkExactMatch(start, "in", TokenKind.KwIn)) |token| return token;
-                if (self.checkExactMatch(start, "include", TokenKind.KwInclude)) |token| return token;
-                if (self.checkExactMatch(start, "infixl", TokenKind.KwInfixLeft)) |token| return token;
-                if (self.checkExactMatch(start, "infixn", TokenKind.KwInfixNon)) |token| return token;
-                if (self.checkExactMatch(start, "infixr", TokenKind.KwInfixRight)) |token| return token;
-                if (self.checkExactMatch(start, "let", TokenKind.KwLet)) |token| return token;
-                if (self.checkExactMatch(start, "match", TokenKind.KwMatch)) |token| return token;
-                if (self.checkExactMatch(start, "module", TokenKind.KwModule)) |token| return token;
-                if (self.checkExactMatch(start, "on", TokenKind.KwOn)) |token| return token;
-                if (self.checkExactMatch(start, "open", TokenKind.KwOpen)) |token| return token;
-                if (self.checkExactMatch(start, "renaming", TokenKind.KwRenaming)) |token| return token;
-                if (self.checkExactMatch(start, "then", TokenKind.KwThen)) |token| return token;
-                if (self.checkExactMatch(start, "to", TokenKind.KwTo)) |token| return token;
-                if (self.checkExactMatch(start, "type", TokenKind.KwType)) |token| return token;
-                if (self.checkExactMatch(start, "using", TokenKind.KwUsing)) |token| return token;
-                if (self.checkExactMatch(start, "when", TokenKind.KwWhen)) |token| return token;
+                if (self.checkExactMatch(start, "alias", .KwAlias)) |token| return token;
+                if (self.checkExactMatch(start, "as", .KwAs)) |token| return token;
+                if (self.checkExactMatch(start, "else", .KwElse)) |token| return token;
+                if (self.checkExactMatch(start, "end", .KwEnd)) |token| return token;
+                if (self.checkExactMatch(start, "exposing", .KwExposing)) |token| return token;
+                if (self.checkExactMatch(start, "foreign", .KwForeign)) |token| return token;
+                if (self.checkExactMatch(start, "hiding", .KwHiding)) |token| return token;
+                if (self.checkExactMatch(start, "if", .KwIf)) |token| return token;
+                if (self.checkExactMatch(start, "in", .KwIn)) |token| return token;
+                if (self.checkExactMatch(start, "include", .KwInclude)) |token| return token;
+                if (self.checkExactMatch(start, "infixl", .KwInfixLeft)) |token| return token;
+                if (self.checkExactMatch(start, "infixn", .KwInfixNon)) |token| return token;
+                if (self.checkExactMatch(start, "infixr", .KwInfixRight)) |token| return token;
+                if (self.checkExactMatch(start, "let", .KwLet)) |token| return token;
+                if (self.checkExactMatch(start, "match", .KwMatch)) |token| return token;
+                if (self.checkExactMatch(start, "module", .KwModule)) |token| return token;
+                if (self.checkExactMatch(start, "on", .KwOn)) |token| return token;
+                if (self.checkExactMatch(start, "open", .KwOpen)) |token| return token;
+                if (self.checkExactMatch(start, "renaming", .KwRenaming)) |token| return token;
+                if (self.checkExactMatch(start, "then", .KwThen)) |token| return token;
+                if (self.checkExactMatch(start, "to", .KwTo)) |token| return token;
+                if (self.checkExactMatch(start, "type", .KwType)) |token| return token;
+                if (self.checkExactMatch(start, "using", .KwUsing)) |token| return token;
+                if (self.checkExactMatch(start, "when", .KwWhen)) |token| return token;
 
                 const first_char = self.source[start];
 
                 switch (first_char) {
                     'A'...'Z' => return Token.init(
-                        TokenKind.UpperIdent,
-                        self.source[start..self.position],
+                        .UpperIdent,
+                        self.source[start..self.buf_pos],
+                        self.filename,
+                        start,
+                        self.buf_pos,
                         start_line,
-                        start_column,
+                        start_col,
                     ),
                     'a'...'z', '_' => return Token.init(
-                        TokenKind.LowerIdent,
-                        self.source[start..self.position],
+                        .LowerIdent,
+                        self.source[start..self.buf_pos],
+                        self.filename,
+                        start,
+                        self.buf_pos,
                         start_line,
-                        start_column,
+                        start_col,
                     ),
                     else => return Token.init(
-                        TokenKind.Invalid,
-                        self.source[start..self.position],
+                        .Unrecognized,
+                        self.source[start..self.buf_pos],
+                        self.filename,
+                        start,
+                        self.buf_pos,
                         start_line,
-                        start_column,
+                        start_col,
                     ),
                 }
             },
@@ -1166,10 +1394,13 @@ pub const Lexer = struct {
                 self.advance();
 
                 return Token.init(
-                    TokenKind.Invalid,
-                    self.source[start..self.position],
+                    .Unrecognized,
+                    self.source[start..self.buf_pos],
+                    self.filename,
+                    start,
+                    self.buf_pos,
                     start_line,
-                    start_column,
+                    start_col,
                 );
             },
         }
@@ -1177,6 +1408,8 @@ pub const Lexer = struct {
 };
 
 const testing = std.testing;
+
+const TEST_FILE = "some_file";
 
 const TestCase = struct {
     source: []const u8,
@@ -1213,14 +1446,14 @@ test "[keyword]" {
     };
 
     for (cases) |case| {
-        var lexer = Lexer.init(case.source);
+        var lexer = Lexer.init(case.source, TEST_FILE);
 
         const token = try lexer.nextToken();
         try testing.expectEqual(case.kind, token.kind);
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(.Eof, eof.kind);
     }
 }
 
@@ -1238,14 +1471,14 @@ test "[delimiter]" {
     };
 
     for (cases) |case| {
-        var lexer = Lexer.init(case.source);
+        var lexer = Lexer.init(case.source, TEST_FILE);
 
         const token = try lexer.nextToken();
         try testing.expectEqual(case.kind, token.kind);
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(.Eof, eof.kind);
     }
 }
 
@@ -1259,14 +1492,14 @@ test "[symbol]" {
     };
 
     for (cases) |case| {
-        var lexer = Lexer.init(case.source);
+        var lexer = Lexer.init(case.source, TEST_FILE);
 
         const token = try lexer.nextToken();
         try testing.expectEqual(case.kind, token.kind);
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(.Eof, eof.kind);
     }
 }
 
@@ -1284,14 +1517,14 @@ test "[operator]" {
     };
 
     for (cases) |case| {
-        var lexer = Lexer.init(case.source);
+        var lexer = Lexer.init(case.source, TEST_FILE);
 
         const token = try lexer.nextToken();
         try testing.expectEqual(case.kind, token.kind);
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(.Eof, eof.kind);
     }
 }
 
@@ -1309,14 +1542,14 @@ test "[arithmetic operator]" {
     };
 
     for (cases) |case| {
-        var lexer = Lexer.init(case.source);
+        var lexer = Lexer.init(case.source, TEST_FILE);
 
         const token = try lexer.nextToken();
         try testing.expectEqual(case.kind, token.kind);
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(.Eof, eof.kind);
     }
 }
 
@@ -1331,14 +1564,14 @@ test "[comparison operator] (relational)" {
     };
 
     for (cases) |case| {
-        var lexer = Lexer.init(case.source);
+        var lexer = Lexer.init(case.source, TEST_FILE);
 
         const token = try lexer.nextToken();
         try testing.expectEqual(case.kind, token.kind);
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(.Eof, eof.kind);
     }
 }
 
@@ -1349,14 +1582,14 @@ test "[logical operator] (boolean)" {
     };
 
     for (cases) |case| {
-        var lexer = Lexer.init(case.source);
+        var lexer = Lexer.init(case.source, TEST_FILE);
 
         const token = try lexer.nextToken();
         try testing.expectEqual(case.kind, token.kind);
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(.Eof, eof.kind);
     }
 }
 
@@ -1366,14 +1599,14 @@ test "[special]" {
     };
 
     for (cases) |case| {
-        var lexer = Lexer.init(case.source);
+        var lexer = Lexer.init(case.source, TEST_FILE);
 
         const token = try lexer.nextToken();
         try testing.expectEqual(case.kind, token.kind);
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(.Eof, eof.kind);
     }
 }
 
@@ -1387,14 +1620,14 @@ test "[comment]" {
     };
 
     for (cases) |case| {
-        var lexer = Lexer.init(case.source);
+        var lexer = Lexer.init(case.source, TEST_FILE);
 
         const token = try lexer.nextToken();
         try testing.expectEqual(case.kind, token.kind);
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(.Eof, eof.kind);
     }
 }
 
@@ -1414,14 +1647,14 @@ test "[multiline string]" {
     };
 
     for (cases) |case| {
-        var lexer = Lexer.init(case.source);
+        var lexer = Lexer.init(case.source, TEST_FILE);
 
         const token = try lexer.nextToken();
         try testing.expectEqual(case.kind, token.kind);
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(.Eof, eof.kind);
     }
 }
 
@@ -1434,7 +1667,7 @@ test "[multiline string] error.UnterminatedStrLiteral" {
     };
 
     for (invalid_cases) |source| {
-        var lexer = Lexer.init(source);
+        var lexer = Lexer.init(source, TEST_FILE);
 
         const result = lexer.nextToken();
         try testing.expectError(error.UnterminatedStrLiteral, result);
@@ -1467,14 +1700,14 @@ test "[string literal]" {
     };
 
     for (cases) |case| {
-        var lexer = Lexer.init(case.source);
+        var lexer = Lexer.init(case.source, TEST_FILE);
 
         const token = try lexer.nextToken();
         try testing.expectEqual(case.kind, token.kind);
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(.Eof, eof.kind);
     }
 }
 
@@ -1486,7 +1719,7 @@ test "[string literal] error.CodePointOutOfRange" {
     };
 
     for (invalid_cases) |source| {
-        var lexer = Lexer.init(source);
+        var lexer = Lexer.init(source, TEST_FILE);
 
         const result = lexer.nextToken();
         try testing.expectError(error.CodePointOutOfRange, result);
@@ -1500,7 +1733,7 @@ test "[string literal] error.UnrecognizedEscapeSequence" {
     };
 
     for (invalid_cases) |source| {
-        var lexer = Lexer.init(source);
+        var lexer = Lexer.init(source, TEST_FILE);
 
         const result = lexer.nextToken();
         try testing.expectError(error.UnrecognizedEscapeSequence, result);
@@ -1514,7 +1747,7 @@ test "[string literal] error.InvalidUnicodeEscapeSequence" {
     };
 
     for (invalid_cases) |source| {
-        var lexer = Lexer.init(source);
+        var lexer = Lexer.init(source, TEST_FILE);
 
         const result = lexer.nextToken();
         try testing.expectError(error.InvalidUnicodeEscapeSequence, result);
@@ -1529,7 +1762,7 @@ test "[string literal] error.UnterminatedStrLiteral" {
     };
 
     for (invalid_cases) |source| {
-        var lexer = Lexer.init(source);
+        var lexer = Lexer.init(source, TEST_FILE);
 
         const result = lexer.nextToken();
         try testing.expectError(error.UnterminatedStrLiteral, result);
@@ -1559,21 +1792,21 @@ test "[char literal]" {
     };
 
     for (cases) |case| {
-        var lexer = Lexer.init(case.source);
+        var lexer = Lexer.init(case.source, TEST_FILE);
 
         const token = try lexer.nextToken();
         try testing.expectEqual(case.kind, token.kind);
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(.Eof, eof.kind);
     }
 }
 
 test "[char literal] error.EmptyCharLiteral" {
     const source = "''";
 
-    var lexer = Lexer.init(source);
+    var lexer = Lexer.init(source, TEST_FILE);
 
     const result = lexer.nextToken();
     try testing.expectError(error.EmptyCharLiteral, result);
@@ -1587,7 +1820,7 @@ test "[char literal] error.CodePointOutOfRange" {
     };
 
     for (invalid_cases) |source| {
-        var lexer = Lexer.init(source);
+        var lexer = Lexer.init(source, TEST_FILE);
 
         const result = lexer.nextToken();
         try testing.expectError(error.CodePointOutOfRange, result);
@@ -1601,7 +1834,7 @@ test "[char literal] error.UnrecognizedEscapeSequence" {
     };
 
     for (invalid_cases) |source| {
-        var lexer = Lexer.init(source);
+        var lexer = Lexer.init(source, TEST_FILE);
 
         const result = lexer.nextToken();
         try testing.expectError(error.UnrecognizedEscapeSequence, result);
@@ -1620,7 +1853,7 @@ test "[char literal] error.MultipleCharsInLiteral" {
     };
 
     for (invalid_cases) |source| {
-        var lexer = Lexer.init(source);
+        var lexer = Lexer.init(source, TEST_FILE);
 
         const result = lexer.nextToken();
         try testing.expectError(error.MultipleCharsInLiteral, result);
@@ -1640,7 +1873,7 @@ test "[char literal] error.UnterminatedCharLiteral" {
     };
 
     for (invalid_cases) |source| {
-        var lexer = Lexer.init(source);
+        var lexer = Lexer.init(source, TEST_FILE);
 
         const result = lexer.nextToken();
         try testing.expectError(error.UnterminatedCharLiteral, result);
@@ -1654,7 +1887,7 @@ test "[char literal] error.InvalidUnicodeEscapeSequence" {
     };
 
     for (invalid_cases) |source| {
-        var lexer = Lexer.init(source);
+        var lexer = Lexer.init(source, TEST_FILE);
 
         const result = lexer.nextToken();
         try testing.expectError(error.InvalidUnicodeEscapeSequence, result);
@@ -1674,14 +1907,14 @@ test "[integer literal]" {
     };
 
     for (cases) |case| {
-        var lexer = Lexer.init(case.source);
+        var lexer = Lexer.init(case.source, TEST_FILE);
 
         const token = try lexer.nextToken();
         try testing.expectEqual(case.kind, token.kind);
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(.Eof, eof.kind);
     }
 }
 
@@ -1694,7 +1927,7 @@ test "[integer literal] error.InvalidIntLiteral" {
     };
 
     for (invalid_cases) |source| {
-        var lexer = Lexer.init(source);
+        var lexer = Lexer.init(source, TEST_FILE);
 
         const result = lexer.nextToken();
         try testing.expectError(error.InvalidIntLiteral, result);
@@ -1724,14 +1957,14 @@ test "[identifier]" {
     };
 
     for (cases) |case| {
-        var lexer = Lexer.init(case.source);
+        var lexer = Lexer.init(case.source, TEST_FILE);
 
         const token = try lexer.nextToken();
         try testing.expectEqual(case.kind, token.kind);
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
         const eof = try lexer.nextToken();
-        try testing.expectEqual(TokenKind.Eof, eof.kind);
+        try testing.expectEqual(.Eof, eof.kind);
     }
 }
 
@@ -1744,7 +1977,7 @@ test "[identifier] error.InvalidIdentifier" {
     };
 
     for (invalid_cases) |source| {
-        var lexer = Lexer.init(source);
+        var lexer = Lexer.init(source, TEST_FILE);
 
         try testing.expectError(error.InvalidIdentifier, lexer.nextToken());
     }
@@ -1754,25 +1987,27 @@ test "type variant" {
     const source = "type FooBar = | Foo | Bar";
 
     const expected_tokens = [_]Token{
-        Token.init(.KwType, "type", 1, 1),
-        Token.init(.UpperIdent, "FooBar", 1, 6),
-        Token.init(.OpAssign, "=", 1, 13),
-        Token.init(.SymPipe, "|", 1, 15),
-        Token.init(.UpperIdent, "Foo", 1, 17),
-        Token.init(.SymPipe, "|", 1, 21),
-        Token.init(.UpperIdent, "Bar", 1, 23),
-        Token.init(.Eof, "", 1, 26),
+        Token.init(.KwType, "type", TEST_FILE, 0, 4, 1, 1),
+        Token.init(.UpperIdent, "FooBar", TEST_FILE, 5, 11, 1, 6),
+        Token.init(.OpAssign, "=", TEST_FILE, 12, 13, 1, 13),
+        Token.init(.SymPipe, "|", TEST_FILE, 14, 15, 1, 15),
+        Token.init(.UpperIdent, "Foo", TEST_FILE, 16, 19, 1, 17),
+        Token.init(.SymPipe, "|", TEST_FILE, 20, 21, 1, 21),
+        Token.init(.UpperIdent, "Bar", TEST_FILE, 22, 25, 1, 23),
+        Token.init(.Eof, "", TEST_FILE, 25, 25, 1, 26),
     };
 
-    var lexer = Lexer.init(source);
+    var lexer = Lexer.init(source, TEST_FILE);
 
     for (expected_tokens) |expected| {
         const token = try lexer.nextToken();
 
         try testing.expectEqual(expected.kind, token.kind);
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try testing.expectEqual(expected.line, token.line);
-        try testing.expectEqual(expected.column, token.column);
+        try testing.expectEqual(expected.loc.buf.start, token.loc.buf.start);
+        try testing.expectEqual(expected.loc.buf.end, token.loc.buf.end);
+        try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
+        try testing.expectEqual(expected.loc.src.col, token.loc.src.col);
     }
 }
 
@@ -1780,23 +2015,25 @@ test "type alias" {
     const source = "type alias Seconds = Int";
 
     const expected_tokens = [_]Token{
-        Token.init(.KwType, "type", 1, 1),
-        Token.init(.KwAlias, "alias", 1, 6),
-        Token.init(.UpperIdent, "Seconds", 1, 12),
-        Token.init(.OpAssign, "=", 1, 20),
-        Token.init(.UpperIdent, "Int", 1, 22),
-        Token.init(.Eof, "", 1, 25),
+        Token.init(.KwType, "type", TEST_FILE, 0, 4, 1, 1),
+        Token.init(.KwAlias, "alias", TEST_FILE, 5, 10, 1, 6),
+        Token.init(.UpperIdent, "Seconds", TEST_FILE, 11, 18, 1, 12),
+        Token.init(.OpAssign, "=", TEST_FILE, 19, 20, 1, 20),
+        Token.init(.UpperIdent, "Int", TEST_FILE, 21, 24, 1, 22),
+        Token.init(.Eof, "", TEST_FILE, 24, 24, 1, 25),
     };
 
-    var lexer = Lexer.init(source);
+    var lexer = Lexer.init(source, TEST_FILE);
 
     for (expected_tokens) |expected| {
         const token = try lexer.nextToken();
 
         try testing.expectEqual(expected.kind, token.kind);
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try testing.expectEqual(expected.line, token.line);
-        try testing.expectEqual(expected.column, token.column);
+        try testing.expectEqual(expected.loc.buf.start, token.loc.buf.start);
+        try testing.expectEqual(expected.loc.buf.end, token.loc.buf.end);
+        try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
+        try testing.expectEqual(expected.loc.src.col, token.loc.src.col);
     }
 }
 
@@ -1804,30 +2041,32 @@ test "record type" {
     const source = "type FooBar = { foo : Int, bar : String }";
 
     const expected_tokens = [_]Token{
-        Token.init(.KwType, "type", 1, 1),
-        Token.init(.UpperIdent, "FooBar", 1, 6),
-        Token.init(.OpAssign, "=", 1, 13),
-        Token.init(.DelLCurly, "{", 1, 15),
-        Token.init(.LowerIdent, "foo", 1, 17),
-        Token.init(.DelColon, ":", 1, 21),
-        Token.init(.UpperIdent, "Int", 1, 23),
-        Token.init(.DelComma, ",", 1, 26),
-        Token.init(.LowerIdent, "bar", 1, 28),
-        Token.init(.DelColon, ":", 1, 32),
-        Token.init(.UpperIdent, "String", 1, 34),
-        Token.init(.DelRCurly, "}", 1, 41),
-        Token.init(.Eof, "", 1, 42),
+        Token.init(.KwType, "type", TEST_FILE, 0, 4, 1, 1),
+        Token.init(.UpperIdent, "FooBar", TEST_FILE, 5, 11, 1, 6),
+        Token.init(.OpAssign, "=", TEST_FILE, 12, 13, 1, 13),
+        Token.init(.DelLCurly, "{", TEST_FILE, 14, 15, 1, 15),
+        Token.init(.LowerIdent, "foo", TEST_FILE, 16, 19, 1, 17),
+        Token.init(.DelColon, ":", TEST_FILE, 20, 21, 1, 21),
+        Token.init(.UpperIdent, "Int", TEST_FILE, 22, 25, 1, 23),
+        Token.init(.DelComma, ",", TEST_FILE, 25, 26, 1, 26),
+        Token.init(.LowerIdent, "bar", TEST_FILE, 27, 30, 1, 28),
+        Token.init(.DelColon, ":", TEST_FILE, 31, 32, 1, 32),
+        Token.init(.UpperIdent, "String", TEST_FILE, 33, 39, 1, 34),
+        Token.init(.DelRCurly, "}", TEST_FILE, 40, 41, 1, 41),
+        Token.init(.Eof, "", TEST_FILE, 41, 41, 1, 42),
     };
 
-    var lexer = Lexer.init(source);
+    var lexer = Lexer.init(source, TEST_FILE);
 
     for (expected_tokens) |expected| {
         const token = try lexer.nextToken();
 
         try testing.expectEqual(expected.kind, token.kind);
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try testing.expectEqual(expected.line, token.line);
-        try testing.expectEqual(expected.column, token.column);
+        try testing.expectEqual(expected.loc.buf.start, token.loc.buf.start);
+        try testing.expectEqual(expected.loc.buf.end, token.loc.buf.end);
+        try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
+        try testing.expectEqual(expected.loc.src.col, token.loc.src.col);
     }
 }
 
@@ -1835,65 +2074,69 @@ test "module definition" {
     const source = "module Foo exposing (Foo(..), bar) end";
 
     const expected_tokens = [_]Token{
-        Token.init(.KwModule, "module", 1, 1),
-        Token.init(.UpperIdent, "Foo", 1, 8),
-        Token.init(.KwExposing, "exposing", 1, 12),
-        Token.init(.DelLParen, "(", 1, 21),
-        Token.init(.UpperIdent, "Foo", 1, 22),
-        Token.init(.DelLParen, "(", 1, 25),
-        Token.init(.OpDoubleDot, "..", 1, 26),
-        Token.init(.DelRParen, ")", 1, 28),
-        Token.init(.DelComma, ",", 1, 29),
-        Token.init(.LowerIdent, "bar", 1, 31),
-        Token.init(.DelRParen, ")", 1, 34),
-        Token.init(.KwEnd, "end", 1, 36),
-        Token.init(.Eof, "", 1, 39),
+        Token.init(.KwModule, "module", TEST_FILE, 0, 6, 1, 1),
+        Token.init(.UpperIdent, "Foo", TEST_FILE, 7, 10, 1, 8),
+        Token.init(.KwExposing, "exposing", TEST_FILE, 11, 19, 1, 12),
+        Token.init(.DelLParen, "(", TEST_FILE, 20, 21, 1, 21),
+        Token.init(.UpperIdent, "Foo", TEST_FILE, 21, 24, 1, 22),
+        Token.init(.DelLParen, "(", TEST_FILE, 24, 25, 1, 25),
+        Token.init(.OpDoubleDot, "..", TEST_FILE, 25, 27, 1, 26),
+        Token.init(.DelRParen, ")", TEST_FILE, 27, 28, 1, 28),
+        Token.init(.DelComma, ",", TEST_FILE, 28, 29, 1, 29),
+        Token.init(.LowerIdent, "bar", TEST_FILE, 30, 33, 1, 31),
+        Token.init(.DelRParen, ")", TEST_FILE, 33, 34, 1, 34),
+        Token.init(.KwEnd, "end", TEST_FILE, 35, 38, 1, 36),
+        Token.init(.Eof, "", TEST_FILE, 38, 38, 1, 39),
     };
 
-    var lexer = Lexer.init(source);
+    var lexer = Lexer.init(source, TEST_FILE);
 
     for (expected_tokens) |expected| {
         const token = try lexer.nextToken();
 
         try testing.expectEqual(expected.kind, token.kind);
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try testing.expectEqual(expected.line, token.line);
-        try testing.expectEqual(expected.column, token.column);
+        try testing.expectEqual(expected.loc.buf.start, token.loc.buf.start);
+        try testing.expectEqual(expected.loc.buf.end, token.loc.buf.end);
+        try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
+        try testing.expectEqual(expected.loc.src.col, token.loc.src.col);
     }
 }
 
-test "top level function defintion" {
+test "top level function definition" {
     const source = "let add : Int -> Int -> Int = \\x y => x + y";
 
     const expected_tokens = [_]Token{
-        Token.init(.KwLet, "let", 1, 1),
-        Token.init(.LowerIdent, "add", 1, 5),
-        Token.init(.DelColon, ":", 1, 9),
-        Token.init(.UpperIdent, "Int", 1, 11),
-        Token.init(.SymArrowRight, "->", 1, 15),
-        Token.init(.UpperIdent, "Int", 1, 18),
-        Token.init(.SymArrowRight, "->", 1, 22),
-        Token.init(.UpperIdent, "Int", 1, 25),
-        Token.init(.OpAssign, "=", 1, 29),
-        Token.init(.OpLambda, "\\", 1, 31),
-        Token.init(.LowerIdent, "x", 1, 32),
-        Token.init(.LowerIdent, "y", 1, 34),
-        Token.init(.SymDoubleArrowRight, "=>", 1, 36),
-        Token.init(.LowerIdent, "x", 1, 39),
-        Token.init(.OpIntAdd, "+", 1, 41),
-        Token.init(.LowerIdent, "y", 1, 43),
-        Token.init(.Eof, "", 1, 44),
+        Token.init(.KwLet, "let", TEST_FILE, 0, 3, 1, 1),
+        Token.init(.LowerIdent, "add", TEST_FILE, 4, 7, 1, 5),
+        Token.init(.DelColon, ":", TEST_FILE, 8, 9, 1, 9),
+        Token.init(.UpperIdent, "Int", TEST_FILE, 10, 13, 1, 11),
+        Token.init(.SymArrowRight, "->", TEST_FILE, 14, 16, 1, 15),
+        Token.init(.UpperIdent, "Int", TEST_FILE, 17, 20, 1, 18),
+        Token.init(.SymArrowRight, "->", TEST_FILE, 21, 23, 1, 22),
+        Token.init(.UpperIdent, "Int", TEST_FILE, 24, 27, 1, 25),
+        Token.init(.OpAssign, "=", TEST_FILE, 28, 29, 1, 29),
+        Token.init(.OpLambda, "\\", TEST_FILE, 30, 31, 1, 31),
+        Token.init(.LowerIdent, "x", TEST_FILE, 31, 32, 1, 32),
+        Token.init(.LowerIdent, "y", TEST_FILE, 33, 34, 1, 34),
+        Token.init(.SymDoubleArrowRight, "=>", TEST_FILE, 35, 37, 1, 36),
+        Token.init(.LowerIdent, "x", TEST_FILE, 38, 39, 1, 39),
+        Token.init(.OpIntAdd, "+", TEST_FILE, 40, 41, 1, 41),
+        Token.init(.LowerIdent, "y", TEST_FILE, 42, 43, 1, 43),
+        Token.init(.Eof, "", TEST_FILE, 43, 43, 1, 44),
     };
 
-    var lexer = Lexer.init(source);
+    var lexer = Lexer.init(source, TEST_FILE);
 
     for (expected_tokens) |expected| {
         const token = try lexer.nextToken();
 
         try testing.expectEqual(expected.kind, token.kind);
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try testing.expectEqual(expected.line, token.line);
-        try testing.expectEqual(expected.column, token.column);
+        try testing.expectEqual(expected.loc.buf.start, token.loc.buf.start);
+        try testing.expectEqual(expected.loc.buf.end, token.loc.buf.end);
+        try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
+        try testing.expectEqual(expected.loc.src.col, token.loc.src.col);
     }
 }
 
@@ -1901,32 +2144,34 @@ test "pattern matching" {
     const source = "match x on | Foo => 1 | Bar => 2 _ => 3";
 
     const expected_tokens = [_]Token{
-        Token.init(.KwMatch, "match", 1, 1),
-        Token.init(.LowerIdent, "x", 1, 7),
-        Token.init(.KwOn, "on", 1, 9),
-        Token.init(.SymPipe, "|", 1, 12),
-        Token.init(.UpperIdent, "Foo", 1, 14),
-        Token.init(.SymDoubleArrowRight, "=>", 1, 18),
-        Token.init(.LitInt, "1", 1, 21),
-        Token.init(.SymPipe, "|", 1, 23),
-        Token.init(.UpperIdent, "Bar", 1, 25),
-        Token.init(.SymDoubleArrowRight, "=>", 1, 29),
-        Token.init(.LitInt, "2", 1, 32),
-        Token.init(.SymUnderscore, "_", 1, 34),
-        Token.init(.SymDoubleArrowRight, "=>", 1, 36),
-        Token.init(.LitInt, "3", 1, 39),
-        Token.init(.Eof, "", 1, 40),
+        Token.init(.KwMatch, "match", TEST_FILE, 0, 5, 1, 1),
+        Token.init(.LowerIdent, "x", TEST_FILE, 6, 7, 1, 7),
+        Token.init(.KwOn, "on", TEST_FILE, 8, 10, 1, 9),
+        Token.init(.SymPipe, "|", TEST_FILE, 11, 12, 1, 12),
+        Token.init(.UpperIdent, "Foo", TEST_FILE, 13, 16, 1, 14),
+        Token.init(.SymDoubleArrowRight, "=>", TEST_FILE, 17, 19, 1, 18),
+        Token.init(.LitInt, "1", TEST_FILE, 20, 21, 1, 21),
+        Token.init(.SymPipe, "|", TEST_FILE, 22, 23, 1, 23),
+        Token.init(.UpperIdent, "Bar", TEST_FILE, 24, 27, 1, 25),
+        Token.init(.SymDoubleArrowRight, "=>", TEST_FILE, 28, 30, 1, 29),
+        Token.init(.LitInt, "2", TEST_FILE, 31, 32, 1, 32),
+        Token.init(.SymUnderscore, "_", TEST_FILE, 33, 34, 1, 34),
+        Token.init(.SymDoubleArrowRight, "=>", TEST_FILE, 35, 37, 1, 36),
+        Token.init(.LitInt, "3", TEST_FILE, 38, 39, 1, 39),
+        Token.init(.Eof, "", TEST_FILE, 39, 39, 1, 40),
     };
 
-    var lexer = Lexer.init(source);
+    var lexer = Lexer.init(source, TEST_FILE);
 
     for (expected_tokens) |expected| {
         const token = try lexer.nextToken();
 
         try testing.expectEqual(expected.kind, token.kind);
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try testing.expectEqual(expected.line, token.line);
-        try testing.expectEqual(expected.column, token.column);
+        try testing.expectEqual(expected.loc.buf.start, token.loc.buf.start);
+        try testing.expectEqual(expected.loc.buf.end, token.loc.buf.end);
+        try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
+        try testing.expectEqual(expected.loc.src.col, token.loc.src.col);
     }
 }
 
@@ -1934,25 +2179,27 @@ test "let/in block" {
     const source = "let x : Int = 42 in";
 
     const expected_tokens = [_]Token{
-        Token.init(.KwLet, "let", 1, 1),
-        Token.init(.LowerIdent, "x", 1, 5),
-        Token.init(.DelColon, ":", 1, 7),
-        Token.init(.UpperIdent, "Int", 1, 9),
-        Token.init(.OpAssign, "=", 1, 13),
-        Token.init(.LitInt, "42", 1, 15),
-        Token.init(.KwIn, "in", 1, 18),
-        Token.init(.Eof, "", 1, 20),
+        Token.init(.KwLet, "let", TEST_FILE, 0, 3, 1, 1),
+        Token.init(.LowerIdent, "x", TEST_FILE, 4, 5, 1, 5),
+        Token.init(.DelColon, ":", TEST_FILE, 6, 7, 1, 7),
+        Token.init(.UpperIdent, "Int", TEST_FILE, 8, 11, 1, 9),
+        Token.init(.OpAssign, "=", TEST_FILE, 12, 13, 1, 13),
+        Token.init(.LitInt, "42", TEST_FILE, 14, 16, 1, 15),
+        Token.init(.KwIn, "in", TEST_FILE, 17, 19, 1, 18),
+        Token.init(.Eof, "", TEST_FILE, 19, 19, 1, 20),
     };
 
-    var lexer = Lexer.init(source);
+    var lexer = Lexer.init(source, TEST_FILE);
 
     for (expected_tokens) |expected| {
         const token = try lexer.nextToken();
 
         try testing.expectEqual(expected.kind, token.kind);
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try testing.expectEqual(expected.line, token.line);
-        try testing.expectEqual(expected.column, token.column);
+        try testing.expectEqual(expected.loc.buf.start, token.loc.buf.start);
+        try testing.expectEqual(expected.loc.buf.end, token.loc.buf.end);
+        try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
+        try testing.expectEqual(expected.loc.src.col, token.loc.src.col);
     }
 }
 
@@ -1960,25 +2207,27 @@ test "if/then/else expression" {
     const source = "if x == 1 then True else False";
 
     const expected_tokens = [_]Token{
-        Token.init(.KwIf, "if", 1, 1),
-        Token.init(.LowerIdent, "x", 1, 4),
-        Token.init(.OpEquality, "==", 1, 6),
-        Token.init(.LitInt, "1", 1, 9),
-        Token.init(.KwThen, "then", 1, 11),
-        Token.init(.UpperIdent, "True", 1, 16),
-        Token.init(.KwElse, "else", 1, 21),
-        Token.init(.UpperIdent, "False", 1, 26),
-        Token.init(.Eof, "", 1, 31),
+        Token.init(.KwIf, "if", TEST_FILE, 0, 2, 1, 1),
+        Token.init(.LowerIdent, "x", TEST_FILE, 3, 4, 1, 4),
+        Token.init(.OpEquality, "==", TEST_FILE, 5, 7, 1, 6),
+        Token.init(.LitInt, "1", TEST_FILE, 8, 9, 1, 9),
+        Token.init(.KwThen, "then", TEST_FILE, 10, 14, 1, 11),
+        Token.init(.UpperIdent, "True", TEST_FILE, 15, 19, 1, 16),
+        Token.init(.KwElse, "else", TEST_FILE, 20, 24, 1, 21),
+        Token.init(.UpperIdent, "False", TEST_FILE, 25, 30, 1, 26),
+        Token.init(.Eof, "", TEST_FILE, 30, 30, 1, 31),
     };
 
-    var lexer = Lexer.init(source);
+    var lexer = Lexer.init(source, TEST_FILE);
 
     for (expected_tokens) |expected| {
         const token = try lexer.nextToken();
 
         try testing.expectEqual(expected.kind, token.kind);
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try testing.expectEqual(expected.line, token.line);
-        try testing.expectEqual(expected.column, token.column);
+        try testing.expectEqual(expected.loc.buf.start, token.loc.buf.start);
+        try testing.expectEqual(expected.loc.buf.end, token.loc.buf.end);
+        try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
+        try testing.expectEqual(expected.loc.src.col, token.loc.src.col);
     }
 }
