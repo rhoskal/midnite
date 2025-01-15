@@ -335,6 +335,13 @@ pub const Lexer = struct {
         return Token.init(.LitInt, lexeme, end_loc);
     }
 
+    fn isValidUnicodeCodepoint(value: u21) bool {
+        // Value must be <= 0x10FFFF and not in the surrogate range (0xD800..0xDFFF)
+        if (value > 0x10FFFF) return false;
+        if (value >= 0xD800 and value <= 0xDFFF) return false;
+        return true;
+    }
+
     fn handleUnicodeEscape(self: *Lexer) !void {
         self.advance();
 
@@ -351,12 +358,7 @@ pub const Lexer = struct {
 
         if (digit_count == 0) return error.InvalidUnicodeEscapeSequence;
 
-        // Check if the unicode value is valid
-        if (unicode_value > 0x10FFFF or
-            (unicode_value >= 0xD800 and unicode_value <= 0xDFFF))
-        {
-            return error.CodePointOutOfRange;
-        }
+        if (!isValidUnicodeCodepoint(unicode_value)) return error.CodePointOutOfRange;
     }
 
     /// Retrieves the next token from the source code, advancing the lexer.
