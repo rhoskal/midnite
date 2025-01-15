@@ -36,6 +36,7 @@
 
         shellHook = ''
           export LC_ALL=en_US.UTF-8
+          export PATH=$PATH:$(pwd)/zig-out/bin
         '';
       };
     };

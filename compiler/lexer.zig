@@ -345,6 +345,10 @@ pub const Lexer = struct {
     fn handleUnicodeEscape(self: *Lexer) !void {
         self.advance();
 
+        // Save the starting position of the hex digits
+        const escape_start = self.loc.buf.end;
+        const escape_col = self.loc.src.col;
+
         var unicode_value: u21 = 0;
         var digit_count: usize = 0;
         while (digit_count < 6) : (digit_count += 1) {
@@ -356,15 +360,25 @@ pub const Lexer = struct {
             self.advance();
         }
 
-        if (digit_count == 0) return error.InvalidUnicodeEscapeSequence;
+        if (digit_count == 0) {
+            // Set error location to start of escape sequence
+            self.loc.buf.start = escape_start;
+            self.loc.src.col = escape_col;
+            return error.InvalidUnicodeEscapeSequence;
+        }
 
-        if (!isValidUnicodeCodepoint(unicode_value)) return error.CodePointOutOfRange;
+        if (!isValidUnicodeCodepoint(unicode_value)) {
+            // Set error location to start of escape sequence
+            self.loc.buf.start = escape_start - 2;
+            self.loc.src.col = escape_col - 2;
+            return error.CodePointOutOfRange;
+        }
     }
 
     /// Retrieves the next token from the source code, advancing the lexer.
     ///
     /// - Returns: A token object corresponding to the next recognized token.
-    pub fn nextToken(self: *Lexer) !Token {
+    pub fn nextToken(self: *Lexer) LexerError!Token {
         self.skipWhitespace();
 
         const buf_start = self.loc.buf.start;
