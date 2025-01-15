@@ -335,6 +335,30 @@ pub const Lexer = struct {
         return Token.init(.LitInt, lexeme, end_loc);
     }
 
+    fn handleUnicodeEscape(self: *Lexer) !void {
+        self.advance();
+
+        var unicode_value: u21 = 0;
+        var digit_count: usize = 0;
+        while (digit_count < 6) : (digit_count += 1) {
+            const hex = self.peek() orelse break;
+            if (!ascii.isHex(hex)) break;
+
+            const digit_value = hexDigitToValue(hex);
+            unicode_value = (unicode_value << 4) | digit_value;
+            self.advance();
+        }
+
+        if (digit_count == 0) return error.InvalidUnicodeEscapeSequence;
+
+        // Check if the unicode value is valid
+        if (unicode_value > 0x10FFFF or
+            (unicode_value >= 0xD800 and unicode_value <= 0xDFFF))
+        {
+            return error.CodePointOutOfRange;
+        }
+    }
+
     /// Retrieves the next token from the source code, advancing the lexer.
     ///
     /// - Returns: A token object corresponding to the next recognized token.
@@ -535,29 +559,7 @@ pub const Lexer = struct {
                             '\\', '"', 'n', 't', 'r', 'b' => {
                                 self.advance();
                             },
-                            'u' => {
-                                self.advance();
-
-                                var unicode_value: u21 = 0;
-                                var digit_count: usize = 0;
-                                while (digit_count < 6) : (digit_count += 1) {
-                                    const hex = self.peek() orelse break;
-                                    if (!ascii.isHex(hex)) break;
-
-                                    const digit_value = hexDigitToValue(hex);
-                                    unicode_value = (unicode_value << 4) | digit_value;
-
-                                    self.advance();
-                                }
-
-                                if (digit_count == 0) return error.InvalidUnicodeEscapeSequence;
-
-                                if (unicode_value > 0x10FFFF or
-                                    (unicode_value >= 0xD800 and unicode_value <= 0xDFFF))
-                                {
-                                    return error.CodePointOutOfRange;
-                                }
-                            },
+                            'u' => try self.handleUnicodeEscape(),
                             else => return error.UnrecognizedEscapeSequence,
                         }
                     } else {
@@ -613,29 +615,7 @@ pub const Lexer = struct {
                             '\\', '\'', 'n', 't', 'r' => {
                                 self.advance();
                             },
-                            'u' => {
-                                self.advance();
-
-                                var unicode_value: u21 = 0;
-                                var digit_count: usize = 0;
-                                while (digit_count < 6) : (digit_count += 1) {
-                                    const hex = self.peek() orelse break;
-                                    if (!ascii.isHex(hex)) break;
-
-                                    const digit_value = hexDigitToValue(hex);
-                                    unicode_value = (unicode_value << 4) | digit_value;
-
-                                    self.advance();
-                                }
-
-                                if (digit_count == 0) return error.InvalidUnicodeEscapeSequence;
-
-                                if (unicode_value > 0x10FFFF or
-                                    (unicode_value >= 0xD800 and unicode_value <= 0xDFFF))
-                                {
-                                    return error.CodePointOutOfRange;
-                                }
-                            },
+                            'u' => try self.handleUnicodeEscape(),
                             else => return error.UnrecognizedEscapeSequence,
                         }
                     } else {
