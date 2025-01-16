@@ -2,7 +2,7 @@ const std = @import("std");
 
 const lexer = @import("lexer.zig");
 const parser = @import("parser.zig");
-const reporter = @import("error_report.zig");
+const diagnostics = @import("diagnostics.zig");
 
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -29,7 +29,7 @@ pub fn main() !void {
 
     while (true) {
         const token = lex.nextToken() catch |err| {
-            const report = reporter.createErrorReport(err, lex.loc, lex.source);
+            const report = diagnostics.Diagnostic.create(err, lex.loc, lex.source);
             try report.format(stderr);
             std.process.exit(1);
         };

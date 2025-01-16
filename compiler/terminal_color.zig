@@ -1,5 +1,6 @@
 const std = @import("std");
 
+/// ANSI terminal colors and text styles.
 pub const Color = enum {
     Reset,
     Red,
@@ -26,6 +27,8 @@ pub const Color = enum {
     }
 };
 
+/// A wrapper around a file writer that provides convenient methods
+/// for writing colored/styled text to the terminal.
 pub const ColorWriter = struct {
     inner: std.fs.File.Writer,
 
@@ -33,12 +36,14 @@ pub const ColorWriter = struct {
         return .{ .inner = writer };
     }
 
+    /// Writes text with the specified color/style, automatically resetting afterwards.
     pub fn styled(self: ColorWriter, color: Color, text: []const u8) !void {
         try self.inner.writeAll(color.toString());
         try self.inner.writeAll(text);
         try self.inner.writeAll(Color.Reset.toString());
     }
 
+    /// Writes text without any color/style formatting.
     pub fn plain(self: ColorWriter, text: []const u8) !void {
         try self.inner.writeAll(text);
     }
