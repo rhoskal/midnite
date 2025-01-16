@@ -281,11 +281,6 @@ pub const Lexer = struct {
         else
             self.loc.buf.end - offset;
         const col_offset = self.loc.src.col - offset;
-        // const mark = self.loc.buf.end - offset;
-        // const col_offset = self.loc.src.col - offset;
-
-        // For non-decimal bases, prefix (0x, 0b, 0o) was already consumed
-        // if (base == .Decimal) self.advance();
 
         if (base != .Decimal) {
             if (self.peek()) |next| {
@@ -303,7 +298,6 @@ pub const Lexer = struct {
                 is_float = true;
 
                 self.advance();
-
                 break;
             }
 
@@ -373,17 +367,17 @@ pub const Lexer = struct {
                     }
 
                     // Must have at least one digit in exponent
-                    var found_exp_digit = false;
+                    var found_exponent_digit = false;
                     last_was_underscore = false;
 
                     while (self.peek()) |digit| {
                         if (ascii.isDigit(digit)) {
-                            found_exp_digit = true;
+                            found_exponent_digit = true;
                             last_was_underscore = false;
 
                             self.advance();
                         } else if (digit == '_') {
-                            if (!found_exp_digit or last_was_underscore) {
+                            if (!found_exponent_digit or last_was_underscore) {
                                 return error.InvalidFloatLiteral;
                             }
 
@@ -395,7 +389,7 @@ pub const Lexer = struct {
                         }
                     }
 
-                    if (!found_exp_digit or last_was_underscore) {
+                    if (!found_exponent_digit or last_was_underscore) {
                         return error.InvalidFloatLiteral;
                     }
                 }
