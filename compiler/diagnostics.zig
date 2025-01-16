@@ -37,6 +37,7 @@ pub const Diagnostic = struct {
         return switch (err) {
             error.CodePointOutOfRange => "Found invalid Unicode code point:",
             error.EmptyCharLiteral => "Found empty character literal:",
+            error.InvalidFloatLiteral => "Found invalid number:",
             error.InvalidIdentifier => "Found invalid identifier:",
             error.InvalidIntLiteral => "Found invalid number:",
             error.InvalidUnicodeEscapeSequence => "Found invalid Unicode escape sequence:",
@@ -53,6 +54,19 @@ pub const Diagnostic = struct {
         return switch (err) {
             error.CodePointOutOfRange => "The Unicode value must be between 0x0000 and 0x10FFFF, excluding 0xD800–0xDFFF (surrogates).",
             error.EmptyCharLiteral => "Character literals must contain exactly one character, e.g., 'a', '1', or '\\n'.",
+            error.InvalidFloatLiteral =>
+            \\Numbers are recognized in the following formats:
+            \\
+            \\    42
+            \\    42_000
+            \\    3.14
+            \\    6.022e23
+            \\    0b101010
+            \\    0o52
+            \\    0x2A
+            \\
+            \\So is there a way to write it like one of those?
+            ,
             error.InvalidIdentifier =>
             \\Identifiers must follow these rules:
             \\

@@ -154,6 +154,7 @@ pub const Token = struct {
 pub const LexerError = error{
     CodePointOutOfRange,
     EmptyCharLiteral,
+    InvalidFloatLiteral,
     InvalidIdentifier,
     InvalidIntLiteral,
     InvalidUnicodeEscapeSequence,
@@ -273,28 +274,39 @@ pub const Lexer = struct {
         };
     }
 
-    fn lexInteger(self: *Lexer, base: enum { Decimal, Hex, Octal, Binary }) LexerError!Token {
+    fn handleNumber(self: *Lexer, base: enum { Decimal, Hex, Octal, Binary }) LexerError!Token {
         const offset = if (base == .Decimal) @as(usize, 0) else 2;
-        const mark = self.loc.buf.end - offset;
+        const mark = if (base == .Decimal)
+            self.loc.buf.start
+        else
+            self.loc.buf.end - offset;
         const col_offset = self.loc.src.col - offset;
+        // const mark = self.loc.buf.end - offset;
+        // const col_offset = self.loc.src.col - offset;
 
-        // For other bases, prefix (0x, 0b, 0o) was already consumed
-        if (base == .Decimal) {
-            self.advance();
-        }
+        // For non-decimal bases, prefix (0x, 0b, 0o) was already consumed
+        // if (base == .Decimal) self.advance();
 
         if (base != .Decimal) {
             if (self.peek()) |next| {
-                if (next == '_') {
-                    return error.InvalidIntLiteral;
-                }
+                if (next == '_') return error.InvalidIntLiteral;
             }
         }
 
         var found_valid_digit = true;
         var last_was_underscore = false;
+        var is_float = false;
 
+        // Handle initial digit sequence
         while (self.peek()) |c| {
+            if (base == .Decimal and c == '.') {
+                is_float = true;
+
+                self.advance();
+
+                break;
+            }
+
             const is_valid_digit = switch (base) {
                 .Decimal => ascii.isDigit(c),
                 .Hex => ascii.isHex(c),
@@ -305,6 +317,7 @@ pub const Lexer = struct {
             if (is_valid_digit) {
                 found_valid_digit = true;
                 last_was_underscore = false;
+
                 self.advance();
             } else if (c == '_') {
                 if (!found_valid_digit or last_was_underscore) {
@@ -312,6 +325,7 @@ pub const Lexer = struct {
                 }
 
                 last_was_underscore = true;
+
                 self.advance();
             } else {
                 break;
@@ -320,8 +334,91 @@ pub const Lexer = struct {
 
         if (last_was_underscore) return error.InvalidIntLiteral;
 
+        if (is_float) {
+            // Must have at least one digit after decimal
+            var found_fraction_digit = false;
+            last_was_underscore = false;
+
+            while (self.peek()) |c| {
+                if (ascii.isDigit(c)) {
+                    found_fraction_digit = true;
+                    last_was_underscore = false;
+
+                    self.advance();
+                } else if (c == '_') {
+                    if (!found_fraction_digit or last_was_underscore) {
+                        return error.InvalidFloatLiteral;
+                    }
+
+                    last_was_underscore = true;
+
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+
+            if (!found_fraction_digit or last_was_underscore) {
+                return error.InvalidFloatLiteral;
+            }
+
+            if (self.peek()) |c| {
+                if (c == 'e') {
+                    self.advance();
+
+                    if (self.peek()) |next| {
+                        if (next == '+' or next == '-') {
+                            self.advance();
+                        }
+                    }
+
+                    // Must have at least one digit in exponent
+                    var found_exp_digit = false;
+                    last_was_underscore = false;
+
+                    while (self.peek()) |digit| {
+                        if (ascii.isDigit(digit)) {
+                            found_exp_digit = true;
+                            last_was_underscore = false;
+
+                            self.advance();
+                        } else if (digit == '_') {
+                            if (!found_exp_digit or last_was_underscore) {
+                                return error.InvalidFloatLiteral;
+                            }
+
+                            last_was_underscore = true;
+
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if (!found_exp_digit or last_was_underscore) {
+                        return error.InvalidFloatLiteral;
+                    }
+                }
+            }
+
+            const lexeme = self.source[mark..self.loc.buf.end];
+
+            return Token.init(.LitFloat, lexeme, .{
+                .filename = self.loc.filename,
+                .buf = .{
+                    .start = mark,
+                    .end = self.loc.buf.end,
+                },
+                .src = .{
+                    .line = self.loc.src.line,
+                    .col = col_offset,
+                },
+            });
+        }
+
         const lexeme = self.source[mark..self.loc.buf.end];
-        const end_loc = TokenLoc{
+
+        return Token.init(.LitInt, lexeme, .{
             .filename = self.loc.filename,
             .buf = .{
                 .start = mark,
@@ -331,9 +428,7 @@ pub const Lexer = struct {
                 .line = self.loc.src.line,
                 .col = col_offset,
             },
-        };
-
-        return Token.init(.LitInt, lexeme, end_loc);
+        });
     }
 
     fn isValidUnicodeCodepoint(value: u21) bool {
@@ -1222,6 +1317,8 @@ pub const Lexer = struct {
                 self.advance();
 
                 if (self.peek()) |next| {
+                    if (ascii.isDigit(next)) return error.InvalidFloatLiteral;
+
                     if (next == '.') {
                         self.advance();
 
@@ -1420,19 +1517,19 @@ pub const Lexer = struct {
                         'b' => {
                             self.advance();
 
-                            return self.lexInteger(.Binary);
+                            return self.handleNumber(.Binary);
                         },
                         'o' => {
                             self.advance();
 
-                            return self.lexInteger(.Octal);
+                            return self.handleNumber(.Octal);
                         },
                         'x' => {
                             self.advance();
 
-                            return self.lexInteger(.Hex);
+                            return self.handleNumber(.Hex);
                         },
-                        else => return self.lexInteger(.Decimal),
+                        else => return self.handleNumber(.Decimal),
                     }
                 }
 
@@ -1452,7 +1549,7 @@ pub const Lexer = struct {
                 return Token.init(.LitInt, lexeme, end_loc);
             },
             '1'...'9' => {
-                return self.lexInteger(.Decimal);
+                return self.handleNumber(.Decimal);
             },
             'a'...'z', 'A'...'Z', '_' => {
                 if (c == '_') {
@@ -2147,6 +2244,8 @@ test "[integer literal] error.InvalidIntLiteral" {
         "_1000", // leading underscore
         "1000_", // trailing underscore
         "0x_1F", // underscore after prefix
+        "10__000.0", // fail before we even know it's a float
+        "_1000.0", // fail before we even know it's a float
     };
 
     for (invalid_cases) |source| {
@@ -2154,6 +2253,42 @@ test "[integer literal] error.InvalidIntLiteral" {
 
         const result = lexer.nextToken();
         try testing.expectError(error.InvalidIntLiteral, result);
+    }
+}
+
+test "[float literal]" {
+    const cases = [_]TestCase{
+        .{ .source = "42.0", .kind = .LitFloat, .lexeme = "42.0" },
+        .{ .source = "42_000_000.0", .kind = .LitFloat, .lexeme = "42_000_000.0" },
+        .{ .source = "0.5", .kind = .LitFloat, .lexeme = "0.5" },
+        .{ .source = "1.23e3", .kind = .LitFloat, .lexeme = "1.23e3" },
+        .{ .source = "4.56e-2", .kind = .LitFloat, .lexeme = "4.56e-2" },
+        .{ .source = "3.141_592", .kind = .LitFloat, .lexeme = "3.141_592" },
+    };
+
+    for (cases) |case| {
+        var lexer = Lexer.init(case.source, TEST_FILE);
+
+        const token = try lexer.nextToken();
+        try std.testing.expectEqual(case.kind, token.kind);
+        try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
+
+        const eof = try lexer.nextToken();
+        try std.testing.expectEqual(TokenKind.Eof, eof.kind);
+    }
+}
+
+test "[float literal] error.InvalidFloat" {
+    const invalid_cases = [_][]const u8{
+        "1000._", // trailing underscore
+        ".5e3", // must begin with a digit
+    };
+
+    for (invalid_cases) |source| {
+        var lexer = Lexer.init(source, TEST_FILE);
+
+        const result = lexer.nextToken();
+        try std.testing.expectError(error.InvalidFloatLiteral, result);
     }
 }
 
