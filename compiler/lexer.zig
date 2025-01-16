@@ -346,6 +346,14 @@ pub const Lexer = struct {
     fn handleUnicodeEscape(self: *Lexer) LexerError!void {
         self.advance();
 
+        if (self.peek()) |next| {
+            if (next != '{') return error.InvalidUnicodeEscapeSequence;
+
+            self.advance();
+        } else {
+            return error.InvalidUnicodeEscapeSequence;
+        }
+
         // Save the starting position of the hex digits
         const escape_start = self.loc.buf.end;
         const escape_col = self.loc.src.col;
@@ -358,20 +366,37 @@ pub const Lexer = struct {
 
             const digit_value = hexDigitToValue(hex);
             unicode_value = (unicode_value << 4) | digit_value;
+
             self.advance();
         }
 
-        if (digit_count == 0) {
-            // Set error location to start of escape sequence
+        if (self.peek()) |next| {
+            if (next != '}') {
+                self.loc.buf.start = escape_start;
+                self.loc.src.col = escape_col;
+
+                return error.InvalidUnicodeEscapeSequence;
+            }
+
+            self.advance();
+        } else {
             self.loc.buf.start = escape_start;
             self.loc.src.col = escape_col;
+
+            return error.InvalidUnicodeEscapeSequence;
+        }
+
+        if (digit_count == 0) {
+            self.loc.buf.start = escape_start;
+            self.loc.src.col = escape_col;
+
             return error.InvalidUnicodeEscapeSequence;
         }
 
         if (!isValidUnicodeCodepoint(unicode_value)) {
-            // Set error location to start of escape sequence
             self.loc.buf.start = escape_start - 2;
             self.loc.src.col = escape_col - 2;
+
             return error.CodePointOutOfRange;
         }
     }
@@ -1883,17 +1908,17 @@ test "[string literal]" {
         .{ .source = "\"Column1\\tColumn2\\tColumn3\"", .kind = .LitString, .lexeme = "\"Column1\\tColumn2\\tColumn3\"" },
         .{ .source = "\"Carriage return\\rOverwritten text\"", .kind = .LitString, .lexeme = "\"Carriage return\\rOverwritten text\"" },
         .{ .source = "\"Backspace test: abc\\bdef\"", .kind = .LitString, .lexeme = "\"Backspace test: abc\\bdef\"" },
-        .{ .source = "\"Unicode test: \\u1\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u1\"" },
-        .{ .source = "\"Unicode test: \\u10\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u10\"" },
-        .{ .source = "\"Unicode test: \\u100\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u100\"" },
-        .{ .source = "\"Unicode test: \\u1000\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u1000\"" },
-        .{ .source = "\"Unicode test: \\u10000\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u10000\"" },
-        .{ .source = "\"Unicode test: \\u100000\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u100000\"" },
-        .{ .source = "\"Unicode test: \\u10FFFF\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u10FFFF\"" },
-        .{ .source = "\"Unicode test: \\u0000\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u0000\"" }, // edge case
-        .{ .source = "\"Unicode test: \\u0020\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u0020\"" }, // edge case
-        .{ .source = "\"Unicode test: \\u007F\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u007F\"" }, // edge case
-        .{ .source = "\"Unicode with extra: \\u1234Hello\"", .kind = .LitString, .lexeme = "\"Unicode with extra: \\u1234Hello\"" },
+        .{ .source = "\"Unicode test: \\u{1}\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u{1}\"" },
+        .{ .source = "\"Unicode test: \\u{10}\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u{10}\"" },
+        .{ .source = "\"Unicode test: \\u{100}\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u{100}\"" },
+        .{ .source = "\"Unicode test: \\u{1000}\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u{1000}\"" },
+        .{ .source = "\"Unicode test: \\u{10000}\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u{10000}\"" },
+        .{ .source = "\"Unicode test: \\u{100000}\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u{100000}\"" },
+        .{ .source = "\"Unicode test: \\u{10FFFF}\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u{10FFFF}\"" },
+        .{ .source = "\"Unicode test: \\u{0000}\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u{0000}\"" }, // edge case
+        .{ .source = "\"Unicode test: \\u{0020}\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u{0020}\"" }, // edge case
+        .{ .source = "\"Unicode test: \\u{007F}\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u{007F}\"" }, // edge case
+        .{ .source = "\"Unicode with extra: \\u{1234}Hello\"", .kind = .LitString, .lexeme = "\"Unicode with extra: \\u{1234}Hello\"" },
         .{ .source = "\"✅\"", .kind = .LitString, .lexeme = "\"✅\"" },
     };
 
@@ -1911,9 +1936,9 @@ test "[string literal]" {
 
 test "[string literal] error.CodePointOutOfRange" {
     const invalid_cases = [_][]const u8{
-        "\"\\u110000\"",
-        "\"\\uD800\"", // high surrogate
-        "\"\\uDFFF\"", // low surrogate
+        "\"\\u{110000}\"",
+        "\"\\u{D800}\"", // high surrogate
+        "\"\\u{DFFF}\"", // low surrogate
     };
 
     for (invalid_cases) |source| {
@@ -1940,8 +1965,8 @@ test "[string literal] error.UnrecognizedStrEscapeSequence" {
 
 test "[string literal] error.InvalidUnicodeEscapeSequence" {
     const invalid_cases = [_][]const u8{
-        "\"unicode missing digits: \\u\"", // Unicode escape needs at least 1 hex digit
-        "\"invalid unicode: \\uGHIJ\"", // Unicode escape must only contain hex digits
+        "\"unicode missing digits: \\u{}\"", // Unicode escape needs at least 1 hex digit
+        "\"invalid unicode: \\u{GHIJ}\"", // Unicode escape must only contain hex digits
     };
 
     for (invalid_cases) |source| {
@@ -1956,7 +1981,7 @@ test "[string literal] error.UnterminatedStrLiteral" {
     const invalid_cases = [_][]const u8{
         "\"no closing quote",
         "\"escape at end\\",
-        "\"unicode escape at end\\u123",
+        "\"unicode escape at end\\u{123}",
     };
 
     for (invalid_cases) |source| {
@@ -1977,16 +2002,16 @@ test "[char literal]" {
         .{ .source = "'\\r'", .kind = .LitChar, .lexeme = "'\\r'" },
         .{ .source = "'\\''", .kind = .LitChar, .lexeme = "'\\''" },
         .{ .source = "'\\\\'", .kind = .LitChar, .lexeme = "'\\\\'" },
-        .{ .source = "'\\u1'", .kind = .LitChar, .lexeme = "'\\u1'" },
-        .{ .source = "'\\u10'", .kind = .LitChar, .lexeme = "'\\u10'" },
-        .{ .source = "'\\u100'", .kind = .LitChar, .lexeme = "'\\u100'" },
-        .{ .source = "'\\u1000'", .kind = .LitChar, .lexeme = "'\\u1000'" },
-        .{ .source = "'\\u10000'", .kind = .LitChar, .lexeme = "'\\u10000'" },
-        .{ .source = "'\\u100000'", .kind = .LitChar, .lexeme = "'\\u100000'" },
-        .{ .source = "'\\u10FFFF'", .kind = .LitChar, .lexeme = "'\\u10FFFF'" },
-        .{ .source = "'\\u0000'", .kind = .LitChar, .lexeme = "'\\u0000'" }, // edge case
-        .{ .source = "'\\u0020'", .kind = .LitChar, .lexeme = "'\\u0020'" }, // edge case
-        .{ .source = "'\\u007F'", .kind = .LitChar, .lexeme = "'\\u007F'" }, // edge case
+        .{ .source = "'\\u{1}'", .kind = .LitChar, .lexeme = "'\\u{1}'" },
+        .{ .source = "'\\u{10}'", .kind = .LitChar, .lexeme = "'\\u{10}'" },
+        .{ .source = "'\\u{100}'", .kind = .LitChar, .lexeme = "'\\u{100}'" },
+        .{ .source = "'\\u{1000}'", .kind = .LitChar, .lexeme = "'\\u{1000}'" },
+        .{ .source = "'\\u{10000}'", .kind = .LitChar, .lexeme = "'\\u{10000}'" },
+        .{ .source = "'\\u{100000}'", .kind = .LitChar, .lexeme = "'\\u{100000}'" },
+        .{ .source = "'\\u{10FFFF}'", .kind = .LitChar, .lexeme = "'\\u{10FFFF}'" },
+        .{ .source = "'\\u{0000}'", .kind = .LitChar, .lexeme = "'\\u{0000}'" }, // edge case
+        .{ .source = "'\\u{0020}'", .kind = .LitChar, .lexeme = "'\\u{0020}'" }, // edge case
+        .{ .source = "'\\u{007F}'", .kind = .LitChar, .lexeme = "'\\u{007F}'" }, // edge case
     };
 
     for (cases) |case| {
@@ -2012,9 +2037,9 @@ test "[char literal] error.EmptyCharLiteral" {
 
 test "[char literal] error.CodePointOutOfRange" {
     const invalid_cases = [_][]const u8{
-        "'\\u110000'",
-        "'\\uD800'", // high surrogate
-        "'\\uDFFF'", // low surrogate
+        "'\\u{110000}'",
+        "'\\u{D800}'", // high surrogate
+        "'\\u{DFFF}'", // low surrogate
     };
 
     for (invalid_cases) |source| {
@@ -2046,8 +2071,8 @@ test "[char literal] error.MultipleCharsInLiteral" {
         "'\\n\n'",
         "'a\\n'",
         "'\\na'",
-        "'\\u123k'",
-        "'\\u000000a'",
+        "'\\u{123}k'",
+        "'\\u{000000}a'",
     };
 
     for (invalid_cases) |source| {
@@ -2080,8 +2105,8 @@ test "[char literal] error.UnterminatedCharLiteral" {
 
 test "[char literal] error.InvalidUnicodeEscapeSequence" {
     const invalid_cases = [_][]const u8{
-        "'\\u'",
-        "'\\ug'",
+        "'\\u{}'",
+        "'\\u{g}'",
     };
 
     for (invalid_cases) |source| {

@@ -80,7 +80,7 @@ pub const Diagnostic = struct {
             \\
             \\So is there a way to write it like one of those?
             ,
-            error.InvalidUnicodeEscapeSequence => "Unicode escape sequences must be in the format \\uXXXXXX where X is a valid hexadecimal digit.",
+            error.InvalidUnicodeEscapeSequence => "Unicode escape sequences must be in the format \\u{XXXXXX} where X is a valid hexadecimal digit.",
             error.MultipleCharsInLiteral => "Use string literals (\"\") for multiple characters or escape sequences for special characters.",
             error.UnrecognizedCharEscapeSequence =>
             \\In character literals, the only valid escape sequences are:
@@ -90,7 +90,7 @@ pub const Diagnostic = struct {
             \\    \t  - tab
             \\    \\  - backslash
             \\    \'  - single quote
-            \\    \u  - Unicode escape (e.g., \u0061 for 'a')
+            \\    \u  - Unicode escape (e.g., \u{0061} for 'a')
             ,
             error.UnrecognizedStrEscapeSequence =>
             \\In string literals, the only valid escape sequences are:
@@ -101,7 +101,7 @@ pub const Diagnostic = struct {
             \\    \b  - backspace
             \\    \\  - backslash
             \\    \"  - double quote
-            \\    \u  - Unicode escape (e.g., \u0061 for "a")
+            \\    \u  - Unicode escape (e.g., \u{0061} for "a")
             ,
             error.UnterminatedCharLiteral => "Character literals must be closed with a single quote ('). Did you forget the closing quote?",
             error.UnterminatedStrLiteral => "String literals must be closed with a double quote (\"). Did you forget the closing quote?",
