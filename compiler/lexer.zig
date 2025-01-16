@@ -158,7 +158,8 @@ pub const LexerError = error{
     InvalidIntLiteral,
     InvalidUnicodeEscapeSequence,
     MultipleCharsInLiteral,
-    UnrecognizedEscapeSequence,
+    UnrecognizedCharEscapeSequence,
+    UnrecognizedStrEscapeSequence,
     UnterminatedCharLiteral,
     UnterminatedStrLiteral,
 };
@@ -272,7 +273,7 @@ pub const Lexer = struct {
         };
     }
 
-    fn lexInteger(self: *Lexer, base: enum { Decimal, Hex, Octal, Binary }) !Token {
+    fn lexInteger(self: *Lexer, base: enum { Decimal, Hex, Octal, Binary }) LexerError!Token {
         const offset = if (base == .Decimal) @as(usize, 0) else 2;
         const mark = self.loc.buf.end - offset;
         const col_offset = self.loc.src.col - offset;
@@ -342,7 +343,7 @@ pub const Lexer = struct {
         return true;
     }
 
-    fn handleUnicodeEscape(self: *Lexer) !void {
+    fn handleUnicodeEscape(self: *Lexer) LexerError!void {
         self.advance();
 
         // Save the starting position of the hex digits
@@ -572,11 +573,9 @@ pub const Lexer = struct {
 
                         const escaped_char = self.peek() orelse return error.UnterminatedStrLiteral;
                         switch (escaped_char) {
-                            '\\', '"', 'n', 't', 'r', 'b' => {
-                                self.advance();
-                            },
+                            '\\', '"', 'n', 't', 'r', 'b' => self.advance(),
                             'u' => try self.handleUnicodeEscape(),
-                            else => return error.UnrecognizedEscapeSequence,
+                            else => return error.UnrecognizedStrEscapeSequence,
                         }
                     } else {
                         const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
@@ -628,11 +627,9 @@ pub const Lexer = struct {
 
                         const escaped_char = self.peek() orelse return error.UnterminatedCharLiteral;
                         switch (escaped_char) {
-                            '\\', '\'', 'n', 't', 'r' => {
-                                self.advance();
-                            },
+                            '\\', '\'', 'n', 't', 'r' => self.advance(),
                             'u' => try self.handleUnicodeEscape(),
-                            else => return error.UnrecognizedEscapeSequence,
+                            else => return error.UnrecognizedCharEscapeSequence,
                         }
                     } else {
                         char_count += 1;
@@ -1913,7 +1910,7 @@ test "[string literal] error.CodePointOutOfRange" {
     }
 }
 
-test "[string literal] error.UnrecognizedEscapeSequence" {
+test "[string literal] error.UnrecognizedStrEscapeSequence" {
     const invalid_cases = [_][]const u8{
         "\"\\q\"",
         "\"\\k\"",
@@ -1923,7 +1920,7 @@ test "[string literal] error.UnrecognizedEscapeSequence" {
         var lexer = Lexer.init(source, TEST_FILE);
 
         const result = lexer.nextToken();
-        try testing.expectError(error.UnrecognizedEscapeSequence, result);
+        try testing.expectError(error.UnrecognizedStrEscapeSequence, result);
     }
 }
 
@@ -2014,7 +2011,7 @@ test "[char literal] error.CodePointOutOfRange" {
     }
 }
 
-test "[char literal] error.UnrecognizedEscapeSequence" {
+test "[char literal] error.UnrecognizedCharEscapeSequence" {
     const invalid_cases = [_][]const u8{
         "'\\q'",
         "'\\k'",
@@ -2024,7 +2021,7 @@ test "[char literal] error.UnrecognizedEscapeSequence" {
         var lexer = Lexer.init(source, TEST_FILE);
 
         const result = lexer.nextToken();
-        try testing.expectError(error.UnrecognizedEscapeSequence, result);
+        try testing.expectError(error.UnrecognizedCharEscapeSequence, result);
     }
 }
 
