@@ -54,21 +54,21 @@ pub const TokenKind = enum {
 
     // Symbols
     SymArrowRight,
-    SymDollarSign,
     SymDoubleArrowRight,
     SymPipe,
     SymUnderscore,
 
     // Operators
-    OpAppend,
     OpAssign,
     OpComposeLeft,
     OpComposeRight,
     OpCons,
     OpDoubleDot,
     OpLambda,
+    OpListConcat,
     OpPipeLeft,
     OpPipeRight,
+    OpStrConcat,
 
     // Arithmetic Operators
     OpExp,
@@ -685,6 +685,26 @@ pub const Lexer = struct {
                     }
                 }
 
+                if (self.peek()) |next| {
+                    if (next == '+') {
+                        self.advance();
+
+                        const end_loc = TokenLoc{
+                            .filename = self.loc.filename,
+                            .buf = .{
+                                .start = buf_start,
+                                .end = self.loc.buf.end,
+                            },
+                            .src = .{
+                                .line = start_line,
+                                .col = start_col,
+                            },
+                        };
+
+                        return Token.init(.OpListConcat, "++", end_loc);
+                    }
+                }
+
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
                     .buf = .{
@@ -901,7 +921,7 @@ pub const Lexer = struct {
                             },
                         };
 
-                        return Token.init(.OpAppend, "<>", end_loc);
+                        return Token.init(.OpStrConcat, "<>", end_loc);
                     }
 
                     if (next == '|') {
@@ -1172,23 +1192,6 @@ pub const Lexer = struct {
                 };
 
                 return Token.init(.DelComma, ",", end_loc);
-            },
-            '$' => {
-                self.advance();
-
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .buf = .{
-                        .start = buf_start,
-                        .end = self.loc.buf.end,
-                    },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.SymDollarSign, "$", end_loc);
             },
             '.' => {
                 self.advance();
@@ -1680,7 +1683,6 @@ test "[delimiter]" {
 test "[symbol]" {
     const cases = [_]TestCase{
         .{ .source = "->", .kind = .SymArrowRight, .lexeme = "->" },
-        .{ .source = "$", .kind = .SymDollarSign, .lexeme = "$" },
         .{ .source = "=>", .kind = .SymDoubleArrowRight, .lexeme = "=>" },
         .{ .source = "|", .kind = .SymPipe, .lexeme = "|" },
         .{ .source = "_", .kind = .SymUnderscore, .lexeme = "_" },
@@ -1700,14 +1702,15 @@ test "[symbol]" {
 
 test "[operator]" {
     const cases = [_]TestCase{
-        .{ .source = "<>", .kind = .OpAppend, .lexeme = "<>" },
-        .{ .source = "=", .kind = .OpAssign, .lexeme = "=" },
-        .{ .source = "<<", .kind = .OpComposeLeft, .lexeme = "<<" },
-        .{ .source = ">>", .kind = .OpComposeRight, .lexeme = ">>" },
-        .{ .source = "::", .kind = .OpCons, .lexeme = "::" },
+        .{ .source = "++", .kind = .OpListConcat, .lexeme = "++" },
         .{ .source = "..", .kind = .OpDoubleDot, .lexeme = ".." },
-        .{ .source = "\\", .kind = .OpLambda, .lexeme = "\\" },
+        .{ .source = "::", .kind = .OpCons, .lexeme = "::" },
+        .{ .source = "<<", .kind = .OpComposeLeft, .lexeme = "<<" },
+        .{ .source = "<>", .kind = .OpStrConcat, .lexeme = "<>" },
         .{ .source = "<|", .kind = .OpPipeLeft, .lexeme = "<|" },
+        .{ .source = "=", .kind = .OpAssign, .lexeme = "=" },
+        .{ .source = ">>", .kind = .OpComposeRight, .lexeme = ">>" },
+        .{ .source = "\\", .kind = .OpLambda, .lexeme = "\\" },
         .{ .source = "|>", .kind = .OpPipeRight, .lexeme = "|>" },
     };
 
