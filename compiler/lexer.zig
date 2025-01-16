@@ -601,24 +601,13 @@ pub const Lexer = struct {
                 if (self.peek() == '\'') return error.EmptyCharLiteral;
 
                 var char_count: usize = 0;
+                var found_closing_quote = false;
+
                 while (self.peek()) |next| {
                     if (next == '\'') {
                         self.advance();
-
-                        const lexeme = self.source[mark..self.loc.buf.end];
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .buf = .{
-                                .start = mark,
-                                .end = self.loc.buf.end,
-                            },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.LitChar, lexeme, end_loc);
+                        found_closing_quote = true;
+                        break;
                     }
 
                     if (next == '\\') {
@@ -645,11 +634,26 @@ pub const Lexer = struct {
                             self.advance();
                         }
                     }
-
-                    if (char_count > 1) return error.MultipleCharsInLiteral;
                 }
 
-                return error.UnterminatedCharLiteral;
+                if (!found_closing_quote) return error.UnterminatedCharLiteral;
+
+                if (char_count > 1) return error.MultipleCharsInLiteral;
+
+                const lexeme = self.source[mark..self.loc.buf.end];
+                const end_loc = TokenLoc{
+                    .filename = self.loc.filename,
+                    .buf = .{
+                        .start = mark,
+                        .end = self.loc.buf.end,
+                    },
+                    .src = .{
+                        .line = start_line,
+                        .col = start_col,
+                    },
+                };
+
+                return Token.init(.LitChar, lexeme, end_loc);
             },
             '+' => {
                 self.advance();
