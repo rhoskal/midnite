@@ -548,24 +548,14 @@ pub const Lexer = struct {
                     }
                 }
 
+                var found_closing_quote = false;
+
                 while (self.peek()) |next| {
                     if (next == '"') {
                         self.advance();
 
-                        const lexeme = self.source[mark..self.loc.buf.end];
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .buf = .{
-                                .start = mark,
-                                .end = self.loc.buf.end,
-                            },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.LitString, lexeme, end_loc);
+                        found_closing_quote = true;
+                        break;
                     }
 
                     if (next == '\\') {
@@ -592,7 +582,22 @@ pub const Lexer = struct {
                     }
                 }
 
-                return error.UnterminatedStrLiteral;
+                if (!found_closing_quote) return error.UnterminatedStrLiteral;
+
+                const lexeme = self.source[mark..self.loc.buf.end];
+                const end_loc = TokenLoc{
+                    .filename = self.loc.filename,
+                    .buf = .{
+                        .start = mark,
+                        .end = self.loc.buf.end,
+                    },
+                    .src = .{
+                        .line = start_line,
+                        .col = start_col,
+                    },
+                };
+
+                return Token.init(.LitString, lexeme, end_loc);
             },
             '\'' => {
                 const mark = buf_start;
@@ -606,12 +611,14 @@ pub const Lexer = struct {
                 while (self.peek()) |next| {
                     if (next == '\'') {
                         self.advance();
+
                         found_closing_quote = true;
                         break;
                     }
 
                     if (next == '\\') {
                         self.advance();
+
                         char_count += 1;
 
                         const escaped_char = self.peek() orelse return error.UnterminatedCharLiteral;
