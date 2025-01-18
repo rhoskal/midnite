@@ -142,7 +142,10 @@ const Parser = struct {
             if (unquoted[i] == '\\') {
                 const sequence = try self.parseStrEscapeSequence(unquoted[i..]);
                 try result.appendSlice(sequence.value);
-                self.allocator.free(sequence.value);
+
+                if (unquoted[i + 1] == 'u') {
+                    self.allocator.free(sequence.value);
+                }
 
                 i += sequence.len;
             } else {
@@ -165,11 +168,11 @@ const Parser = struct {
 
     fn parseStrEscapeSequence(self: *Parser, unquoted: []const u8) !EscapeSequence {
         return switch (unquoted[1]) {
-            'n' => .{ .value = try self.allocator.dupe(u8, "\n"), .len = 2 },
-            'r' => .{ .value = try self.allocator.dupe(u8, "\r"), .len = 2 },
-            't' => .{ .value = try self.allocator.dupe(u8, "\t"), .len = 2 },
-            '\\' => .{ .value = try self.allocator.dupe(u8, "\\"), .len = 2 },
-            '\"' => .{ .value = try self.allocator.dupe(u8, "\""), .len = 2 },
+            'n' => .{ .value = "\n", .len = 2 },
+            'r' => .{ .value = "\r", .len = 2 },
+            't' => .{ .value = "\t", .len = 2 },
+            '\\' => .{ .value = "\\", .len = 2 },
+            '\"' => .{ .value = "\"", .len = 2 },
             'u' => {
                 // Handle Unicode escape \u{XXXXXX} where XXXXXX is 1-6 hex digits
                 const brace_index = std.mem.indexOfScalar(u8, unquoted[3..], '}') orelse return error.InvalidUnicodeEscape;
