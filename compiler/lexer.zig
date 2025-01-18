@@ -659,6 +659,21 @@ pub const Lexer = struct {
                                 return Token.init(.LitMultilineString, lexeme, end_loc);
                             }
                         }
+
+                        const lexeme = self.source[mark..self.loc.buf.end];
+                        const end_loc = TokenLoc{
+                            .filename = self.loc.filename,
+                            .buf = .{
+                                .start = mark,
+                                .end = self.loc.buf.end,
+                            },
+                            .src = .{
+                                .line = start_line,
+                                .col = start_col,
+                            },
+                        };
+
+                        return Token.init(.LitString, lexeme, end_loc);
                     }
                 }
 
@@ -677,7 +692,7 @@ pub const Lexer = struct {
 
                         const escaped_char = self.peek() orelse return error.UnterminatedStrLiteral;
                         switch (escaped_char) {
-                            '\\', '"', 'n', 't', 'r', 'b' => self.advance(),
+                            '\\', '"', 'n', 't', 'r' => self.advance(),
                             'u' => try self.handleUnicodeEscape(),
                             else => return error.UnrecognizedStrEscapeSequence,
                         }
@@ -1990,6 +2005,7 @@ test "[multiline string] error.UnterminatedStrLiteral" {
 
 test "[string literal]" {
     const cases = [_]TestCase{
+        .{ .source = "\"\"", .kind = .LitString, .lexeme = "\"\"" },
         .{ .source = "\"foo\"", .kind = .LitString, .lexeme = "\"foo\"" },
         .{ .source = "\"1\"", .kind = .LitString, .lexeme = "\"1\"" },
         .{ .source = "\"$\"", .kind = .LitString, .lexeme = "\"$\"" },
@@ -1998,7 +2014,6 @@ test "[string literal]" {
         .{ .source = "\"First line\\nSecond line\"", .kind = .LitString, .lexeme = "\"First line\\nSecond line\"" },
         .{ .source = "\"Column1\\tColumn2\\tColumn3\"", .kind = .LitString, .lexeme = "\"Column1\\tColumn2\\tColumn3\"" },
         .{ .source = "\"Carriage return\\rOverwritten text\"", .kind = .LitString, .lexeme = "\"Carriage return\\rOverwritten text\"" },
-        .{ .source = "\"Backspace test: abc\\bdef\"", .kind = .LitString, .lexeme = "\"Backspace test: abc\\bdef\"" },
         .{ .source = "\"Unicode test: \\u{1}\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u{1}\"" },
         .{ .source = "\"Unicode test: \\u{10}\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u{10}\"" },
         .{ .source = "\"Unicode test: \\u{100}\"", .kind = .LitString, .lexeme = "\"Unicode test: \\u{100}\"" },

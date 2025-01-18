@@ -15,7 +15,7 @@ pub const DocCommentNode = struct {
 };
 
 /// Represents a literal integer value.
-pub const IntegerLiteralNode = struct {
+pub const IntLiteralNode = struct {
     value: i64,
     token: lexer.Token,
 };
@@ -27,14 +27,20 @@ pub const FloatLiteralNode = struct {
 };
 
 /// Represents a string literal value.
-pub const StringLiteralNode = struct {
+pub const StrLiteralNode = struct {
     value: []const u8,
     token: lexer.Token,
 };
 
+/// Represents a multiline string literal value.
+pub const MultilineStrLiteralNode = struct {
+    value: []const u8,
+    token: lexer.Toke,
+};
+
 /// Represents a char literal value.
 pub const CharLiteralNode = struct {
-    value: u21, // Unicode codepoint
+    value: u21,
     token: lexer.Token,
 };
 
@@ -68,7 +74,7 @@ pub const ComparisonExprNode = BinaryOp;
 /// A unary operation node representing operations with only one operand.
 ///
 /// Examples:
-/// - Negation: `-`
+/// - Negation: (-)
 pub const UnaryExprNode = struct {
     operator: lexer.Token,
     operand: *Node,
@@ -144,9 +150,9 @@ pub const Node = union(enum) {
     doc_comment: DocCommentNode,
 
     // Literal Types
-    integer_literal: IntegerLiteralNode,
+    integer_literal: IntLiteralNode,
     float_literal: FloatLiteralNode,
-    string_literal: StringLiteralNode,
+    string_literal: StrLiteralNode,
     char_literal: CharLiteralNode,
 
     // Expressions
