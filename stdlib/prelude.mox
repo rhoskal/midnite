@@ -264,28 +264,29 @@ module Prelude exposing
 
   # INFIX OPERATORS
 
-  infixr 0 (<|) = ap_left
-  infixl 0 (|>) = ap_right
-  infixr 2 (||) = or
-  infixr 3 (&&) = and
-  infixn 4 (==) = eq
-  infixn 4 (/=) = neq
-  infixn 4 (<) = lt
-  infixn 4 (>) = gt
-  infixn 4 (<=) = lte
-  infixn 4 (>=) = gte
-  infixr 4 (..) = List.range
-  infixr 5 (<>) = append
-  infixr 5 (::) = List.cons
-  infixl 6 (+) = add
-  infixl 6 (-) = sub
-  infixl 6 (+.) = Float.add
-  infixl 6 (-.) = Float.sub
-  infixl 7 (*) = mul
-  infixl 7 (/) = div
-  infixl 7 (*.) = Float.mul
-  infixl 7 (/.) = Float.div
-  infixl 8 (**) = Float.pow
-  infixl 9 (<<) = compose_left
-  infixr 9 (>>) = compose_right
+  infixr 2  (<|)  = pipe_left
+  infixl 2  (|>)  = pipe_right
+  infixr 3  (||)  = logical_or
+  infixr 4  (&&)  = logical_and
+  infixn 5  (==)  = eq
+  infixn 5  (/=)  = neq
+  infixn 5  (<)   = lt
+  infixn 5  (>)   = gt
+  infixn 5  (<=)  = lte
+  infixn 5  (>=)  = gte
+  infixr 6  (++)  = List.concat
+  infixr 7  (<>)  = Str.concat
+  infixr 8  (..)  = range
+  infixr 9  (::)  = cons
+  infixl 10 (<<)  = compose_left
+  infixr 10 (>>)  = compose_right
+  infixl 11 (+)   = add
+  infixl 11 (-)   = sub
+  infixl 11 (+.)  = Float.add
+  infixl 11 (-.)  = Float.sub
+  infixl 12 (*)   = mul
+  infixl 12 (/)   = div
+  infixl 12 (*.)  = Float.mul
+  infixl 12 (/.)  = Float.div
+  infixl 13 (**)  = Float.pow
 end

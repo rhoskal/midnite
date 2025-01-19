@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const lexer = @import("lexer.zig");
-const term_color = @import("terminal_color.zig");
+const term = @import("terminal.zig");
 
 pub const Diagnostic = struct {
     problem: []const u8,
@@ -128,7 +128,7 @@ pub const Diagnostic = struct {
     const ERROR_MARKER = "^";
 
     pub fn format(self: Diagnostic, raw_writer: anytype) !void {
-        const writer = term_color.ColorWriter.init(raw_writer);
+        const writer = term.ColorWriter.init(raw_writer);
 
         // Header
         const header_text = " SYNTAX ERROR ";
@@ -137,13 +137,13 @@ pub const Diagnostic = struct {
         const suffix_dashes = HEADER_DASH ** (dash_count - 2);
 
         try writer.format("\n", .{});
-        try writer.styled(term_color.Color.Dim, prefix_dashes);
-        try writer.styled(term_color.Color.Blue, header_text);
-        try writer.styled(term_color.Color.Dim, suffix_dashes);
+        try writer.styled(term.Color.Dim, prefix_dashes);
+        try writer.styled(term.Color.Blue, header_text);
+        try writer.styled(term.Color.Dim, suffix_dashes);
         try writer.format("\n\n", .{});
 
         // Error message
-        try writer.styled(term_color.Color.Bold, self.problem);
+        try writer.styled(term.Color.Bold, self.problem);
         try writer.format("\n\n", .{});
 
         // Code snippet with line number
@@ -161,7 +161,7 @@ pub const Diagnostic = struct {
         const span_length = self.loc.buf.end - self.loc.buf.start;
         var j: usize = 0;
         while (j < span_length) : (j += 1) {
-            try writer.styled(term_color.Color.Red, "^");
+            try writer.styled(term.Color.Red, "^");
         }
 
         try writer.format("\n", .{});
@@ -172,7 +172,7 @@ pub const Diagnostic = struct {
 
         // Optional hint
         if (self.hint.len > 0) {
-            try writer.styled(term_color.Color.Cyan, "Hint: ");
+            try writer.styled(term.Color.Cyan, "Hint: ");
             try writer.plain(self.hint);
             try writer.plain("\n\n");
         }

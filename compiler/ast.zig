@@ -150,9 +150,9 @@ pub const Node = union(enum) {
     doc_comment: DocCommentNode,
 
     // Literal Types
-    integer_literal: IntLiteralNode,
+    int_literal: IntLiteralNode,
     float_literal: FloatLiteralNode,
-    string_literal: StrLiteralNode,
+    str_literal: StrLiteralNode,
     char_literal: CharLiteralNode,
 
     // Expressions
@@ -266,7 +266,7 @@ test "BinaryExprNode memory management" {
 
     const left = try allocator.create(Node);
     left.* = .{
-        .integer_literal = .{
+        .int_literal = .{
             .value = 42,
             .token = lexer.Token{
                 .kind = .LitInt,
@@ -282,7 +282,7 @@ test "BinaryExprNode memory management" {
 
     const right = try allocator.create(Node);
     right.* = .{
-        .integer_literal = .{
+        .int_literal = .{
             .value = 24,
             .token = lexer.Token{
                 .kind = .LitInt,
@@ -313,8 +313,8 @@ test "BinaryExprNode memory management" {
         },
     };
 
-    try testing.expect(binary.arithmetic_expr.left.integer_literal.value == 42);
-    try testing.expect(binary.arithmetic_expr.right.integer_literal.value == 24);
+    try testing.expect(binary.arithmetic_expr.left.int_literal.value == 42);
+    try testing.expect(binary.arithmetic_expr.right.int_literal.value == 24);
     try testing.expectEqual(lexer.TokenKind.OpIntAdd, binary.arithmetic_expr.operator.kind);
 
     binary.deinit(allocator);
@@ -330,7 +330,7 @@ test "UnaryExprNode memory management" {
 
     const operand = try allocator.create(Node);
     operand.* = .{
-        .integer_literal = .{
+        .int_literal = .{
             .value = 42,
             .token = lexer.Token{
                 .kind = .LitInt,
@@ -362,8 +362,8 @@ test "UnaryExprNode memory management" {
 
     try testing.expectEqual(lexer.TokenKind.OpIntSub, unary.unary_expr.operator.kind);
     try testing.expectEqualStrings("-", unary.unary_expr.operator.lexeme);
-    try testing.expectEqual(lexer.TokenKind.LitInt, unary.unary_expr.operand.integer_literal.token.kind);
-    try testing.expect(unary.unary_expr.operand.integer_literal.value == 42);
+    try testing.expectEqual(lexer.TokenKind.LitInt, unary.unary_expr.operand.int_literal.token.kind);
+    try testing.expect(unary.unary_expr.operand.int_literal.value == 42);
 
     unary.deinit(allocator);
     allocator.destroy(unary);
