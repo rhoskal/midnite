@@ -3,18 +3,17 @@ const std = @import("std");
 const ast = @import("ast.zig");
 const lexer = @import("lexer.zig");
 
-const ParserError =
-    lexer.LexerError ||
-    std.fmt.ParseIntError ||
-    std.fmt.ParseFloatError ||
-    std.mem.Allocator.Error ||
-    error{
+pub const ParseError = error{
+    UnexpectedToken,
+    InvalidIntLiteral,
+    InvalidFloatLiteral,
     InvalidCharLiteral,
     InvalidStrLiteral,
-    UnexpectedToken,
 };
 
-const Parser = struct {
+pub const ParserError = ParseError || lexer.LexerError || std.mem.Allocator.Error;
+
+pub const Parser = struct {
     lex: *lexer.Lexer,
     allocator: std.mem.Allocator,
     current_token: lexer.Token,
@@ -189,7 +188,9 @@ const Parser = struct {
     /// Underscores in numbers are allowed and ignored (e.g., 1_000_000).
     fn parseIntLiteral(self: *Parser) ParserError!ast.IntLiteralNode {
         const token = try self.expect(lexer.TokenKind.LitInt);
-        const value = try std.fmt.parseInt(i64, token.lexeme, 0);
+        const value = std.fmt.parseInt(i64, token.lexeme, 0) catch {
+            return error.InvalidIntLiteral;
+        };
 
         return ast.IntLiteralNode{
             .value = value,
@@ -202,7 +203,9 @@ const Parser = struct {
     /// Underscores in numbers are allowed and ignored (e.g., 3.141_592).
     fn parseFloatLiteral(self: *Parser) ParserError!ast.FloatLiteralNode {
         const token = try self.expect(lexer.TokenKind.LitFloat);
-        const value = try std.fmt.parseFloat(f64, token.lexeme);
+        const value = std.fmt.parseFloat(f64, token.lexeme) catch {
+            return error.InvalidFloatLiteral;
+        };
 
         return ast.FloatLiteralNode{
             .value = value,
@@ -211,7 +214,7 @@ const Parser = struct {
     }
 
     /// Parses a string literal into a structured node.
-    fn parseStrLiteral(self: *Parser) !ast.StrLiteralNode {
+    fn parseStrLiteral(self: *Parser) ParserError!ast.StrLiteralNode {
         const token = try self.expect(lexer.TokenKind.LitString);
 
         // Strip quotes
@@ -249,7 +252,7 @@ const Parser = struct {
         len: usize,
     };
 
-    fn parseStrEscapeSequence(self: *Parser, unquoted: []const u8) !EscapeSequence {
+    fn parseStrEscapeSequence(self: *Parser, unquoted: []const u8) ParserError!EscapeSequence {
         return switch (unquoted[1]) {
             'n' => .{ .value = "\n", .len = 2 },
             'r' => .{ .value = "\r", .len = 2 },
@@ -258,12 +261,16 @@ const Parser = struct {
             '\"' => .{ .value = "\"", .len = 2 },
             'u' => {
                 // Handle Unicode escape \u{XXXXXX} where XXXXXX is 1-6 hex digits
-                const brace_index = std.mem.indexOfScalar(u8, unquoted[3..], '}') orelse return error.InvalidUnicodeEscape;
+                const brace_index = std.mem.indexOfScalar(u8, unquoted[3..], '}') orelse return error.InvalidStrLiteral;
                 const hex = unquoted[3 .. 3 + brace_index];
-                const code_point = try std.fmt.parseInt(u21, hex, 16);
+                const code_point = std.fmt.parseInt(u21, hex, 16) catch {
+                    return error.InvalidStrLiteral;
+                };
 
                 var utf8_buffer: [4]u8 = undefined;
-                const utf8_len = try std.unicode.utf8Encode(code_point, &utf8_buffer);
+                const utf8_len = std.unicode.utf8Encode(code_point, &utf8_buffer) catch {
+                    return error.InvalidStrLiteral;
+                };
 
                 // Length is: \u{ + hex digits + }
                 const sequence_len = 3 + hex.len + 1;
@@ -273,7 +280,7 @@ const Parser = struct {
                     .len = sequence_len,
                 };
             },
-            else => unreachable,
+            else => return error.InvalidStrLiteral,
         };
     }
 
@@ -292,7 +299,9 @@ const Parser = struct {
         if (unquoted[0] == '\\') {
             value = try parseCharEscapeSequence(unquoted);
         } else {
-            value = std.unicode.utf8Decode(unquoted) catch unreachable;
+            value = std.unicode.utf8Decode(unquoted) catch {
+                return error.InvalidCharLiteral;
+            };
         }
 
         return ast.CharLiteralNode{
@@ -301,7 +310,7 @@ const Parser = struct {
         };
     }
 
-    fn parseCharEscapeSequence(unquoted: []const u8) !u21 {
+    fn parseCharEscapeSequence(unquoted: []const u8) ParserError!u21 {
         return switch (unquoted[1]) {
             'n' => '\n',
             'r' => '\r',
@@ -313,9 +322,11 @@ const Parser = struct {
                 // Skip the \u{ and }
                 const hex = unquoted[3 .. unquoted.len - 1];
 
-                return try std.fmt.parseInt(u21, hex, 16);
+                return std.fmt.parseInt(u21, hex, 16) catch {
+                    return error.InvalidCharLiteral;
+                };
             },
-            else => unreachable,
+            else => error.InvalidCharLiteral,
         };
     }
 
