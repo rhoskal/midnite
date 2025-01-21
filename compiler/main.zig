@@ -40,6 +40,8 @@ pub fn main() !void {
         try stdout.print("Token: {s} ({any})\n", .{ token.lexeme, token.kind });
     }
 
-    // const ast = try parser.parse(tokens);
-    // std.debug.print("AST: {}\n", .{ast});
+    const p = try parser.Parser.init(&lex, allocator);
+    const ast = try p.parseProgram();
+    std.debug.print("\nAST:\n", .{});
+    std.debug.print("{}\n", .{ast});
 }

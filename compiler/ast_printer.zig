@@ -22,35 +22,52 @@ pub const AstPrinter = struct {
     /// Print a complete AST node and its children.
     pub fn printNode(self: *AstPrinter, node: *const ast.Node) !void {
         switch (node.*) {
+            .char_literal => |lit| {
+                try self.writer.styled(term.Color.Bold, "CharacterLiteral");
+                try self.writer.plain("('");
+                try self.writer.styled(term.Color.Green, try std.fmt.allocPrint(
+                    self.allocator,
+                    "{u}",
+                    .{lit.value},
+                ));
+                try self.writer.plain("')\n");
+            },
+            .float_literal => |lit| {
+                try self.writer.styled(term.Color.Bold, "FloatLiteral");
+                try self.writer.plain("(");
+                try self.writer.styled(term.Color.Green, try std.fmt.allocPrint(
+                    self.allocator,
+                    "{d}",
+                    .{lit.value},
+                ));
+                try self.writer.plain(")\n");
+            },
+            .int_literal => |lit| {
+                try self.writer.styled(term.Color.Bold, "IntegerLiteral");
+                try self.writer.plain("(");
+                const formatted = try std.fmt.allocPrint(
+                    self.allocator,
+                    "{d}",
+                    .{lit.value},
+                );
+                defer self.allocator.free(formatted);
+                try self.writer.styled(term.Color.Green, formatted);
+                try self.writer.plain(")\n");
+            },
+            .str_literal => |lit| {
+                try self.writer.styled(term.Color.Bold, "StringLiteral");
+                try self.writer.plain("(\"");
+                try self.writer.styled(term.Color.Green, lit.value);
+                try self.writer.plain("\")\n");
+            },
+            .list => {
+                try self.writer.styled(term.Color.Bold, "List");
+                try self.writer.plain("(");
+                try self.writer.styled(term.Color.Green, "type");
+                try self.writer.plain(")\n");
+            },
             .arithmetic_expr => |expr| {
                 try self.writer.styled(term.Color.Bold, "ArithmeticExpr");
-                try self.writer.styled(term.Color.Dim, " {\n");
-
-                self.indent_level += 1;
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "operator: ");
-                try self.writer.styled(term.Color.Yellow, @tagName(expr.operator.kind));
-                try self.writer.plain(" (");
-                try self.writer.styled(term.Color.Yellow, expr.operator.lexeme);
-                try self.writer.plain(")\n");
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "left: ");
-                try self.printNode(expr.left);
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "right: ");
-                try self.printNode(expr.right);
-
-                self.indent_level -= 1;
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Dim, "}\n");
-            },
-            .logical_expr => |expr| {
-                try self.printIndent();
-                try self.writer.styled(term.Color.Bold, "LogicalExpr");
                 try self.writer.styled(term.Color.Dim, " {\n");
 
                 self.indent_level += 1;
@@ -102,6 +119,33 @@ pub const AstPrinter = struct {
                 try self.printIndent();
                 try self.writer.styled(term.Color.Dim, "}\n");
             },
+            .logical_expr => |expr| {
+                try self.printIndent();
+                try self.writer.styled(term.Color.Bold, "LogicalExpr");
+                try self.writer.styled(term.Color.Dim, " {\n");
+
+                self.indent_level += 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "operator: ");
+                try self.writer.styled(term.Color.Yellow, @tagName(expr.operator.kind));
+                try self.writer.plain(" (");
+                try self.writer.styled(term.Color.Yellow, expr.operator.lexeme);
+                try self.writer.plain(")\n");
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "left: ");
+                try self.printNode(expr.left);
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "right: ");
+                try self.printNode(expr.right);
+
+                self.indent_level -= 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Dim, "}\n");
+            },
             .unary_expr => |expr| {
                 try self.printIndent();
                 try self.writer.styled(term.Color.Bold, "UnaryExpr");
@@ -124,44 +168,6 @@ pub const AstPrinter = struct {
 
                 try self.printIndent();
                 try self.writer.styled(term.Color.Dim, "}\n");
-            },
-            .int_literal => |lit| {
-                try self.writer.styled(term.Color.Bold, "IntegerLiteral");
-                try self.writer.plain("(");
-                const formatted = try std.fmt.allocPrint(
-                    self.allocator,
-                    "{d}",
-                    .{lit.value},
-                );
-                defer self.allocator.free(formatted);
-                try self.writer.styled(term.Color.Green, formatted);
-                try self.writer.plain(")\n");
-            },
-            .float_literal => |lit| {
-                try self.writer.styled(term.Color.Bold, "FloatLiteral");
-                try self.writer.plain("(");
-                try self.writer.styled(term.Color.Green, try std.fmt.allocPrint(
-                    self.allocator,
-                    "{d}",
-                    .{lit.value},
-                ));
-                try self.writer.plain(")\n");
-            },
-            .str_literal => |lit| {
-                try self.writer.styled(term.Color.Bold, "StringLiteral");
-                try self.writer.plain("(\"");
-                try self.writer.styled(term.Color.Green, lit.value);
-                try self.writer.plain("\")\n");
-            },
-            .char_literal => |lit| {
-                try self.writer.styled(term.Color.Bold, "CharacterLiteral");
-                try self.writer.plain("('");
-                try self.writer.styled(term.Color.Green, try std.fmt.allocPrint(
-                    self.allocator,
-                    "{u}",
-                    .{lit.value},
-                ));
-                try self.writer.plain("')\n");
             },
             .lower_identifier => |id| {
                 try self.writer.styled(term.Color.Bold, "LowerIdent");

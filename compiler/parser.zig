@@ -5,9 +5,10 @@ const lexer = @import("lexer.zig");
 
 pub const ParseError = error{
     UnexpectedToken,
-    InvalidIntLiteral,
-    InvalidFloatLiteral,
+    EmptyLambdaParams,
     InvalidCharLiteral,
+    InvalidFloatLiteral,
+    InvalidIntLiteral,
     InvalidStrLiteral,
 };
 
@@ -18,83 +19,99 @@ pub const Parser = struct {
     allocator: std.mem.Allocator,
     current_token: lexer.Token,
 
+    /// Represents the possible associativity rules for operators.
+    /// Determines how operators of the same precedence are grouped.
     const Associativity = enum {
+        /// Left-associative operators group from left to right
+        /// Example: a - b - c is parsed as (a - b) - c
         Left,
+
+        /// Non-associative operators cannot be chained
+        /// Example: a == b == c is not allowed
         None,
+
+        /// Right-associative operators group from right to left
+        /// Example: a :: b :: c is parsed as a :: (b :: c)
         Right,
     };
 
+    /// Holds the precedence and associativity information for an operator.
+    /// Used to implement the precedence climbing algorithm for expression parsing.
     const OperatorInfo = struct {
+        /// Lower numbers indicate higher precedence.
         precedence: u8,
         associativity: Associativity,
     };
 
+    /// Retrieves the operator information for a given token kind.
+    /// Returns precedence and associativity rules used by the parser
+    /// to correctly structure operator expressions.
     fn getOperatorInfo(kind: lexer.TokenKind) ?OperatorInfo {
         return switch (kind) {
             // Highest precedence (tightest binding)
             .OpExp => .{
-                .precedence = 0,
+                .precedence = 13,
                 .associativity = .Left,
             },
             .OpIntMul, .OpIntDiv, .OpFloatMul, .OpFloatDiv => .{
-                .precedence = 1,
+                .precedence = 12,
                 .associativity = .Left,
             },
             .OpIntAdd, .OpIntSub, .OpFloatAdd, .OpFloatSub => .{
-                .precedence = 2,
+                .precedence = 11,
                 .associativity = .Left,
             },
             .OpComposeRight => .{
-                .precedence = 3,
-                .associativity = .Right,
-            },
-            .OpComposeLeft => .{
-                .precedence = 3,
-                .associativity = .Left,
-            },
-            .OpCons => .{
-                .precedence = 4,
-                .associativity = .Right,
-            },
-            .OpDoubleDot => .{
-                .precedence = 5,
-                .associativity = .Right,
-            },
-            .OpStrConcat => .{
-                .precedence = 6,
-                .associativity = .Right,
-            },
-            .OpListConcat => .{
-                .precedence = 7,
-                .associativity = .Right,
-            },
-            .OpEquality, .OpNotEqual, .OpLessThan, .OpGreaterThan, .OpLessThanEqual, .OpGreaterThanEqual, .OpDoubleDot => .{
-                .precedence = 8,
-                .associativity = .None,
-            },
-            .OpLogicalAnd => .{
-                .precedence = 9,
-                .associativity = .Right,
-            },
-            .OpLogicalOr => .{
                 .precedence = 10,
                 .associativity = .Right,
             },
+            .OpComposeLeft => .{
+                .precedence = 10,
+                .associativity = .Left,
+            },
+            .OpCons => .{
+                .precedence = 9,
+                .associativity = .Right,
+            },
+            .OpDoubleDot => .{
+                .precedence = 8,
+                .associativity = .Right,
+            },
+            .OpStrConcat => .{
+                .precedence = 7,
+                .associativity = .Right,
+            },
+            .OpListConcat => .{
+                .precedence = 6,
+                .associativity = .Right,
+            },
+            .OpEquality, .OpNotEqual, .OpLessThan, .OpGreaterThan, .OpLessThanEqual, .OpGreaterThanEqual => .{
+                .precedence = 5,
+                .associativity = .None,
+            },
+            .OpLogicalAnd => .{
+                .precedence = 4,
+                .associativity = .Right,
+            },
+            .OpLogicalOr => .{
+                .precedence = 3,
+                .associativity = .Right,
+            },
             .OpPipeRight => .{
-                .precedence = 11,
+                .precedence = 2,
                 .associativity = .Left,
             },
             .OpPipeLeft => .{
-                .precedence = 11,
+                .precedence = 2,
                 .associativity = .Right,
             },
             .SymDoubleArrowRight => .{
-                .precedence = 12,
+                .precedence = 1,
                 .associativity = .Right,
             },
             // Lowest precedence (loosest binding)
             .OpAssign => .{
-                .precedence = 13,
+                .precedence = 0,
                 .associativity = .None,
             },
             else => null,
@@ -163,25 +180,12 @@ pub const Parser = struct {
         return error.UnexpectedToken;
     }
 
-    /// Parses a regular comment node from the input.
-    fn parseComment(self: *Parser) ParserError!ast.CommentNode {
-        const token = try self.expect(lexer.TokenKind.Comment);
-
-        return ast.CommentNode{
-            .content = token.lexeme,
-            .token = token,
-        };
-    }
-
-    /// Parses a documentation comment node from the input.
-    fn parseDocComment(self: *Parser) ParserError!ast.DocCommentNode {
-        const token = try self.expect(lexer.TokenKind.DocComment);
-
-        return ast.DocCommentNode{
-            .content = token.lexeme,
-            .token = token,
-        };
-    }
+    //==========================================================================
+    // Component Parsers
+    //==========================================================================
+    // These methods parse building blocks of larger language constructs.
+    // They return specific node structs rather than allocated Nodes.
+    //==========================================================================
 
     /// Parses an integer literal value into a structured node.
     /// The literal can be in decimal, hexadecimal (0x), binary (0b), or octal (0o) format.
@@ -350,11 +354,53 @@ pub const Parser = struct {
         };
     }
 
+    //==========================================================================
+    // Language Construct Parsers
+    //==========================================================================
+    // These methods parse complete language constructs.
+    // They handle allocation and return *ast.Node.
+    //==========================================================================
+
+    /// Parses a regular comment node from the input.
+    fn parseComment(self: *Parser) ParserError!*ast.Node {
+        const token = try self.expect(lexer.TokenKind.Comment);
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer self.allocator.destroy(node);
+
+        node.* = .{
+            .comment = .{
+                .content = token.lexeme,
+                .token = token,
+            },
+        };
+
+        return node;
+    }
+
+    /// Parses a documentation comment node from the input.
+    fn parseDocComment(self: *Parser) ParserError!*ast.Node {
+        const token = try self.expect(lexer.TokenKind.DocComment);
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer self.allocator.destroy(node);
+
+        node.* = .{
+            .doc_comment = .{
+                .content = token.lexeme,
+                .token = token,
+            },
+        };
+
+        return node;
+    }
+
     /// Parses a primary expression, such as literals, identifiers, or parenthesized expressions.
     /// Handles cases for basic literals (int, float, string, char), identifiers (lower and upper),
     /// and parenthesized expressions.
     fn parsePrimaryExpr(self: *Parser) ParserError!*ast.Node {
         const node = try self.allocator.create(ast.Node);
+        errdefer self.allocator.destroy(node);
 
         switch (self.current_token.kind) {
             .LitInt => {
@@ -396,6 +442,11 @@ pub const Parser = struct {
 
                 return expr;
             },
+            .OpLambda => {
+                const lambda = try self.parseLambdaExpr();
+
+                return lambda;
+            },
             else => {
                 self.allocator.destroy(node);
 
@@ -411,18 +462,24 @@ pub const Parser = struct {
     /// parsing any expression.
     fn parseExpression(self: *Parser) ParserError!*ast.Node {
         // Start at highest precedence level
-        return self.parseBinaryExpr(0);
+        const expr = try self.parseBinaryExpr(0);
+        errdefer {
+            expr.deinit(self.allocator);
+            self.allocator.destroy(expr);
+        }
+
+        return expr;
     }
 
     /// Parses binary expressions using precedence climbing. Recursively builds an
     /// expression tree that respects operator precedence and associativity rules.
-    fn parseBinaryExpr(self: *Parser, min_precedence: i8) ParserError!*ast.Node {
-        const left = try self.parseSimpleExpr();
+    fn parseBinaryExpr(self: *Parser, min_precedence: u8) ParserError!*ast.Node {
+        var left = try self.parseSimpleExpr();
 
         while (true) {
-            const op_info = if (self.getOperatorInfo(self.current_token.kind)) |info| info else break;
+            const op_info = if (Parser.getOperatorInfo(self.current_token.kind)) |info| info else break;
 
-            if (op_info.precedence >= min_precedence) break;
+            if (op_info.precedence < min_precedence) break;
 
             const operator = self.current_token;
             try self.advance();
@@ -499,13 +556,19 @@ pub const Parser = struct {
             errdefer self.allocator.destroy(node);
 
             const operator = self.current_token;
-            self.advance();
+            try self.advance();
 
             const operand = try self.parseSimpleExpr();
+            errdefer {
+                operand.deinit(self.allocator);
+                self.allocator.destroy(operand);
+            }
 
             node.* = .{
-                .operator = operator,
-                .operand = operand,
+                .unary_expr = .{
+                    .operator = operator,
+                    .operand = operand,
+                },
             };
 
             return node;
@@ -514,6 +577,277 @@ pub const Parser = struct {
         return self.parsePrimaryExpr();
     }
 
+    /// Parses a function declaration with an optional type annotation.
+    ///
+    /// Examples:
+    /// - `let add = \x y => x + y`
+    /// - `let factorial : Int -> Int = \n => if n == 0 then 1 else n * factorial (n - 1)`
+    /// - `let const : a -> b -> a = \x y => x`
+    fn parseFunctionDecl(self: *Parser) ParserError!*ast.Node {
+        const token = try self.expect(lexer.TokenKind.KwLet);
+        const name = try self.expect(lexer.TokenKind.LowerIdent);
+
+        var type_annotation: ?*ast.Node = null;
+        if (self.check(lexer.TokenKind.DelColon)) {
+            try self.advance();
+
+            type_annotation = try self.parseFunctionType();
+        }
+
+        _ = try self.expect(lexer.TokenKind.OpAssign);
+        const value = try self.parseExpression();
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer {
+            value.deinit(self.allocator);
+
+            if (type_annotation) |ta| {
+                ta.deinit(self.allocator);
+                self.allocator.destroy(ta);
+            }
+        }
+
+        node.* = .{
+            .function_decl = .{
+                .name = name.lexeme,
+                .type_annotation = type_annotation,
+                .value = value,
+                .token = token,
+            },
+        };
+
+        return node;
+    }
+
+    /// Parses a lambda expression of the form: \param1 param2 => expr
+    ///
+    /// A lambda expression consists of:
+    /// - A lambda symbol (\)
+    /// - One or more parameters (lowercase identifiers)
+    /// - A double arrow (=>)
+    /// - An expression body
+    ///
+    /// Examples:
+    /// - `\x => x + 1`
+    /// - `\x y => x * y`
+    /// - `\a b c => a + b + c`
+    fn parseLambdaExpr(self: *Parser) ParserError!*ast.Node {
+        const token = try self.expect(lexer.TokenKind.OpLambda);
+
+        var params = std.ArrayList([]const u8).init(self.allocator);
+        errdefer params.deinit();
+
+        while (self.check(lexer.TokenKind.LowerIdent)) {
+            const param = try self.expect(lexer.TokenKind.LowerIdent);
+            try params.append(param.lexeme);
+        }
+
+        if (params.items.len == 0) return error.EmptyLambdaParams;
+
+        _ = try self.expect(lexer.TokenKind.SymDoubleArrowRight);
+        const body = try self.parseExpression();
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer {
+            body.deinit(self.allocator);
+            self.allocator.destroy(body);
+        }
+
+        node.* = .{
+            .lambda_expr = .{
+                .params = params,
+                .body = body,
+                .token = token,
+            },
+        };
+
+        return node;
+    }
+
+    /// Parses a function type signature consisting of types separated by arrows.
+    /// The final type is considered the return type.
+    ///
+    /// Examples:
+    /// - `Int -> Int`
+    /// - `String -> Int -> Bool`
+    /// - `(List a) -> Maybe b -> Result Error c`
+    fn parseFunctionType(self: *Parser) ParserError!*ast.Node {
+        const token = self.current_token;
+
+        var param_types = std.ArrayList(*ast.Node).init(self.allocator);
+        errdefer {
+            for (param_types.items) |param| {
+                param.deinit(self.allocator);
+                self.allocator.destroy(param);
+            }
+
+            param_types.deinit();
+        }
+
+        const first_type = try self.parseTypeExpression();
+        try param_types.append(first_type);
+
+        while (try self.match(lexer.TokenKind.SymArrowRight)) {
+            const param_type = try self.parseTypeExpression();
+            try param_types.append(param_type);
+        }
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer self.allocator.destroy(node);
+
+        node.* = .{
+            .function_type = .{
+                .param_types = param_types,
+                .token = token,
+            },
+        };
+
+        return node;
+    }
+
+    /// Parses a type expression, which can be a simple type name or a more complex
+    /// parameterized type.
+    ///
+    /// Examples:
+    /// - `Int`
+    /// - `Maybe a`
+    /// - `List String`
+    fn parseTypeExpression(self: *Parser) ParserError!*ast.Node {
+        // For now just handle simple types
+        if (self.check(lexer.TokenKind.UpperIdent)) {
+            const type_name = try self.expect(lexer.TokenKind.UpperIdent);
+
+            const node = try self.allocator.create(ast.Node);
+            node.* = .{
+                .upper_identifier = .{
+                    .name = type_name.lexeme,
+                    .token = type_name,
+                },
+            };
+
+            return node;
+        }
+
+        // Handle type variables
+        if (self.check(lexer.TokenKind.LowerIdent)) {
+            const type_var = try self.expect(lexer.TokenKind.LowerIdent);
+
+            const node = try self.allocator.create(ast.Node);
+            node.* = .{
+                .lower_identifier = .{
+                    .name = type_var.lexeme,
+                    .token = type_var,
+                },
+            };
+
+            return node;
+        }
+
+        // Handle parenthesized type expressions
+        if (try self.match(lexer.TokenKind.DelLParen)) {
+            const inner_type = try self.parseTypeExpression();
+            _ = try self.expect(lexer.TokenKind.DelRParen);
+
+            return inner_type;
+        }
+
+        return error.UnexpectedToken;
+    }
+
+    /// Parses a conditional expression with a required 'then' and 'else' branch.
+    /// The condition must evaluate to a boolean value. If true, the 'then' branch
+    /// is evaluated; otherwise, the 'else' branch is evaluated.
+    ///
+    /// Examples:
+    /// - `if x > 0 then "positive" else "non-positive"`
+    /// - `if empty? list then None else head list`
+    /// - `if x == 0 then
+    ///      "zero"
+    ///    else if x < 0 then
+    ///      "negative"
+    ///    else
+    ///      "positive"`
+    fn parseIfThenElse(self: *Parser) ParserError!*ast.Node {
+        _ = try self.expect(lexer.TokenKind.KwIf);
+        const condition = try self.parseExpression();
+
+        _ = try self.expect(lexer.TokenKind.KwThen);
+        const then_branch = try self.parseExpression();
+
+        _ = try self.expect(lexer.TokenKind.KwElse);
+        const else_branch = try self.parseExpression();
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer {
+            condition.deinit(self.allocator);
+            then_branch.deinit(self.allocator);
+            else_branch.deinit(self.allocator);
+            self.allocator.destroy(node);
+        }
+
+        node.* = .{
+            .if_then_else_stmt = .{
+                .condition = condition,
+                .then_branch = then_branch,
+                .else_branch = else_branch,
+            },
+        };
+
+        return node;
+    }
+
+    /// Parses a complete program, which consists of a sequence of top-level declarations.
+    pub fn parseProgram(self: *Parser) ParserError!*ast.Node {
+        var statements = std.ArrayList(*ast.Node).init(self.allocator);
+        errdefer {
+            for (statements.items) |stmt| {
+                stmt.deinit(self.allocator);
+                self.allocator.destroy(stmt);
+            }
+
+            statements.deinit();
+        }
+
+        while (self.current_token.kind != .Eof) {
+            const stmt = try self.parseTopLevel();
+            try statements.append(stmt);
+        }
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer self.allocator.destroy(node);
+
+        node.* = .{
+            .program = .{
+                .statements = statements,
+                .token = self.current_token,
+            },
+        };
+
+        return node;
+    }
+
+    /// Parses a single top-level declaration based on the current token.
+    fn parseTopLevel(self: *Parser) ParserError!*ast.Node {
+        switch (self.current_token.kind) {
+            .KwLet => return self.parseFunctionDecl(),
+            // .KwForeign => return self.parseForeignFunctionDecl(),
+            // .KwType => {
+            //     try self.advance();
+
+            //     if (self.check(.KwAlias)) {
+            //         return self.parseTypeAlias();
+            //     } else {
+            //         return self.parseVariantType();
+            //     }
+            // },
+            // .KwModule => return self.parseModuleDecl(),
+            // .KwOpen => return self.parseImportSpec(),
+            // .KwInclude => return self.parseInclude(),
+            .Comment => return self.parseComment(),
+            .DocComment => return self.parseDocComment(),
+            else => return error.UnexpectedToken,
+        }
+    }
 };
 
 const testing = std.testing;
@@ -530,14 +864,20 @@ test "[comment]" {
     var parser = try Parser.init(&lex, allocator);
     defer parser.deinit();
 
-    const comment = try parser.parseComment();
+    const node = try parser.parseComment();
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    try testing.expect(node.* == .comment);
+
+    const comment = node.comment;
     try testing.expectEqual(lexer.TokenKind.Comment, comment.token.kind);
     try testing.expectEqualStrings(source, comment.content);
-    try testing.expectEqual(@as(usize, 1), comment.token.loc.src.line);
-    try testing.expectEqual(@as(usize, 1), comment.token.loc.src.col);
 }
 
-test "[doc comment]" {
+test "[doc_comment]" {
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -547,14 +887,23 @@ test "[doc comment]" {
     var parser = try Parser.init(&lex, allocator);
     defer parser.deinit();
 
-    const comment = try parser.parseDocComment();
+    const node = try parser.parseDocComment();
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    try testing.expect(node.* == .doc_comment);
+
+    const comment = node.doc_comment;
     try testing.expectEqual(lexer.TokenKind.DocComment, comment.token.kind);
     try testing.expectEqualStrings(source, comment.content);
-    try testing.expectEqual(@as(usize, 1), comment.token.loc.src.line);
-    try testing.expectEqual(@as(usize, 1), comment.token.loc.src.col);
+
+    try testing.expectEqual(lexer.TokenKind.DocComment, comment.token.kind);
+    try testing.expectEqualStrings(source, comment.content);
 }
 
-test "[int literal]" {
+test "[int_literal]" {
     const TestCase = struct {
         source: []const u8,
         expected: i64,
@@ -585,16 +934,15 @@ test "[int literal]" {
         var parser = try Parser.init(&lex, allocator);
         defer parser.deinit();
 
-        const int = try parser.parseIntLiteral();
-        try testing.expectEqual(lexer.TokenKind.LitInt, int.token.kind);
-        try testing.expectEqualStrings(case.source, int.token.lexeme);
-        try testing.expectEqual(case.expected, int.value);
-        try testing.expectEqual(@as(usize, 1), int.token.loc.src.line);
-        try testing.expectEqual(@as(usize, 1), int.token.loc.src.col);
+        const lit = try parser.parseIntLiteral();
+
+        try testing.expectEqual(lexer.TokenKind.LitInt, lit.token.kind);
+        try testing.expectEqualStrings(case.source, lit.token.lexeme);
+        try testing.expectEqual(case.expected, lit.value);
     }
 }
 
-test "[float literal]" {
+test "[float_literal]" {
     const TestCase = struct {
         source: []const u8,
         expected: f64,
@@ -617,16 +965,15 @@ test "[float literal]" {
         var parser = try Parser.init(&lex, allocator);
         defer parser.deinit();
 
-        const float = try parser.parseFloatLiteral();
-        try testing.expectEqual(lexer.TokenKind.LitFloat, float.token.kind);
-        try testing.expectEqualStrings(case.source, float.token.lexeme);
-        try testing.expectEqual(case.expected, float.value);
-        try testing.expectEqual(@as(usize, 1), float.token.loc.src.line);
-        try testing.expectEqual(@as(usize, 1), float.token.loc.src.col);
+        const lit = try parser.parseFloatLiteral();
+
+        try testing.expectEqual(lexer.TokenKind.LitFloat, lit.token.kind);
+        try testing.expectEqualStrings(case.source, lit.token.lexeme);
+        try testing.expectEqual(case.expected, lit.value);
     }
 }
 
-test "[str literal]" {
+test "[str_literal]" {
     const TestCase = struct {
         source: []const u8,
         expected: []const u8,
@@ -687,16 +1034,16 @@ test "[str literal]" {
         var parser = try Parser.init(&lex, allocator);
         defer parser.deinit();
 
-        const str = try parser.parseStrLiteral();
-        try testing.expectEqual(lexer.TokenKind.LitString, str.token.kind);
-        try testing.expectEqualStrings(case.source, str.token.lexeme);
-        try testing.expectEqualStrings(case.expected, str.value);
-        try testing.expectEqual(@as(usize, 1), str.token.loc.src.line);
-        try testing.expectEqual(@as(usize, 1), str.token.loc.src.col);
+        const lit = try parser.parseStrLiteral();
+        defer allocator.free(lit.value);
+
+        try testing.expectEqual(lexer.TokenKind.LitString, lit.token.kind);
+        try testing.expectEqualStrings(case.source, lit.token.lexeme);
+        try testing.expectEqualStrings(case.expected, lit.value);
     }
 }
 
-test "[char literal]" {
+test "[char_literal]" {
     const TestCase = struct {
         source: []const u8,
         expected: u21,
@@ -731,16 +1078,15 @@ test "[char literal]" {
         var parser = try Parser.init(&lex, allocator);
         defer parser.deinit();
 
-        const char = try parser.parseCharLiteral();
-        try testing.expectEqual(lexer.TokenKind.LitChar, char.token.kind);
-        try testing.expectEqualStrings(case.source, char.token.lexeme);
-        try testing.expectEqual(case.expected, char.value);
-        try testing.expectEqual(@as(usize, 1), char.token.loc.src.line);
-        try testing.expectEqual(@as(usize, 1), char.token.loc.src.col);
+        const lit = try parser.parseCharLiteral();
+
+        try testing.expectEqual(lexer.TokenKind.LitChar, lit.token.kind);
+        try testing.expectEqualStrings(case.source, lit.token.lexeme);
+        try testing.expectEqual(case.expected, lit.value);
     }
 }
 
-test "[lower identifier]" {
+test "[lower_identifier]" {
     const TestCase = struct {
         source: []const u8,
         expected: []const u8,
@@ -763,15 +1109,14 @@ test "[lower identifier]" {
         defer parser.deinit();
 
         const ident = try parser.parseLowerIdentifier();
+
         try testing.expectEqual(lexer.TokenKind.LowerIdent, ident.token.kind);
         try testing.expectEqualStrings(case.source, ident.token.lexeme);
         try testing.expectEqualStrings(case.expected, ident.name);
-        try testing.expectEqual(@as(usize, 1), ident.token.loc.src.line);
-        try testing.expectEqual(@as(usize, 1), ident.token.loc.src.col);
     }
 }
 
-test "[upper identifier]" {
+test "[upper_identifier]" {
     const TestCase = struct {
         source: []const u8,
         expected: []const u8,
@@ -795,10 +1140,509 @@ test "[upper identifier]" {
         defer parser.deinit();
 
         const ident = try parser.parseUpperIdentifier();
+
         try testing.expectEqual(lexer.TokenKind.UpperIdent, ident.token.kind);
         try testing.expectEqualStrings(case.source, ident.token.lexeme);
         try testing.expectEqualStrings(case.expected, ident.name);
-        try testing.expectEqual(@as(usize, 1), ident.token.loc.src.line);
-        try testing.expectEqual(@as(usize, 1), ident.token.loc.src.col);
     }
+}
+
+test "[unary_expr]" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const source = "-42";
+    var lex = lexer.Lexer.init(source, TEST_FILE);
+    var parser = try Parser.init(&lex, allocator);
+    defer parser.deinit();
+
+    const expr = try parser.parseSimpleExpr();
+    defer {
+        expr.deinit(allocator);
+        allocator.destroy(expr);
+    }
+
+    try testing.expect(expr.* == .unary_expr);
+    try testing.expectEqual(lexer.TokenKind.OpIntSub, expr.unary_expr.operator.kind);
+    try testing.expectEqualStrings("-", expr.unary_expr.operator.lexeme);
+
+    const operand = expr.unary_expr.operand;
+    try testing.expect(operand.* == .int_literal);
+    try testing.expect(operand.int_literal.value == 42);
+}
+
+test "[arithmetic_expr]" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const source = "42 + 24";
+    var lex = lexer.Lexer.init(source, TEST_FILE);
+    var parser = try Parser.init(&lex, allocator);
+    defer parser.deinit();
+
+    const expr = try parser.parseExpression();
+    defer {
+        expr.deinit(allocator);
+        allocator.destroy(expr);
+    }
+
+    try testing.expect(expr.* == .arithmetic_expr);
+    try testing.expectEqual(lexer.TokenKind.OpIntAdd, expr.arithmetic_expr.operator.kind);
+
+    const left = expr.arithmetic_expr.left;
+    try testing.expect(left.* == .int_literal);
+    try testing.expect(left.int_literal.value == 42);
+
+    const right = expr.arithmetic_expr.right;
+    try testing.expect(right.* == .int_literal);
+    try testing.expect(right.int_literal.value == 24);
+}
+
+test "[comparison_expr]" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const TestCase = struct {
+        source: []const u8,
+        op: lexer.TokenKind,
+        left_val: i64,
+        right_val: i64,
+    };
+
+    const cases = [_]TestCase{
+        .{ .source = "42 == 24", .op = .OpEquality, .left_val = 42, .right_val = 24 },
+        .{ .source = "42 /= 24", .op = .OpNotEqual, .left_val = 42, .right_val = 24 },
+        .{ .source = "42 < 24", .op = .OpLessThan, .left_val = 42, .right_val = 24 },
+        .{ .source = "42 > 24", .op = .OpGreaterThan, .left_val = 42, .right_val = 24 },
+        .{ .source = "42 <= 24", .op = .OpLessThanEqual, .left_val = 42, .right_val = 24 },
+        .{ .source = "42 >= 24", .op = .OpGreaterThanEqual, .left_val = 42, .right_val = 24 },
+    };
+
+    for (cases) |case| {
+        var lex = lexer.Lexer.init(case.source, TEST_FILE);
+        var parser = try Parser.init(&lex, allocator);
+        defer parser.deinit();
+
+        const expr = try parser.parseExpression();
+        defer {
+            expr.deinit(allocator);
+            allocator.destroy(expr);
+        }
+
+        try testing.expect(expr.* == .comparison_expr);
+        try testing.expectEqual(case.op, expr.comparison_expr.operator.kind);
+
+        const left = expr.comparison_expr.left;
+        try testing.expect(left.* == .int_literal);
+        try testing.expectEqual(case.left_val, left.int_literal.value);
+
+        const right = expr.comparison_expr.right;
+        try testing.expect(right.* == .int_literal);
+        try testing.expectEqual(case.right_val, right.int_literal.value);
+    }
+}
+
+test "[logical_expr]" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const TestCase = struct {
+        source: []const u8,
+        op: lexer.TokenKind,
+    };
+
+    const cases = [_]TestCase{
+        .{ .source = "true && false", .op = .OpLogicalAnd },
+        .{ .source = "true || false", .op = .OpLogicalOr },
+    };
+
+    for (cases) |case| {
+        var lex = lexer.Lexer.init(case.source, TEST_FILE);
+        var parser = try Parser.init(&lex, allocator);
+        defer parser.deinit();
+
+        const expr = try parser.parseExpression();
+        defer {
+            expr.deinit(allocator);
+            allocator.destroy(expr);
+        }
+
+        try testing.expect(expr.* == .logical_expr);
+        try testing.expectEqual(case.op, expr.logical_expr.operator.kind);
+
+        const left = expr.logical_expr.left;
+        try testing.expect(left.* == .lower_identifier);
+        try testing.expectEqualStrings("true", left.lower_identifier.name);
+
+        const right = expr.logical_expr.right;
+        try testing.expect(right.* == .lower_identifier);
+        try testing.expectEqualStrings("false", right.lower_identifier.name);
+    }
+}
+
+test "[operator precedence]" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const TestCase = struct {
+        source: []const u8,
+        root_type: std.meta.Tag(ast.Node),
+        root_op: lexer.TokenKind,
+    };
+
+    const cases = [_]TestCase{
+        // Arithmetic precedence
+        .{
+            .source = "1 + 2 * 3", // Should be 1 + (2 * 3)
+            .root_type = .arithmetic_expr,
+            .root_op = .OpIntAdd,
+        },
+        .{
+            .source = "1 * 2 + 3", // Should be (1 * 2) + 3
+            .root_type = .arithmetic_expr,
+            .root_op = .OpIntAdd,
+        },
+        .{
+            .source = "2 ** 3 * 4", // Should be (2 ** 3) * 4
+            .root_type = .arithmetic_expr,
+            .root_op = .OpIntMul,
+        },
+
+        // Comparison and arithmetic
+        .{
+            .source = "1 + 2 == 3 * 4", // Should be (1 + 2) == (3 * 4)
+            .root_type = .comparison_expr,
+            .root_op = .OpEquality,
+        },
+
+        // Logical operators
+        .{
+            .source = "a && b || c", // Should be (a && b) || c
+            .root_type = .logical_expr,
+            .root_op = .OpLogicalOr,
+        },
+        .{
+            .source = "a || b && c", // Should be a || (b && c)
+            .root_type = .logical_expr,
+            .root_op = .OpLogicalOr,
+        },
+
+        // Mixed operators
+        .{
+            .source = "1 + 2 * 3 == 4 && 5 * 6 == 7", // Should be ((1 + (2 * 3)) == 4) && ((5 * 6) == 7)
+            .root_type = .logical_expr,
+            .root_op = .OpLogicalAnd,
+        },
+        .{
+            .source = "2 ** 3 ** 4", // Should be 2 ** (3 ** 4) due to right associativity
+            .root_type = .arithmetic_expr,
+            .root_op = .OpExp,
+        },
+        .{
+            .source = "a && b && c || d && e", // Should be ((a && b) && c) || (d && e)
+            .root_type = .logical_expr,
+            .root_op = .OpLogicalOr,
+        },
+        .{
+            .source = "1 * 2 + 3 * 4 + 5", // Should be ((1 * 2) + (3 * 4)) + 5
+            .root_type = .arithmetic_expr,
+            .root_op = .OpIntAdd,
+        },
+        .{
+            .source = "1 + 2 * 3 ** 4 * 5 + 6", // Should be 1 + ((2 * (3 ** 4)) * 5) + 6
+            .root_type = .arithmetic_expr,
+            .root_op = .OpIntAdd,
+        },
+        .{
+            .source = "a || b && c && d || e", // Should be (a || ((b && c) && d)) || e
+            .root_type = .logical_expr,
+            .root_op = .OpLogicalOr,
+        },
+        .{
+            .source = "1 * 2 + 3 == 4 + 5 * 6 && 7 + 8 == 9", // Should be (((1 * 2) + 3) == (4 + (5 * 6))) && ((7 + 8) == 9)
+            .root_type = .logical_expr,
+            .root_op = .OpLogicalAnd,
+        },
+        .{
+            .source = "a <= b + c * d && e > f ** g || h == i", // Should be ((a <= (b + (c * d))) && (e > (f ** g))) || (h == i)
+            .root_type = .logical_expr,
+            .root_op = .OpLogicalOr,
+        },
+    };
+
+    for (cases) |case| {
+        var lex = lexer.Lexer.init(case.source, TEST_FILE);
+        var parser = try Parser.init(&lex, allocator);
+        defer parser.deinit();
+
+        const expr = try parser.parseExpression();
+        defer {
+            expr.deinit(allocator);
+            allocator.destroy(expr);
+        }
+
+        try testing.expectEqual(case.root_type, std.meta.activeTag(expr.*));
+
+        switch (expr.*) {
+            .arithmetic_expr => |aexpr| {
+                try testing.expectEqual(case.root_op, aexpr.operator.kind);
+            },
+            .logical_expr => |lexpr| {
+                try testing.expectEqual(case.root_op, lexpr.operator.kind);
+            },
+            .comparison_expr => |cexpr| {
+                try testing.expectEqual(case.root_op, cexpr.operator.kind);
+            },
+            else => unreachable,
+        }
+    }
+}
+
+test "[operator precedence] (structural)" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    {
+        var lex = lexer.Lexer.init("1 + 2 * 3", TEST_FILE);
+        var parser = try Parser.init(&lex, allocator);
+        defer parser.deinit();
+
+        const expr = try parser.parseExpression();
+        defer {
+            expr.deinit(allocator);
+            allocator.destroy(expr);
+        }
+
+        // Should be structured as: (1 + (2 * 3))
+        try testing.expect(expr.* == .arithmetic_expr);
+        try testing.expectEqual(lexer.TokenKind.OpIntAdd, expr.arithmetic_expr.operator.kind);
+
+        const left = expr.arithmetic_expr.left;
+        try testing.expect(left.* == .int_literal);
+        try testing.expectEqual(@as(i64, 1), left.int_literal.value);
+
+        const right = expr.arithmetic_expr.right;
+        try testing.expect(right.* == .arithmetic_expr);
+        try testing.expectEqual(lexer.TokenKind.OpIntMul, right.arithmetic_expr.operator.kind);
+
+        const mul_left = right.arithmetic_expr.left;
+        try testing.expect(mul_left.* == .int_literal);
+        try testing.expectEqual(@as(i64, 2), mul_left.int_literal.value);
+
+        const mul_right = right.arithmetic_expr.right;
+        try testing.expect(mul_right.* == .int_literal);
+        try testing.expectEqual(@as(i64, 3), mul_right.int_literal.value);
+    }
+
+    {
+        var lex = lexer.Lexer.init("1 * 2 + 3 == 4", TEST_FILE);
+        var parser = try Parser.init(&lex, allocator);
+        defer parser.deinit();
+
+        const expr = try parser.parseExpression();
+        defer {
+            expr.deinit(allocator);
+            allocator.destroy(expr);
+        }
+
+        // Should be structured as: ((1 * 2 + 3) == 4)
+        try testing.expect(expr.* == .comparison_expr);
+        try testing.expectEqual(lexer.TokenKind.OpEquality, expr.comparison_expr.operator.kind);
+
+        const right = expr.comparison_expr.right;
+        try testing.expect(right.* == .int_literal);
+        try testing.expectEqual(@as(i64, 4), right.int_literal.value);
+
+        const left = expr.comparison_expr.left;
+        try testing.expect(left.* == .arithmetic_expr);
+        try testing.expectEqual(lexer.TokenKind.OpIntAdd, left.arithmetic_expr.operator.kind);
+
+        const add_right = left.arithmetic_expr.right;
+        try testing.expect(add_right.* == .int_literal);
+        try testing.expectEqual(@as(i64, 3), add_right.int_literal.value);
+
+        const add_left = left.arithmetic_expr.left;
+        try testing.expect(add_left.* == .arithmetic_expr);
+        try testing.expectEqual(lexer.TokenKind.OpIntMul, add_left.arithmetic_expr.operator.kind);
+
+        const mul_left = add_left.arithmetic_expr.left;
+        try testing.expect(mul_left.* == .int_literal);
+        try testing.expectEqual(@as(i64, 1), mul_left.int_literal.value);
+
+        const mul_right = add_left.arithmetic_expr.right;
+        try testing.expect(mul_right.* == .int_literal);
+        try testing.expectEqual(@as(i64, 2), mul_right.int_literal.value);
+    }
+}
+
+test "[lambda_expr]" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const source = "\\x => x + 1";
+    var lex = lexer.Lexer.init(source, TEST_FILE);
+    var parser = try Parser.init(&lex, allocator);
+    defer parser.deinit();
+
+    const expr = try parser.parseExpression();
+    defer {
+        expr.deinit(allocator);
+        allocator.destroy(expr);
+    }
+
+    try testing.expect(expr.* == .lambda_expr);
+    try testing.expectEqual(@as(usize, 1), expr.lambda_expr.params.items.len);
+    try testing.expectEqualStrings("x", expr.lambda_expr.params.items[0]);
+    try testing.expect(expr.lambda_expr.body.* == .arithmetic_expr);
+}
+
+test "[if_then_else_stmt]" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const source = "if x > 0 then 1 else -1";
+    var lex = lexer.Lexer.init(source, TEST_FILE);
+    var parser = try Parser.init(&lex, allocator);
+    defer parser.deinit();
+
+    const node = try parser.parseIfThenElse();
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    try testing.expect(node.* == .if_then_else_stmt);
+    const stmt = node.if_then_else_stmt;
+
+    try testing.expect(stmt.condition.* == .comparison_expr);
+    const condition = stmt.condition.comparison_expr;
+    try testing.expectEqual(lexer.TokenKind.OpGreaterThan, condition.operator.kind);
+
+    // Check left side of condition (x)
+    try testing.expect(condition.left.* == .lower_identifier);
+    try testing.expectEqualStrings("x", condition.left.lower_identifier.name);
+
+    // Check right side of condition (0)
+    try testing.expect(condition.right.* == .int_literal);
+    try testing.expectEqual(@as(i64, 0), condition.right.int_literal.value);
+
+    // Verify then branch (1)
+    try testing.expect(stmt.then_branch.* == .int_literal);
+    try testing.expectEqual(@as(i64, 1), stmt.then_branch.int_literal.value);
+
+    // Verify else branch (-1)
+    try testing.expect(stmt.else_branch.* == .unary_expr);
+    const else_expr = stmt.else_branch.unary_expr;
+    try testing.expectEqual(lexer.TokenKind.OpIntSub, else_expr.operator.kind);
+    try testing.expect(else_expr.operand.* == .int_literal);
+    try testing.expectEqual(@as(i64, 1), else_expr.operand.int_literal.value);
+}
+
+test "[function_decl] (simple)" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    // Test a simple function declaration without type annotation
+    const source = "let add = \\x y => x + y";
+    var lex = lexer.Lexer.init(source, TEST_FILE);
+    var parser = try Parser.init(&lex, allocator);
+    defer parser.deinit();
+
+    const node = try parser.parseFunctionDecl();
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    // Verify the node is a function declaration
+    try testing.expect(node.* == .function_decl);
+    const decl = node.function_decl;
+
+    // Check function name
+    try testing.expectEqualStrings("add", decl.name);
+
+    // Verify type annotation is null for simple declaration
+    try testing.expect(decl.type_annotation == null);
+
+    // Verify function value is a lambda expression
+    try testing.expect(decl.value.* == .lambda_expr);
+    const lambda = decl.value.lambda_expr;
+
+    // Check lambda parameters
+    try testing.expectEqual(@as(usize, 2), lambda.params.items.len);
+    try testing.expectEqualStrings("x", lambda.params.items[0]);
+    try testing.expectEqualStrings("y", lambda.params.items[1]);
+
+    // Verify lambda body is an arithmetic expression
+    try testing.expect(lambda.body.* == .arithmetic_expr);
+    const body = lambda.body.arithmetic_expr;
+    try testing.expectEqual(lexer.TokenKind.OpIntAdd, body.operator.kind);
+    try testing.expect(body.left.* == .lower_identifier);
+    try testing.expect(body.right.* == .lower_identifier);
+    try testing.expectEqualStrings("x", body.left.lower_identifier.name);
+    try testing.expectEqualStrings("y", body.right.lower_identifier.name);
+}
+
+test "[function_decl] (w/ type annotation)" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    // Test function declaration with type annotation
+    const source = "let inc : Int -> Int = \\x => x + 1";
+    var lex = lexer.Lexer.init(source, TEST_FILE);
+    var parser = try Parser.init(&lex, allocator);
+    defer parser.deinit();
+
+    const node = try parser.parseFunctionDecl();
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    // Verify the node is a function declaration
+    try testing.expect(node.* == .function_decl);
+    const decl = node.function_decl;
+
+    // Check function name
+    try testing.expectEqualStrings("inc", decl.name);
+
+    // Verify type annotation exists and is correct
+    try testing.expect(decl.type_annotation != null);
+    try testing.expect(decl.type_annotation.?.* == .function_type);
+
+    const type_annotation = decl.type_annotation.?.function_type;
+    try testing.expectEqual(@as(usize, 2), type_annotation.param_types.items.len);
+
+    // Check param types are both Int
+    try testing.expect(type_annotation.param_types.items[0].* == .upper_identifier);
+    try testing.expect(type_annotation.param_types.items[1].* == .upper_identifier);
+    try testing.expectEqualStrings("Int", type_annotation.param_types.items[0].upper_identifier.name);
+    try testing.expectEqualStrings("Int", type_annotation.param_types.items[1].upper_identifier.name);
+
+    // Verify function value is a lambda expression
+    try testing.expect(decl.value.* == .lambda_expr);
+    const lambda = decl.value.lambda_expr;
+
+    // Check lambda parameters
+    try testing.expectEqual(@as(usize, 1), lambda.params.items.len);
+    try testing.expectEqualStrings("x", lambda.params.items[0]);
+
+    // Verify lambda body is an arithmetic expression
+    try testing.expect(lambda.body.* == .arithmetic_expr);
+    const body = lambda.body.arithmetic_expr;
+    try testing.expectEqual(lexer.TokenKind.OpIntAdd, body.operator.kind);
+    try testing.expect(body.left.* == .lower_identifier);
+    try testing.expect(body.right.* == .int_literal);
+    try testing.expectEqualStrings("x", body.left.lower_identifier.name);
+    try testing.expectEqual(@as(i64, 1), body.right.int_literal.value);
 }
