@@ -465,9 +465,7 @@ pub const Parser = struct {
                 },
             },
             .operator => |op| switch (op) {
-                .Lambda => {
-                    return try self.parseLambdaExpr();
-                },
+                .Lambda => return try self.parseLambdaExpr(),
                 else => {
                     self.allocator.destroy(node);
 
@@ -844,6 +842,34 @@ pub const Parser = struct {
         return node;
     }
 
+    /// Parses a single top-level declaration based on the current token.
+    fn parseTopLevel(self: *Parser) ParserError!*ast.Node {
+        switch (self.current_token.kind) {
+            .keyword => |kw| switch (kw) {
+                .Foreign => return self.parseForeignFunctionDecl(),
+                // .Include => return self.parseInclude(),
+                .Let => return self.parseFunctionDecl(),
+                // .Module => return self.parseModuleDecl(),
+                // .Open => return self.parseImportSpec(),
+                // .Type => {
+                //     try self.advance();
+
+                //     if (self.check(.KwAlias)) {
+                //         return self.parseTypeAlias();
+                //     } else {
+                //         return self.parseVariantType();
+                //     }
+                // },
+                else => return error.UnexpectedToken,
+            },
+            .comment => |c| switch (c) {
+                .Doc => return self.parseDocComment(),
+                .Regular => return self.parseComment(),
+            },
+            else => return error.UnexpectedToken,
+        }
+    }
+
     /// Parses a complete program, which consists of a sequence of top-level declarations.
     pub fn parseProgram(self: *Parser) ParserError!*ast.Node {
         var statements = std.ArrayList(*ast.Node).init(self.allocator);
@@ -872,29 +898,6 @@ pub const Parser = struct {
         };
 
         return node;
-    }
-
-    /// Parses a single top-level declaration based on the current token.
-    fn parseTopLevel(self: *Parser) ParserError!*ast.Node {
-        switch (self.current_token.kind) {
-            .KwLet => return self.parseFunctionDecl(),
-            // .KwForeign => return self.parseForeignFunctionDecl(),
-            // .KwType => {
-            //     try self.advance();
-
-            //     if (self.check(.KwAlias)) {
-            //         return self.parseTypeAlias();
-            //     } else {
-            //         return self.parseVariantType();
-            //     }
-            // },
-            // .KwModule => return self.parseModuleDecl(),
-            // .KwOpen => return self.parseImportSpec(),
-            // .KwInclude => return self.parseInclude(),
-            .Comment => return self.parseComment(),
-            .DocComment => return self.parseDocComment(),
-            else => return error.UnexpectedToken,
-        }
     }
 };
 
@@ -1726,4 +1729,40 @@ test "[function_decl] (w/ type annotation)" {
     try testing.expect(body.right.* == .int_literal);
     try testing.expectEqualStrings("x", body.left.lower_identifier.name);
     try testing.expectEqual(@as(i64, 1), body.right.int_literal.value);
+}
+
+test "[foreign_function_decl]" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    // foreign sqrt : Float -> Float = "c_sqrt"
+
+    const source = "foreign sqrt : Float -> Float = \"c_sqrt\"";
+    var l = lexer.Lexer.init(source, TEST_FILE);
+    var parser = try Parser.init(allocator, &l);
+    defer parser.deinit();
+
+    const node = try parser.parseForeignFunctionDecl();
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    try testing.expect(node.* == .foreign_function_decl);
+
+    const decl = node.foreign_function_decl;
+
+    try testing.expectEqualStrings("sqrt", decl.name);
+    try testing.expectEqualStrings("c_sqrt", decl.external_name);
+
+    try testing.expect(decl.type_annotation.* == .function_type);
+    const type_annotation = decl.type_annotation.function_type;
+    try testing.expectEqual(@as(usize, 2), type_annotation.param_types.items.len);
+
+    // Check both param types are Float
+    try testing.expect(type_annotation.param_types.items[0].* == .upper_identifier);
+    try testing.expect(type_annotation.param_types.items[1].* == .upper_identifier);
+    try testing.expectEqualStrings("Float", type_annotation.param_types.items[0].upper_identifier.name);
+    try testing.expectEqualStrings("Float", type_annotation.param_types.items[1].upper_identifier.name);
 }

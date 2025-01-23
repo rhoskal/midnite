@@ -5,42 +5,56 @@ const lexer = @import("lexer.zig");
 /// Represents a regular, single line comment.
 pub const CommentNode = struct {
     content: []const u8,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Represents a documentation comment that will be processed as markdown.
 pub const DocCommentNode = struct {
     content: []const u8,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Represents a literal integer value.
 pub const IntLiteralNode = struct {
     value: i64,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Represents a literal floating-point value.
 pub const FloatLiteralNode = struct {
     value: f64,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Represents a string literal value.
 pub const StrLiteralNode = struct {
     value: []const u8,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Represents a multiline string literal value.
 pub const MultilineStrLiteralNode = struct {
     value: []const u8,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Represents a char literal value.
 pub const CharLiteralNode = struct {
     value: u21,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -52,13 +66,17 @@ pub const CharLiteralNode = struct {
 /// - `[True, False, True]`
 pub const ListNode = struct {
     elements: std.ArrayList(*Node),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Common structure for binary operations.
 pub const BinaryOp = struct {
     left: *Node,
+
     operator: lexer.Token,
+
     right: *Node,
 };
 
@@ -88,6 +106,7 @@ pub const ComparisonExprNode = BinaryOp;
 /// - Negation: (-)
 pub const UnaryExprNode = struct {
     operator: lexer.Token,
+
     operand: *Node,
 };
 
@@ -100,7 +119,10 @@ pub const UnaryExprNode = struct {
 /// - `match result on | Ok v => v | Err e => default`
 pub const MatchExprNode = struct {
     value: *Node,
+
     cases: std.ArrayList(MatchCase),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -108,8 +130,12 @@ pub const MatchExprNode = struct {
 /// When pattern matches and guard evaluates true, the expression is evaluated.
 pub const MatchCase = struct {
     pattern: *PatternNode,
+
     expression: *Node,
+
     guard: ?*GuardNode,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -154,6 +180,8 @@ pub const PatternNode = union(enum) {
 /// - `when is_valid? name`
 pub const GuardNode = struct {
     condition: *Node,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -167,7 +195,9 @@ pub const GuardNode = struct {
 /// - `if even? n then n / 2 else 3 * n + 1`
 pub const IfThenElseStmtNode = struct {
     condition: *Node,
+
     then_branch: *Node,
+
     else_branch: *Node,
 };
 
@@ -181,6 +211,8 @@ pub const FunctionTypeNode = struct {
     /// this would contain `[Int, Int, Int]` where the last
     /// one is the return type.
     param_types: std.ArrayList(*Node),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -190,7 +222,10 @@ pub const FunctionTypeNode = struct {
 /// - `\x y => x + y`
 pub const LambdaExprNode = struct {
     params: std.ArrayList([]const u8),
+
     body: *Node,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -202,21 +237,49 @@ pub const LambdaExprNode = struct {
 /// - `let compose : (b -> c) -> (a -> b) -> a -> c = \f g x => f (g x)`
 pub const FunctionDeclNode = struct {
     name: []const u8,
+
     type_annotation: ?*Node,
+
     // doc_comments: []*DocCommentNode,
+
     value: *Node,
+
+    /// The token representing the start of this declaration.
+    token: lexer.Token,
+};
+
+/// Represents a foreign function declaration that links to external code.
+/// Maps an internal function name and type signature to an external symbol name.
+///
+/// Example:
+/// - `foreign bitwise_and : Int -> Int -> Int = "zig_bitwise_and"`
+pub const ForeignFunctionDeclNode = struct {
+    /// The internal name used to refer to this function.
+    name: []const u8,
+
+    /// The function's type signature.
+    type_annotation: *Node,
+
+    /// The external symbol name to link against.
+    external_name: []const u8,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Represents a lowercase identifier reference (variable names, function names, etc).
 pub const LowerIdentifierNode = struct {
     name: []const u8,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Represents an uppercase identifier reference (type names, type constructors, etc).
 pub const UpperIdentifierNode = struct {
     name: []const u8,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -228,7 +291,9 @@ pub const UpperIdentifierNode = struct {
 /// - `x :: xs` pattern matches head and tail of list
 pub const ConsExprNode = struct {
     head: *Node,
+
     operator: lexer.Token,
+
     tail: *Node,
 };
 
@@ -254,7 +319,9 @@ pub const ListConcatExprNode = BinaryOp;
 /// - `f << g` applies f after g (backward composition)
 pub const CompositionExprNode = struct {
     first: *Node,
+
     operator: lexer.Token,
+
     second: *Node,
 };
 
@@ -266,7 +333,9 @@ pub const CompositionExprNode = struct {
 /// - `f <| x` applies f to x (backward pipe)
 pub const PipeExprNode = struct {
     value: *Node,
+
     operator: lexer.Token,
+
     func: *Node,
 };
 
@@ -279,13 +348,19 @@ pub const PipeExprNode = struct {
 /// - `exposing ()`
 pub const ExportSpecNode = struct {
     exposing_all: bool,
+
     items: ?std.ArrayList(ExportItem),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 pub const ExportItem = struct {
     name: []const u8,
+
     expose_constructors: bool,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -298,6 +373,8 @@ pub const ExportItem = struct {
 /// - `Std.List`
 pub const ModulePathNode = struct {
     segments: std.ArrayList([]const u8),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -311,8 +388,12 @@ pub const ModulePathNode = struct {
 /// - `module Parser exposing (Parser, run, map) ... end`
 pub const ModuleDeclNode = struct {
     path: ModulePathNode,
+
     exports: ExportSpecNode,
+
     declarations: std.ArrayList(*Node),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -336,17 +417,25 @@ pub const ImportSpecNode = struct {
 
     const RenameItem = struct {
         old_name: []const u8,
+
         new_name: []const u8,
+
+        /// The token representing the start of this declaration.
         token: lexer.Token,
     };
 
     path: ModulePathNode,
+
     kind: ImportKind,
+
     alias: ?[]const u8,
+
     items: ?std.ArrayList(union(enum) {
         name: []const u8,
         rename: RenameItem,
     }),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -359,11 +448,14 @@ pub const ImportSpecNode = struct {
 /// - `include Parser.Internal`
 pub const IncludeNode = struct {
     path: ModulePathNode,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Represents a typed hole - a placeholder for a type that should be inferred.
 pub const TypedHoleNode = struct {
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -377,7 +469,10 @@ pub const TypedHoleNode = struct {
 /// - `Node a (Tree a)` (nested type parameters)
 pub const VariantConstructorNode = struct {
     name: []const u8,
+
     params: std.ArrayList(*Node),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -392,8 +487,12 @@ pub const VariantConstructorNode = struct {
 /// - `type Result e a = Err e | Ok a`
 pub const VariantTypeNode = struct {
     name: []const u8,
+
     type_params: std.ArrayList([]const u8),
+
     constructors: std.ArrayList(VariantConstructorNode),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -407,7 +506,10 @@ pub const VariantTypeNode = struct {
 /// - `type alias Parser = String -> Maybe Expr`
 pub const TypeAliasNode = struct {
     name: []const u8,
+
     value: *Node,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -415,6 +517,8 @@ pub const TypeAliasNode = struct {
 /// function definitions, type declarations, imports, and module definitions.
 pub const ProgramNode = struct {
     statements: std.ArrayList(*Node),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -451,6 +555,7 @@ pub const Node = union(enum) {
     if_then_else_stmt: IfThenElseStmtNode,
 
     // Declarations
+    foreign_function_decl: ForeignFunctionDeclNode,
     function_decl: FunctionDeclNode,
     module_decl: ModuleDeclNode,
 
@@ -577,6 +682,11 @@ pub const Node = union(enum) {
                 allocator.destroy(stmt.condition);
                 allocator.destroy(stmt.else_branch);
                 allocator.destroy(stmt.then_branch);
+            },
+            .foreign_function_decl => |*decl| {
+                decl.type_annotation.deinit(allocator);
+                allocator.free(decl.name);
+                allocator.destroy(decl.type_annotation);
             },
             .function_decl => |*decl| {
                 if (decl.type_annotation) |type_annotation| {
@@ -1087,6 +1197,90 @@ test "[IfThenElseStmtNode]" {
     try testing.expect(if_then_else.if_then_else_stmt.else_branch.* == .upper_identifier);
     try testing.expectEqualStrings("False", if_then_else.if_then_else_stmt.else_branch.upper_identifier.name);
     try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, if_then_else.if_then_else_stmt.else_branch.upper_identifier.token.kind);
+}
+
+test "[ForeignFunctionDeclNode]" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    // foreign sqrt : Float -> Float = "c_sqrt"
+
+    const type_node = try allocator.create(Node);
+    const float_type1 = try allocator.create(Node);
+    const float_type2 = try allocator.create(Node);
+
+    var param_types = std.ArrayList(*Node).init(allocator);
+    try param_types.append(float_type1);
+    try param_types.append(float_type2);
+
+    float_type1.* = .{
+        .upper_identifier = .{
+            .name = "Float",
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "Float",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 5 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    float_type2.* = .{
+        .upper_identifier = .{
+            .name = "Float",
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "Float",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 5 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    type_node.* = .{
+        .function_type = .{
+            .param_types = param_types,
+            .token = .{
+                .kind = .{ .symbol = .ArrowRight },
+                .lexeme = "->",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 2 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const foreign_func = try allocator.create(Node);
+    foreign_func.* = .{
+        .foreign_function_decl = .{
+            .name = "sqrt",
+            .type_annotation = type_node,
+            .external_name = try allocator.dupe(u8, "c_sqrt"),
+            .token = .{
+                .kind = .{ .keyword = .Foreign },
+                .lexeme = "foreign",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 7 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const decl = foreign_func.foreign_function_decl;
+    try testing.expectEqualStrings("sqrt", decl.name);
+    try testing.expectEqualStrings("c_sqrt", decl.external_name);
+    try testing.expectEqual(@as(usize, 2), decl.type_annotation.function_type.param_types.items.len);
 }
 
 test "[FunctionTypeNode]" {
