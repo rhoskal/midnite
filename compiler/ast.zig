@@ -35,7 +35,7 @@ pub const StrLiteralNode = struct {
 /// Represents a multiline string literal value.
 pub const MultilineStrLiteralNode = struct {
     value: []const u8,
-    token: lexer.Toke,
+    token: lexer.Token,
 };
 
 /// Represents a char literal value.
@@ -104,8 +104,8 @@ pub const MatchExprNode = struct {
     token: lexer.Token,
 };
 
-/// Represents a single case in a match expression, consisting of
-/// a pattern to test and an expression to evaluate on match.
+/// A single pattern matching case with an optional guard condition.
+/// When pattern matches and guard evaluates true, the expression is evaluated.
 pub const MatchCase = struct {
     pattern: *PatternNode,
     expression: *Node,
@@ -113,9 +113,8 @@ pub const MatchCase = struct {
     token: lexer.Token,
 };
 
-/// Represents all possible forms of patterns in pattern matching.
-/// Patterns can match literals, destructure data types, bind variables,
-/// or combine these behaviors.
+/// Pattern matching constructs that can appear in match expressions.
+/// Includes literals, variables, constructors, list patterns, and wildcards.
 pub const PatternNode = union(enum) {
     wildcard: struct {
         token: lexer.Token,
@@ -178,8 +177,8 @@ pub const IfThenElseStmtNode = struct {
 /// - `Int -> Int -> Int`
 pub const FunctionTypeNode = struct {
     /// The parameter types in order.
-    /// For curried functions like Int -> Int -> Int,
-    /// this would contain [Int, Int, Int] where the last
+    /// For curried functions like `Int -> Int -> Int`,
+    /// this would contain `[Int, Int, Int]` where the last
     /// one is the return type.
     param_types: std.ArrayList(*Node),
     token: lexer.Token,
@@ -195,10 +194,12 @@ pub const LambdaExprNode = struct {
     token: lexer.Token,
 };
 
-/// Represents a top-level function definition.
+/// Represents a top-level function declaration with name, optional type annotation, and value.
+/// The value is typically a lambda expression but can be any valid expression.
 ///
 /// Examples:
 /// - `let add : Int -> Int -> Int = \x y => x + y`
+/// - `let compose : (b -> c) -> (a -> b) -> a -> c = \f g x => f (g x)`
 pub const FunctionDeclNode = struct {
     name: []const u8,
     type_annotation: ?*Node,
@@ -410,7 +411,8 @@ pub const TypeAliasNode = struct {
     token: lexer.Token,
 };
 
-/// The root node of the AST containing all top-level declarations.
+/// The root AST node containing a sequence of top-level declarations like
+/// function definitions, type declarations, imports, and module definitions.
 pub const ProgramNode = struct {
     statements: std.ArrayList(*Node),
     token: lexer.Token,
@@ -741,7 +743,7 @@ const testing = std.testing;
 
 const TEST_FILE = "test.mox";
 
-test "BinaryExprNode memory management" {
+test "[BinaryExprNode]" {
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -753,7 +755,7 @@ test "BinaryExprNode memory management" {
         .int_literal = .{
             .value = 42,
             .token = lexer.Token{
-                .kind = .LitInt,
+                .kind = lexer.TokenKind{ .literal = .Int },
                 .lexeme = "42",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -769,7 +771,7 @@ test "BinaryExprNode memory management" {
         .int_literal = .{
             .value = 24,
             .token = lexer.Token{
-                .kind = .LitInt,
+                .kind = lexer.TokenKind{ .literal = .Int },
                 .lexeme = "24",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -790,7 +792,7 @@ test "BinaryExprNode memory management" {
         .arithmetic_expr = .{
             .left = left,
             .operator = lexer.Token{
-                .kind = .OpIntAdd,
+                .kind = lexer.TokenKind{ .operator = .IntAdd },
                 .lexeme = "+",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -802,12 +804,13 @@ test "BinaryExprNode memory management" {
         },
     };
 
-    try testing.expectEqual(lexer.TokenKind.OpIntAdd, binary.arithmetic_expr.operator.kind);
-    try testing.expect(binary.arithmetic_expr.left.int_literal.value == 42);
-    try testing.expect(binary.arithmetic_expr.right.int_literal.value == 24);
+    const expr = binary.arithmetic_expr;
+    try testing.expectEqual(lexer.TokenKind{ .operator = .IntAdd }, expr.operator.kind);
+    try testing.expect(expr.left.int_literal.value == 42);
+    try testing.expect(expr.right.int_literal.value == 24);
 }
 
-test "UnaryExprNode memory management" {
+test "[UnaryExprNode]" {
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -819,7 +822,7 @@ test "UnaryExprNode memory management" {
         .int_literal = .{
             .value = 42,
             .token = lexer.Token{
-                .kind = .LitInt,
+                .kind = lexer.TokenKind{ .literal = .Int },
                 .lexeme = "42",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -839,7 +842,7 @@ test "UnaryExprNode memory management" {
     unary.* = .{
         .unary_expr = .{
             .operator = lexer.Token{
-                .kind = .OpIntSub,
+                .kind = lexer.TokenKind{ .operator = .IntSub },
                 .lexeme = "-",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -851,13 +854,14 @@ test "UnaryExprNode memory management" {
         },
     };
 
-    try testing.expectEqual(lexer.TokenKind.OpIntSub, unary.unary_expr.operator.kind);
-    try testing.expectEqualStrings("-", unary.unary_expr.operator.lexeme);
-    try testing.expectEqual(lexer.TokenKind.LitInt, unary.unary_expr.operand.int_literal.token.kind);
-    try testing.expect(unary.unary_expr.operand.int_literal.value == 42);
+    const expr = unary.unary_expr;
+    try testing.expectEqual(lexer.TokenKind{ .operator = .IntSub }, expr.operator.kind);
+    try testing.expectEqualStrings("-", expr.operator.lexeme);
+    try testing.expectEqual(lexer.TokenKind{ .literal = .Int }, expr.operand.int_literal.token.kind);
+    try testing.expect(expr.operand.int_literal.value == 42);
 }
 
-test "LambdaExprNode memory management" {
+test "[LambdaExprNode]" {
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -873,7 +877,7 @@ test "LambdaExprNode memory management" {
         .lower_identifier = .{
             .name = "x",
             .token = lexer.Token{
-                .kind = .LowerIdent,
+                .kind = lexer.TokenKind{ .identifier = .Lower },
                 .lexeme = "x",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -889,7 +893,7 @@ test "LambdaExprNode memory management" {
         .lower_identifier = .{
             .name = "y",
             .token = lexer.Token{
-                .kind = .LowerIdent,
+                .kind = lexer.TokenKind{ .identifier = .Lower },
                 .lexeme = "y",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -905,7 +909,7 @@ test "LambdaExprNode memory management" {
         .arithmetic_expr = .{
             .left = left,
             .operator = lexer.Token{
-                .kind = .OpIntAdd,
+                .kind = lexer.TokenKind{ .operator = .IntAdd },
                 .lexeme = "+",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -928,7 +932,7 @@ test "LambdaExprNode memory management" {
             .params = params,
             .body = body,
             .token = lexer.Token{
-                .kind = .OpLambda,
+                .kind = lexer.TokenKind{ .operator = .Lambda },
                 .lexeme = "\\",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -939,23 +943,24 @@ test "LambdaExprNode memory management" {
         },
     };
 
-    try testing.expectEqual(@as(usize, 2), lambda.lambda_expr.params.items.len);
-    try testing.expectEqualStrings("x", lambda.lambda_expr.params.items[0]);
-    try testing.expectEqualStrings("y", lambda.lambda_expr.params.items[1]);
+    const expr = lambda.lambda_expr;
+    try testing.expectEqual(@as(usize, 2), expr.params.items.len);
+    try testing.expectEqualStrings("x", expr.params.items[0]);
+    try testing.expectEqualStrings("y", expr.params.items[1]);
 
-    try testing.expectEqual(lexer.TokenKind.OpLambda, lambda.lambda_expr.token.kind);
-    try testing.expectEqualStrings("\\", lambda.lambda_expr.token.lexeme);
+    try testing.expectEqual(lexer.TokenKind{ .operator = .Lambda }, expr.token.kind);
+    try testing.expectEqualStrings("\\", expr.token.lexeme);
 
-    const lambda_body = lambda.lambda_expr.body.arithmetic_expr;
-    try testing.expectEqual(lexer.TokenKind.OpIntAdd, lambda_body.operator.kind);
+    const lambda_body = expr.body.arithmetic_expr;
+    try testing.expectEqual(lexer.TokenKind{ .operator = .IntAdd }, lambda_body.operator.kind);
     try testing.expectEqualStrings("+", lambda_body.operator.lexeme);
 
     try testing.expect(lambda_body.left.* == .lower_identifier);
     try testing.expectEqualStrings("x", lambda_body.left.lower_identifier.name);
-    try testing.expectEqual(lexer.TokenKind.LowerIdent, lambda_body.left.lower_identifier.token.kind);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, lambda_body.left.lower_identifier.token.kind);
 }
 
-test "IfThenElseStmtNode memory management" {
+test "[IfThenElseStmtNode]" {
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -967,7 +972,7 @@ test "IfThenElseStmtNode memory management" {
         .lower_identifier = .{
             .name = "x",
             .token = lexer.Token{
-                .kind = .LowerIdent,
+                .kind = lexer.TokenKind{ .identifier = .Lower },
                 .lexeme = "x",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -983,7 +988,7 @@ test "IfThenElseStmtNode memory management" {
         .lower_identifier = .{
             .name = "y",
             .token = lexer.Token{
-                .kind = .LowerIdent,
+                .kind = lexer.TokenKind{ .identifier = .Lower },
                 .lexeme = "y",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -999,7 +1004,7 @@ test "IfThenElseStmtNode memory management" {
         .comparison_expr = .{
             .left = left,
             .operator = lexer.Token{
-                .kind = .OpEquality,
+                .kind = lexer.TokenKind{ .operator = .Equality },
                 .lexeme = "==",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1016,7 +1021,7 @@ test "IfThenElseStmtNode memory management" {
         .upper_identifier = .{
             .name = "True",
             .token = lexer.Token{
-                .kind = .UpperIdent,
+                .kind = lexer.TokenKind{ .identifier = .Upper },
                 .lexeme = "True",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1032,7 +1037,7 @@ test "IfThenElseStmtNode memory management" {
         .upper_identifier = .{
             .name = "False",
             .token = lexer.Token{
-                .kind = .UpperIdent,
+                .kind = lexer.TokenKind{ .identifier = .Upper },
                 .lexeme = "False",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1058,33 +1063,33 @@ test "IfThenElseStmtNode memory management" {
     };
 
     // Test condition (x == y)
-    const _condition = if_then_else.if_then_else_stmt.condition.comparison_expr;
+    const cond = if_then_else.if_then_else_stmt.condition.comparison_expr;
     try testing.expect(if_then_else.if_then_else_stmt.condition.* == .comparison_expr);
-    try testing.expectEqual(lexer.TokenKind.OpEquality, _condition.operator.kind);
-    try testing.expectEqualStrings("==", _condition.operator.lexeme);
+    try testing.expectEqual(lexer.TokenKind{ .operator = .Equality }, cond.operator.kind);
+    try testing.expectEqualStrings("==", cond.operator.lexeme);
 
     // Test left side of condition (x)
-    try testing.expect(_condition.left.* == .lower_identifier);
-    try testing.expectEqualStrings("x", _condition.left.lower_identifier.name);
-    try testing.expectEqual(lexer.TokenKind.LowerIdent, _condition.left.lower_identifier.token.kind);
+    try testing.expect(cond.left.* == .lower_identifier);
+    try testing.expectEqualStrings("x", cond.left.lower_identifier.name);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, cond.left.lower_identifier.token.kind);
 
     // Test right side of condition (y)
-    try testing.expect(_condition.right.* == .lower_identifier);
-    try testing.expectEqualStrings("y", _condition.right.lower_identifier.name);
-    try testing.expectEqual(lexer.TokenKind.LowerIdent, _condition.right.lower_identifier.token.kind);
+    try testing.expect(cond.right.* == .lower_identifier);
+    try testing.expectEqualStrings("y", cond.right.lower_identifier.name);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, cond.right.lower_identifier.token.kind);
 
     // Test then branch (True)
     try testing.expect(if_then_else.if_then_else_stmt.then_branch.* == .upper_identifier);
     try testing.expectEqualStrings("True", if_then_else.if_then_else_stmt.then_branch.upper_identifier.name);
-    try testing.expectEqual(lexer.TokenKind.UpperIdent, if_then_else.if_then_else_stmt.then_branch.upper_identifier.token.kind);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, if_then_else.if_then_else_stmt.then_branch.upper_identifier.token.kind);
 
     // Test else branch (False)
     try testing.expect(if_then_else.if_then_else_stmt.else_branch.* == .upper_identifier);
     try testing.expectEqualStrings("False", if_then_else.if_then_else_stmt.else_branch.upper_identifier.name);
-    try testing.expectEqual(lexer.TokenKind.UpperIdent, if_then_else.if_then_else_stmt.else_branch.upper_identifier.token.kind);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, if_then_else.if_then_else_stmt.else_branch.upper_identifier.token.kind);
 }
 
-test "FunctionTypeNode memory management" {
+test "[FunctionTypeNode]" {
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1098,7 +1103,7 @@ test "FunctionTypeNode memory management" {
         .upper_identifier = .{
             .name = "Int",
             .token = lexer.Token{
-                .kind = .UpperIdent,
+                .kind = lexer.TokenKind{ .identifier = .Upper },
                 .lexeme = "Int",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1114,7 +1119,7 @@ test "FunctionTypeNode memory management" {
         .upper_identifier = .{
             .name = "Int",
             .token = lexer.Token{
-                .kind = .UpperIdent,
+                .kind = lexer.TokenKind{ .identifier = .Upper },
                 .lexeme = "Int",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1130,7 +1135,7 @@ test "FunctionTypeNode memory management" {
         .upper_identifier = .{
             .name = "Int",
             .token = lexer.Token{
-                .kind = .UpperIdent,
+                .kind = lexer.TokenKind{ .identifier = .Upper },
                 .lexeme = "Int",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1155,7 +1160,7 @@ test "FunctionTypeNode memory management" {
         .function_type = .{
             .param_types = param_types,
             .token = lexer.Token{
-                .kind = .DelColon,
+                .kind = lexer.TokenKind{ .delimiter = .Colon },
                 .lexeme = ":",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1167,14 +1172,14 @@ test "FunctionTypeNode memory management" {
     };
 
     // Test the structure
-    try testing.expectEqual(lexer.TokenKind.DelColon, func_type.function_type.token.kind);
+    try testing.expectEqual(lexer.TokenKind{ .delimiter = .Colon }, func_type.function_type.token.kind);
     try testing.expectEqualStrings(":", func_type.function_type.token.lexeme);
     try testing.expectEqual(@as(usize, 3), func_type.function_type.param_types.items.len);
 
     // Test each Int type
     for (func_type.function_type.param_types.items) |type_node| {
         try testing.expect(type_node.* == .upper_identifier);
-        try testing.expectEqual(lexer.TokenKind.UpperIdent, type_node.upper_identifier.token.kind);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, type_node.upper_identifier.token.kind);
         try testing.expectEqualStrings("Int", type_node.upper_identifier.name);
         try testing.expectEqualStrings("Int", type_node.upper_identifier.token.lexeme);
     }
@@ -1193,7 +1198,7 @@ test "FunctionTypeNode memory management" {
     try testing.expectEqual(@as(usize, 17), third_int.upper_identifier.token.loc.src.col);
 }
 
-test "FunctionDeclNode memory management" {
+test "[FunctionDeclNode]" {
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1207,7 +1212,7 @@ test "FunctionDeclNode memory management" {
         .upper_identifier = .{
             .name = "Int",
             .token = lexer.Token{
-                .kind = .UpperIdent,
+                .kind = lexer.TokenKind{ .identifier = .Upper },
                 .lexeme = "Int",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1223,7 +1228,7 @@ test "FunctionDeclNode memory management" {
         .upper_identifier = .{
             .name = "Int",
             .token = lexer.Token{
-                .kind = .UpperIdent,
+                .kind = lexer.TokenKind{ .identifier = .Upper },
                 .lexeme = "Int",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1239,7 +1244,7 @@ test "FunctionDeclNode memory management" {
         .upper_identifier = .{
             .name = "Int",
             .token = lexer.Token{
-                .kind = .UpperIdent,
+                .kind = lexer.TokenKind{ .identifier = .Upper },
                 .lexeme = "Int",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1259,7 +1264,7 @@ test "FunctionDeclNode memory management" {
         .function_type = .{
             .param_types = param_types,
             .token = lexer.Token{
-                .kind = .DelColon,
+                .kind = lexer.TokenKind{ .delimiter = .Colon },
                 .lexeme = ":",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1280,7 +1285,7 @@ test "FunctionDeclNode memory management" {
         .lower_identifier = .{
             .name = "x",
             .token = lexer.Token{
-                .kind = .LowerIdent,
+                .kind = lexer.TokenKind{ .identifier = .Lower },
                 .lexeme = "x",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1296,7 +1301,7 @@ test "FunctionDeclNode memory management" {
         .lower_identifier = .{
             .name = "y",
             .token = lexer.Token{
-                .kind = .LowerIdent,
+                .kind = lexer.TokenKind{ .identifier = .Lower },
                 .lexeme = "y",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1312,7 +1317,7 @@ test "FunctionDeclNode memory management" {
         .arithmetic_expr = .{
             .left = left,
             .operator = lexer.Token{
-                .kind = .OpIntAdd,
+                .kind = lexer.TokenKind{ .operator = .IntAdd },
                 .lexeme = "+",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1330,7 +1335,7 @@ test "FunctionDeclNode memory management" {
             .params = params,
             .body = body,
             .token = lexer.Token{
-                .kind = .OpLambda,
+                .kind = lexer.TokenKind{ .operator = .Lambda },
                 .lexeme = "\\",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1353,7 +1358,7 @@ test "FunctionDeclNode memory management" {
             .type_annotation = func_type,
             .value = lambda,
             .token = lexer.Token{
-                .kind = .KwLet,
+                .kind = lexer.TokenKind{ .keyword = .Let },
                 .lexeme = "let",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1365,27 +1370,27 @@ test "FunctionDeclNode memory management" {
     };
 
     // Verify the structure
-    try testing.expectEqual(lexer.TokenKind.KwLet, func_decl.function_decl.token.kind);
+    try testing.expectEqual(lexer.TokenKind{ .keyword = .Let }, func_decl.function_decl.token.kind);
     try testing.expectEqualStrings("let", func_decl.function_decl.token.lexeme);
     try testing.expectEqualStrings("add", func_decl.function_decl.name);
 
     // Test type annotation
     const type_annot = func_decl.function_decl.type_annotation.?;
     try testing.expect(type_annot.* == .function_type);
-    try testing.expectEqual(lexer.TokenKind.DelColon, type_annot.function_type.token.kind);
+    try testing.expectEqual(lexer.TokenKind{ .delimiter = .Colon }, type_annot.function_type.token.kind);
     try testing.expectEqual(@as(usize, 3), type_annot.function_type.param_types.items.len);
 
     // Test each Int in type signature
     for (type_annot.function_type.param_types.items) |type_node| {
         try testing.expect(type_node.* == .upper_identifier);
-        try testing.expectEqual(lexer.TokenKind.UpperIdent, type_node.upper_identifier.token.kind);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, type_node.upper_identifier.token.kind);
         try testing.expectEqualStrings("Int", type_node.upper_identifier.name);
     }
 
     // Test lambda expression
     const lambda_value = func_decl.function_decl.value;
     try testing.expect(lambda_value.* == .lambda_expr);
-    try testing.expectEqual(lexer.TokenKind.OpLambda, lambda_value.lambda_expr.token.kind);
+    try testing.expectEqual(lexer.TokenKind{ .operator = .Lambda }, lambda_value.lambda_expr.token.kind);
     try testing.expectEqual(@as(usize, 2), lambda_value.lambda_expr.params.items.len);
     try testing.expectEqualStrings("x", lambda_value.lambda_expr.params.items[0]);
     try testing.expectEqualStrings("y", lambda_value.lambda_expr.params.items[1]);
@@ -1393,7 +1398,7 @@ test "FunctionDeclNode memory management" {
     // Test lambda body
     const lambda_body = lambda_value.lambda_expr.body;
     try testing.expect(lambda_body.* == .arithmetic_expr);
-    try testing.expectEqual(lexer.TokenKind.OpIntAdd, lambda_body.arithmetic_expr.operator.kind);
+    try testing.expectEqual(lexer.TokenKind{ .operator = .IntAdd }, lambda_body.arithmetic_expr.operator.kind);
     try testing.expectEqualStrings("+", lambda_body.arithmetic_expr.operator.lexeme);
 
     const body_left = lambda_body.arithmetic_expr.left;
@@ -1405,7 +1410,7 @@ test "FunctionDeclNode memory management" {
     try testing.expectEqualStrings("y", body_right.lower_identifier.name);
 }
 
-test "ConsExprNode memory management" {
+test "[ConsExprNode]" {
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1417,7 +1422,7 @@ test "ConsExprNode memory management" {
         .int_literal = .{
             .value = 1,
             .token = lexer.Token{
-                .kind = .LitInt,
+                .kind = lexer.TokenKind{ .literal = .Int },
                 .lexeme = "1",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1435,7 +1440,7 @@ test "ConsExprNode memory management" {
         .int_literal = .{
             .value = 2,
             .token = lexer.Token{
-                .kind = .LitInt,
+                .kind = lexer.TokenKind{ .literal = .Int },
                 .lexeme = "2",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1451,7 +1456,7 @@ test "ConsExprNode memory management" {
         .int_literal = .{
             .value = 3,
             .token = lexer.Token{
-                .kind = .LitInt,
+                .kind = lexer.TokenKind{ .literal = .Int },
                 .lexeme = "3",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1470,7 +1475,7 @@ test "ConsExprNode memory management" {
         .list = .{
             .elements = elements,
             .token = lexer.Token{
-                .kind = .DelLeftBracket,
+                .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
                 .lexeme = "[",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1491,7 +1496,7 @@ test "ConsExprNode memory management" {
         .cons_expr = .{
             .head = head,
             .operator = lexer.Token{
-                .kind = .OpCons,
+                .kind = lexer.TokenKind{ .operator = .Cons },
                 .lexeme = "::",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1505,7 +1510,7 @@ test "ConsExprNode memory management" {
 
     // Verify the structure
     try testing.expect(cons.* == .cons_expr);
-    try testing.expectEqual(lexer.TokenKind.OpCons, cons.cons_expr.operator.kind);
+    try testing.expectEqual(lexer.TokenKind{ .operator = .Cons }, cons.cons_expr.operator.kind);
     try testing.expectEqualStrings("::", cons.cons_expr.operator.lexeme);
 
     // Test head (1)
@@ -1524,7 +1529,7 @@ test "ConsExprNode memory management" {
     try testing.expectEqual(@as(i64, 3), list_elements[1].int_literal.value);
 }
 
-test "StrConcatExprNode memory management" {
+test "[StrConcatExprNode]" {
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1537,7 +1542,7 @@ test "StrConcatExprNode memory management" {
         .str_literal = .{
             .value = left_str,
             .token = lexer.Token{
-                .kind = .LitString,
+                .kind = lexer.TokenKind{ .literal = .String },
                 .lexeme = "\"Hello\"",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1554,7 +1559,7 @@ test "StrConcatExprNode memory management" {
         .str_literal = .{
             .value = right_str,
             .token = lexer.Token{
-                .kind = .LitString,
+                .kind = lexer.TokenKind{ .literal = .String },
                 .lexeme = "\"World\"",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1575,7 +1580,7 @@ test "StrConcatExprNode memory management" {
         .str_concat_expr = .{
             .left = left,
             .operator = lexer.Token{
-                .kind = .OpStrConcat,
+                .kind = lexer.TokenKind{ .operator = .StrConcat },
                 .lexeme = "<>",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1588,13 +1593,13 @@ test "StrConcatExprNode memory management" {
     };
 
     // Verify the structure
-    try testing.expectEqual(lexer.TokenKind.OpStrConcat, concat.str_concat_expr.operator.kind);
+    try testing.expectEqual(lexer.TokenKind{ .operator = .StrConcat }, concat.str_concat_expr.operator.kind);
     try testing.expectEqualStrings("<>", concat.str_concat_expr.operator.lexeme);
     try testing.expectEqualStrings("Hello", concat.str_concat_expr.left.str_literal.value);
     try testing.expectEqualStrings("World", concat.str_concat_expr.right.str_literal.value);
 }
 
-test "ListConcatExprNode memory management" {
+test "[ListConcatExprNode]" {
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1609,7 +1614,7 @@ test "ListConcatExprNode memory management" {
         .int_literal = .{
             .value = 1,
             .token = lexer.Token{
-                .kind = .LitInt,
+                .kind = lexer.TokenKind{ .literal = .Int },
                 .lexeme = "1",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1625,7 +1630,7 @@ test "ListConcatExprNode memory management" {
         .int_literal = .{
             .value = 2,
             .token = lexer.Token{
-                .kind = .LitInt,
+                .kind = lexer.TokenKind{ .literal = .Int },
                 .lexeme = "2",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1643,7 +1648,7 @@ test "ListConcatExprNode memory management" {
         .list = .{
             .elements = left_elements,
             .token = lexer.Token{
-                .kind = .DelLeftBracket,
+                .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
                 .lexeme = "[",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1662,7 +1667,7 @@ test "ListConcatExprNode memory management" {
         .int_literal = .{
             .value = 3,
             .token = lexer.Token{
-                .kind = .LitInt,
+                .kind = lexer.TokenKind{ .literal = .Int },
                 .lexeme = "3",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1678,7 +1683,7 @@ test "ListConcatExprNode memory management" {
         .int_literal = .{
             .value = 4,
             .token = lexer.Token{
-                .kind = .LitInt,
+                .kind = lexer.TokenKind{ .literal = .Int },
                 .lexeme = "4",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1696,7 +1701,7 @@ test "ListConcatExprNode memory management" {
         .list = .{
             .elements = right_elements,
             .token = lexer.Token{
-                .kind = .DelLeftBracket,
+                .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
                 .lexeme = "[",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1717,7 +1722,7 @@ test "ListConcatExprNode memory management" {
         .list_concat_expr = .{
             .left = left,
             .operator = lexer.Token{
-                .kind = .OpListConcat,
+                .kind = lexer.TokenKind{ .operator = .ListConcat },
                 .lexeme = "++",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1732,7 +1737,7 @@ test "ListConcatExprNode memory management" {
     const expr = concat.list_concat_expr;
 
     // Verify the structure
-    try testing.expectEqual(lexer.TokenKind.OpListConcat, expr.operator.kind);
+    try testing.expectEqual(lexer.TokenKind{ .operator = .ListConcat }, expr.operator.kind);
     try testing.expectEqualStrings("++", expr.operator.lexeme);
 
     // Verify left list [1, 2]
@@ -1752,7 +1757,7 @@ test "ListConcatExprNode memory management" {
     try testing.expectEqual(@as(i64, 4), expr.right.list.elements.items[1].int_literal.value);
 }
 
-test "CompositionExprNode memory management" {
+test "[CompositionExprNode]" {
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1764,7 +1769,7 @@ test "CompositionExprNode memory management" {
         .lower_identifier = .{
             .name = "f",
             .token = lexer.Token{
-                .kind = .LowerIdent,
+                .kind = lexer.TokenKind{ .identifier = .Lower },
                 .lexeme = "f",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1780,7 +1785,7 @@ test "CompositionExprNode memory management" {
         .lower_identifier = .{
             .name = "g",
             .token = lexer.Token{
-                .kind = .LowerIdent,
+                .kind = lexer.TokenKind{ .identifier = .Lower },
                 .lexeme = "g",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1801,7 +1806,7 @@ test "CompositionExprNode memory management" {
         .composition_expr = .{
             .first = first,
             .operator = lexer.Token{
-                .kind = .OpComposeRight,
+                .kind = lexer.TokenKind{ .operator = .ComposeRight },
                 .lexeme = ">>",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1816,21 +1821,21 @@ test "CompositionExprNode memory management" {
     const expr = compose.composition_expr;
 
     // Verify the structure
-    try testing.expectEqual(lexer.TokenKind.OpComposeRight, expr.operator.kind);
+    try testing.expectEqual(lexer.TokenKind{ .operator = .ComposeRight }, expr.operator.kind);
     try testing.expectEqualStrings(">>", expr.operator.lexeme);
 
     // Verify first function (f)
     try testing.expect(expr.first.* == .lower_identifier);
-    try testing.expectEqual(lexer.TokenKind.LowerIdent, expr.first.lower_identifier.token.kind);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.first.lower_identifier.token.kind);
     try testing.expectEqualStrings("f", expr.first.lower_identifier.name);
 
     // Verify second function (g)
     try testing.expect(expr.second.* == .lower_identifier);
-    try testing.expectEqual(lexer.TokenKind.LowerIdent, expr.second.lower_identifier.token.kind);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.second.lower_identifier.token.kind);
     try testing.expectEqualStrings("g", expr.second.lower_identifier.name);
 }
 
-test "PipeExprNode memory management" {
+test "[PipeExprNode]" {
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1842,7 +1847,7 @@ test "PipeExprNode memory management" {
         .lower_identifier = .{
             .name = "x",
             .token = lexer.Token{
-                .kind = .LowerIdent,
+                .kind = lexer.TokenKind{ .identifier = .Lower },
                 .lexeme = "x",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1858,7 +1863,7 @@ test "PipeExprNode memory management" {
         .lower_identifier = .{
             .name = "f",
             .token = lexer.Token{
-                .kind = .LowerIdent,
+                .kind = lexer.TokenKind{ .identifier = .Lower },
                 .lexeme = "f",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1879,7 +1884,7 @@ test "PipeExprNode memory management" {
         .pipe_expr = .{
             .value = value,
             .operator = lexer.Token{
-                .kind = .OpPipeRight,
+                .kind = lexer.TokenKind{ .operator = .PipeRight },
                 .lexeme = "|>",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1894,16 +1899,16 @@ test "PipeExprNode memory management" {
     const expr = pipe.pipe_expr;
 
     // Verify the structure
-    try testing.expectEqual(lexer.TokenKind.OpPipeRight, expr.operator.kind);
+    try testing.expectEqual(lexer.TokenKind{ .operator = .PipeRight }, expr.operator.kind);
     try testing.expectEqualStrings("|>", expr.operator.lexeme);
 
     // Verify value being piped (x)
     try testing.expect(expr.value.* == .lower_identifier);
-    try testing.expectEqual(lexer.TokenKind.LowerIdent, expr.value.lower_identifier.token.kind);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.value.lower_identifier.token.kind);
     try testing.expectEqualStrings("x", expr.value.lower_identifier.name);
 
     // Verify function (f)
     try testing.expect(expr.func.* == .lower_identifier);
-    try testing.expectEqual(lexer.TokenKind.LowerIdent, expr.func.lower_identifier.token.kind);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.func.lower_identifier.token.kind);
     try testing.expectEqualStrings("f", expr.func.lower_identifier.name);
 }
