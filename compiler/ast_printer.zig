@@ -12,7 +12,7 @@ pub const AstPrinter = struct {
     allocator: std.mem.Allocator,
 
     /// Initialize a new AST printer that writes to the given writer.
-    pub fn init(writer: std.fs.File.Writer, allocator: std.mem.Allocator) AstPrinter {
+    pub fn init(allocator: std.mem.Allocator, writer: std.fs.File.Writer) AstPrinter {
         return .{
             .writer = term.ColorWriter.init(writer),
             .allocator = allocator,
@@ -222,7 +222,7 @@ test "example" {
                 .lexeme = "2",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 4, .end = 5 },
+                    .span = .{ .start = 4, .end = 5 },
                     .src = .{ .line = 1, .col = 5 },
                 },
             },
@@ -239,7 +239,7 @@ test "example" {
                 .lexeme = "3",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 8, .end = 9 },
+                    .span = .{ .start = 8, .end = 9 },
                     .src = .{ .line = 1, .col = 9 },
                 },
             },
@@ -256,7 +256,7 @@ test "example" {
                 .lexeme = "*",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 6, .end = 7 },
+                    .span = .{ .start = 6, .end = 7 },
                     .src = .{ .line = 1, .col = 7 },
                 },
             },
@@ -274,7 +274,7 @@ test "example" {
                 .lexeme = "1",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 0, .end = 1 },
+                    .span = .{ .start = 0, .end = 1 },
                     .src = .{ .line = 1, .col = 1 },
                 },
             },
@@ -291,7 +291,7 @@ test "example" {
                 .lexeme = "+",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 2, .end = 3 },
+                    .span = .{ .start = 2, .end = 3 },
                     .src = .{ .line = 1, .col = 3 },
                 },
             },
@@ -299,6 +299,6 @@ test "example" {
         },
     };
 
-    var printer = AstPrinter.init(std.io.getStdOut().writer(), allocator);
+    var printer = AstPrinter.init(allocator, std.io.getStdOut().writer());
     try printer.printNode(add);
 }

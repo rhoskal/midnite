@@ -124,6 +124,10 @@ pub const PatternNode = union(enum) {
     float_literal: FloatLiteralNode,
     char_literal: CharLiteralNode,
     string_literal: StrLiteralNode,
+    list: struct {
+        elements: std.ArrayList(*PatternNode),
+        token: lexer.Token,
+    },
     variable: struct {
         name: []const u8,
         token: lexer.Token,
@@ -139,10 +143,6 @@ pub const PatternNode = union(enum) {
     cons: struct {
         head: *PatternNode,
         tail: *PatternNode,
-        token: lexer.Token,
-    },
-    list_literal: struct {
-        elements: std.ArrayList(*PatternNode),
         token: lexer.Token,
     },
 };
@@ -533,7 +533,7 @@ pub const Node = union(enum) {
                 allocator.destroy(expr.value);
 
                 for (expr.cases.items) |*case| {
-                    deinitPattern(case.pattern, allocator);
+                    deinitPattern(allocator, case.pattern);
 
                     allocator.destroy(case.pattern);
 
@@ -550,7 +550,7 @@ pub const Node = union(enum) {
                 expr.cases.deinit();
             },
             .pattern => |*pat| {
-                deinitPattern(pat, allocator);
+                deinitPattern(allocator, pat);
             },
             .pipe_expr => |*expr| {
                 expr.value.deinit(allocator);
@@ -695,7 +695,7 @@ pub const Node = union(enum) {
         }
     }
 
-    fn deinitPattern(pattern: *PatternNode, allocator: std.mem.Allocator) void {
+    fn deinitPattern(allocator: std.mem.Allocator, pattern: *PatternNode) void {
         switch (pattern.*) {
             .wildcard,
             .int_literal,
@@ -713,21 +713,21 @@ pub const Node = union(enum) {
                 allocator.free(con.name);
 
                 for (con.args.items) |arg| {
-                    deinitPattern(arg, allocator);
+                    deinitPattern(allocator, arg);
                     allocator.destroy(arg);
                 }
 
                 con.args.deinit();
             },
             .cons => |*cons| {
-                deinitPattern(cons.head, allocator);
-                deinitPattern(cons.tail, allocator);
+                deinitPattern(allocator, cons.head);
+                deinitPattern(allocator, cons.tail);
                 allocator.destroy(cons.head);
                 allocator.destroy(cons.tail);
             },
-            .list_literal => |*list| {
+            .list => |*list| {
                 for (list.elements.items) |element| {
-                    deinitPattern(element, allocator);
+                    deinitPattern(allocator, element);
                     allocator.destroy(element);
                 }
 
@@ -757,7 +757,7 @@ test "BinaryExprNode memory management" {
                 .lexeme = "42",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 0, .end = 2 },
+                    .span = .{ .start = 0, .end = 2 },
                     .src = .{ .line = 1, .col = 1 },
                 },
             },
@@ -773,7 +773,7 @@ test "BinaryExprNode memory management" {
                 .lexeme = "24",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 6, .end = 8 },
+                    .span = .{ .start = 6, .end = 8 },
                     .src = .{ .line = 1, .col = 7 },
                 },
             },
@@ -794,7 +794,7 @@ test "BinaryExprNode memory management" {
                 .lexeme = "+",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 3, .end = 3 },
+                    .span = .{ .start = 3, .end = 3 },
                     .src = .{ .line = 1, .col = 4 },
                 },
             },
@@ -823,7 +823,7 @@ test "UnaryExprNode memory management" {
                 .lexeme = "42",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 1, .end = 3 },
+                    .span = .{ .start = 1, .end = 3 },
                     .src = .{ .line = 1, .col = 2 },
                 },
             },
@@ -843,7 +843,7 @@ test "UnaryExprNode memory management" {
                 .lexeme = "-",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 0, .end = 1 },
+                    .span = .{ .start = 0, .end = 1 },
                     .src = .{ .line = 1, .col = 1 },
                 },
             },
@@ -877,7 +877,7 @@ test "LambdaExprNode memory management" {
                 .lexeme = "x",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 7, .end = 8 },
+                    .span = .{ .start = 7, .end = 8 },
                     .src = .{ .line = 1, .col = 8 },
                 },
             },
@@ -893,7 +893,7 @@ test "LambdaExprNode memory management" {
                 .lexeme = "y",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 10, .end = 11 },
+                    .span = .{ .start = 10, .end = 11 },
                     .src = .{ .line = 1, .col = 11 },
                 },
             },
@@ -909,7 +909,7 @@ test "LambdaExprNode memory management" {
                 .lexeme = "+",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 8, .end = 9 },
+                    .span = .{ .start = 8, .end = 9 },
                     .src = .{ .line = 1, .col = 9 },
                 },
             },
@@ -932,7 +932,7 @@ test "LambdaExprNode memory management" {
                 .lexeme = "\\",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 0, .end = 1 },
+                    .span = .{ .start = 0, .end = 1 },
                     .src = .{ .line = 1, .col = 1 },
                 },
             },
@@ -971,7 +971,7 @@ test "IfThenElseStmtNode memory management" {
                 .lexeme = "x",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 3, .end = 4 },
+                    .span = .{ .start = 3, .end = 4 },
                     .src = .{ .line = 1, .col = 4 },
                 },
             },
@@ -987,7 +987,7 @@ test "IfThenElseStmtNode memory management" {
                 .lexeme = "y",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 8, .end = 9 },
+                    .span = .{ .start = 8, .end = 9 },
                     .src = .{ .line = 1, .col = 9 },
                 },
             },
@@ -1003,7 +1003,7 @@ test "IfThenElseStmtNode memory management" {
                 .lexeme = "==",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 5, .end = 7 },
+                    .span = .{ .start = 5, .end = 7 },
                     .src = .{ .line = 1, .col = 6 },
                 },
             },
@@ -1020,7 +1020,7 @@ test "IfThenElseStmtNode memory management" {
                 .lexeme = "True",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 15, .end = 19 },
+                    .span = .{ .start = 15, .end = 19 },
                     .src = .{ .line = 1, .col = 16 },
                 },
             },
@@ -1036,7 +1036,7 @@ test "IfThenElseStmtNode memory management" {
                 .lexeme = "False",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 25, .end = 30 },
+                    .span = .{ .start = 25, .end = 30 },
                     .src = .{ .line = 1, .col = 26 },
                 },
             },
@@ -1102,7 +1102,7 @@ test "FunctionTypeNode memory management" {
                 .lexeme = "Int",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 2, .end = 5 },
+                    .span = .{ .start = 2, .end = 5 },
                     .src = .{ .line = 1, .col = 3 },
                 },
             },
@@ -1118,7 +1118,7 @@ test "FunctionTypeNode memory management" {
                 .lexeme = "Int",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 9, .end = 12 },
+                    .span = .{ .start = 9, .end = 12 },
                     .src = .{ .line = 1, .col = 10 },
                 },
             },
@@ -1134,7 +1134,7 @@ test "FunctionTypeNode memory management" {
                 .lexeme = "Int",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 16, .end = 19 },
+                    .span = .{ .start = 16, .end = 19 },
                     .src = .{ .line = 1, .col = 17 },
                 },
             },
@@ -1159,7 +1159,7 @@ test "FunctionTypeNode memory management" {
                 .lexeme = ":",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 0, .end = 1 },
+                    .span = .{ .start = 0, .end = 1 },
                     .src = .{ .line = 1, .col = 1 },
                 },
             },
@@ -1181,15 +1181,15 @@ test "FunctionTypeNode memory management" {
 
     // Test specific positions of each Int
     const first_int = func_type.function_type.param_types.items[0];
-    try testing.expectEqual(@as(usize, 2), first_int.upper_identifier.token.loc.buf.start);
+    try testing.expectEqual(@as(usize, 2), first_int.upper_identifier.token.loc.span.start);
     try testing.expectEqual(@as(usize, 3), first_int.upper_identifier.token.loc.src.col);
 
     const second_int = func_type.function_type.param_types.items[1];
-    try testing.expectEqual(@as(usize, 9), second_int.upper_identifier.token.loc.buf.start);
+    try testing.expectEqual(@as(usize, 9), second_int.upper_identifier.token.loc.span.start);
     try testing.expectEqual(@as(usize, 10), second_int.upper_identifier.token.loc.src.col);
 
     const third_int = func_type.function_type.param_types.items[2];
-    try testing.expectEqual(@as(usize, 16), third_int.upper_identifier.token.loc.buf.start);
+    try testing.expectEqual(@as(usize, 16), third_int.upper_identifier.token.loc.span.start);
     try testing.expectEqual(@as(usize, 17), third_int.upper_identifier.token.loc.src.col);
 }
 
@@ -1211,7 +1211,7 @@ test "FunctionDeclNode memory management" {
                 .lexeme = "Int",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 9, .end = 12 },
+                    .span = .{ .start = 9, .end = 12 },
                     .src = .{ .line = 1, .col = 10 },
                 },
             },
@@ -1227,7 +1227,7 @@ test "FunctionDeclNode memory management" {
                 .lexeme = "Int",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 16, .end = 19 },
+                    .span = .{ .start = 16, .end = 19 },
                     .src = .{ .line = 1, .col = 17 },
                 },
             },
@@ -1243,7 +1243,7 @@ test "FunctionDeclNode memory management" {
                 .lexeme = "Int",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 23, .end = 26 },
+                    .span = .{ .start = 23, .end = 26 },
                     .src = .{ .line = 1, .col = 24 },
                 },
             },
@@ -1263,7 +1263,7 @@ test "FunctionDeclNode memory management" {
                 .lexeme = ":",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 7, .end = 8 },
+                    .span = .{ .start = 7, .end = 8 },
                     .src = .{ .line = 1, .col = 8 },
                 },
             },
@@ -1284,7 +1284,7 @@ test "FunctionDeclNode memory management" {
                 .lexeme = "x",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 37, .end = 38 },
+                    .span = .{ .start = 37, .end = 38 },
                     .src = .{ .line = 1, .col = 38 },
                 },
             },
@@ -1300,7 +1300,7 @@ test "FunctionDeclNode memory management" {
                 .lexeme = "y",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 41, .end = 42 },
+                    .span = .{ .start = 41, .end = 42 },
                     .src = .{ .line = 1, .col = 42 },
                 },
             },
@@ -1316,7 +1316,7 @@ test "FunctionDeclNode memory management" {
                 .lexeme = "+",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 39, .end = 40 },
+                    .span = .{ .start = 39, .end = 40 },
                     .src = .{ .line = 1, .col = 40 },
                 },
             },
@@ -1334,7 +1334,7 @@ test "FunctionDeclNode memory management" {
                 .lexeme = "\\",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 30, .end = 31 },
+                    .span = .{ .start = 30, .end = 31 },
                     .src = .{ .line = 1, .col = 31 },
                 },
             },
@@ -1357,7 +1357,7 @@ test "FunctionDeclNode memory management" {
                 .lexeme = "let",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 0, .end = 3 },
+                    .span = .{ .start = 0, .end = 3 },
                     .src = .{ .line = 1, .col = 1 },
                 },
             },
@@ -1421,7 +1421,7 @@ test "ConsExprNode memory management" {
                 .lexeme = "1",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 0, .end = 1 },
+                    .span = .{ .start = 0, .end = 1 },
                     .src = .{ .line = 1, .col = 1 },
                 },
             },
@@ -1439,7 +1439,7 @@ test "ConsExprNode memory management" {
                 .lexeme = "2",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 6, .end = 7 },
+                    .span = .{ .start = 6, .end = 7 },
                     .src = .{ .line = 1, .col = 7 },
                 },
             },
@@ -1455,7 +1455,7 @@ test "ConsExprNode memory management" {
                 .lexeme = "3",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 9, .end = 10 },
+                    .span = .{ .start = 9, .end = 10 },
                     .src = .{ .line = 1, .col = 10 },
                 },
             },
@@ -1470,11 +1470,11 @@ test "ConsExprNode memory management" {
         .list = .{
             .elements = elements,
             .token = lexer.Token{
-                .kind = .DelLBrack,
+                .kind = .DelLeftBracket,
                 .lexeme = "[",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 5, .end = 6 },
+                    .span = .{ .start = 5, .end = 6 },
                     .src = .{ .line = 1, .col = 6 },
                 },
             },
@@ -1495,7 +1495,7 @@ test "ConsExprNode memory management" {
                 .lexeme = "::",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 2, .end = 3 },
+                    .span = .{ .start = 2, .end = 3 },
                     .src = .{ .line = 1, .col = 3 },
                 },
             },
@@ -1541,7 +1541,7 @@ test "StrConcatExprNode memory management" {
                 .lexeme = "\"Hello\"",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 0, .end = 7 },
+                    .span = .{ .start = 0, .end = 7 },
                     .src = .{ .line = 1, .col = 1 },
                 },
             },
@@ -1558,7 +1558,7 @@ test "StrConcatExprNode memory management" {
                 .lexeme = "\"World\"",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 11, .end = 18 },
+                    .span = .{ .start = 11, .end = 18 },
                     .src = .{ .line = 1, .col = 12 },
                 },
             },
@@ -1579,7 +1579,7 @@ test "StrConcatExprNode memory management" {
                 .lexeme = "<>",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 8, .end = 10 },
+                    .span = .{ .start = 8, .end = 10 },
                     .src = .{ .line = 1, .col = 9 },
                 },
             },
@@ -1613,7 +1613,7 @@ test "ListConcatExprNode memory management" {
                 .lexeme = "1",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 1, .end = 2 },
+                    .span = .{ .start = 1, .end = 2 },
                     .src = .{ .line = 1, .col = 2 },
                 },
             },
@@ -1629,7 +1629,7 @@ test "ListConcatExprNode memory management" {
                 .lexeme = "2",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 4, .end = 5 },
+                    .span = .{ .start = 4, .end = 5 },
                     .src = .{ .line = 1, .col = 5 },
                 },
             },
@@ -1643,11 +1643,11 @@ test "ListConcatExprNode memory management" {
         .list = .{
             .elements = left_elements,
             .token = lexer.Token{
-                .kind = .DelLBrack,
+                .kind = .DelLeftBracket,
                 .lexeme = "[",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 0, .end = 1 },
+                    .span = .{ .start = 0, .end = 1 },
                     .src = .{ .line = 1, .col = 1 },
                 },
             },
@@ -1666,7 +1666,7 @@ test "ListConcatExprNode memory management" {
                 .lexeme = "3",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 11, .end = 12 },
+                    .span = .{ .start = 11, .end = 12 },
                     .src = .{ .line = 1, .col = 12 },
                 },
             },
@@ -1682,7 +1682,7 @@ test "ListConcatExprNode memory management" {
                 .lexeme = "4",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 14, .end = 15 },
+                    .span = .{ .start = 14, .end = 15 },
                     .src = .{ .line = 1, .col = 15 },
                 },
             },
@@ -1696,11 +1696,11 @@ test "ListConcatExprNode memory management" {
         .list = .{
             .elements = right_elements,
             .token = lexer.Token{
-                .kind = .DelLBrack,
+                .kind = .DelLeftBracket,
                 .lexeme = "[",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 10, .end = 11 },
+                    .span = .{ .start = 10, .end = 11 },
                     .src = .{ .line = 1, .col = 11 },
                 },
             },
@@ -1721,7 +1721,7 @@ test "ListConcatExprNode memory management" {
                 .lexeme = "++",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 7, .end = 9 },
+                    .span = .{ .start = 7, .end = 9 },
                     .src = .{ .line = 1, .col = 8 },
                 },
             },
@@ -1768,7 +1768,7 @@ test "CompositionExprNode memory management" {
                 .lexeme = "f",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 0, .end = 1 },
+                    .span = .{ .start = 0, .end = 1 },
                     .src = .{ .line = 1, .col = 1 },
                 },
             },
@@ -1784,7 +1784,7 @@ test "CompositionExprNode memory management" {
                 .lexeme = "g",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 5, .end = 6 },
+                    .span = .{ .start = 5, .end = 6 },
                     .src = .{ .line = 1, .col = 6 },
                 },
             },
@@ -1805,7 +1805,7 @@ test "CompositionExprNode memory management" {
                 .lexeme = ">>",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 2, .end = 4 },
+                    .span = .{ .start = 2, .end = 4 },
                     .src = .{ .line = 1, .col = 3 },
                 },
             },
@@ -1846,7 +1846,7 @@ test "PipeExprNode memory management" {
                 .lexeme = "x",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 0, .end = 1 },
+                    .span = .{ .start = 0, .end = 1 },
                     .src = .{ .line = 1, .col = 1 },
                 },
             },
@@ -1862,7 +1862,7 @@ test "PipeExprNode memory management" {
                 .lexeme = "f",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 5, .end = 6 },
+                    .span = .{ .start = 5, .end = 6 },
                     .src = .{ .line = 1, .col = 6 },
                 },
             },
@@ -1883,7 +1883,7 @@ test "PipeExprNode memory management" {
                 .lexeme = "|>",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .buf = .{ .start = 2, .end = 4 },
+                    .span = .{ .start = 2, .end = 4 },
                     .src = .{ .line = 1, .col = 3 },
                 },
             },

@@ -5,7 +5,7 @@ pub const TokenKind = enum {
     // Special
     Eof,
     Unrecognized,
-    TypedHole,
+    Hole,
 
     // Comments
     Comment,
@@ -45,12 +45,12 @@ pub const TokenKind = enum {
     DelColon,
     DelComma,
     DelDot,
-    DelLBrack,
-    DelLCurly,
-    DelLParen,
-    DelRBrack,
-    DelRCurly,
-    DelRParen,
+    DelLeftBracket,
+    DelLeftBrace,
+    DelLeftParen,
+    DelRightBracket,
+    DelRightBrace,
+    DelRightParen,
 
     // Symbols
     SymArrowRight,
@@ -59,11 +59,11 @@ pub const TokenKind = enum {
     SymUnderscore,
 
     // Operators
-    OpAssign,
+    OpEqual,
     OpComposeLeft,
     OpComposeRight,
     OpCons,
-    OpDoubleDot,
+    OpExpand,
     OpLambda,
     OpListConcat,
     OpPipeLeft,
@@ -102,7 +102,7 @@ pub const TokenKind = enum {
 };
 
 /// Represents a location in the source buffer using raw byte indices.
-pub const BufferLoc = struct {
+pub const Span = struct {
     /// The start index of the lexeme in the source buffer (inclusive).
     start: usize,
 
@@ -125,7 +125,7 @@ pub const TokenLoc = struct {
     filename: []const u8,
 
     /// The raw buffer location of the token.
-    buf: BufferLoc,
+    span: Span,
 
     /// The human-readable source location of the token.
     src: SourceLoc,
@@ -143,7 +143,7 @@ pub const Token = struct {
     /// - `lexeme`: The string representation of the token.
     /// - `loc`: The complete location information for the token.
     pub fn init(kind: TokenKind, lexeme: []const u8, loc: TokenLoc) Token {
-        return Token{
+        return .{
             .kind = kind,
             .lexeme = lexeme,
             .loc = loc,
@@ -177,11 +177,11 @@ pub const Lexer = struct {
     /// - `source`: The source code to be lexed.
     /// - `filename`: The name of the source file where the token is located.
     pub fn init(source: []const u8, filename: []const u8) Lexer {
-        return Lexer{
+        return .{
             .source = source,
             .loc = .{
                 .filename = filename,
-                .buf = .{ .start = 0, .end = 0 },
+                .span = .{ .start = 0, .end = 0 },
                 .src = .{ .line = 1, .col = 1 },
             },
         };
@@ -191,24 +191,24 @@ pub const Lexer = struct {
     ///
     /// Returns `null` if the end of the source is reached.
     fn peek(self: *Lexer) ?u8 {
-        if (self.loc.buf.end >= self.source.len) return null;
+        if (self.loc.span.end >= self.source.len) return null;
 
-        return self.source[self.loc.buf.end];
+        return self.source[self.loc.span.end];
     }
 
     /// Advances the lexer by one position in the source code.
     /// Updates the current line and column numbers accordingly.
     fn advance(self: *Lexer) void {
-        if (self.loc.buf.end >= self.source.len) return;
+        if (self.loc.span.end >= self.source.len) return;
 
-        if (self.source[self.loc.buf.end] == '\n') {
+        if (self.source[self.loc.span.end] == '\n') {
             self.loc.src.line += 1;
             self.loc.src.col = 1;
         } else {
             self.loc.src.col += 1;
         }
 
-        self.loc.buf.end += 1;
+        self.loc.span.end += 1;
     }
 
     fn skipWhitespace(self: *Lexer) void {
@@ -218,7 +218,7 @@ pub const Lexer = struct {
             self.advance();
         }
 
-        self.loc.buf.start = self.loc.buf.end;
+        self.loc.span.start = self.loc.span.end;
     }
 
     /// Checks if there is an exact match for a keyword starting at a given position.
@@ -235,18 +235,18 @@ pub const Lexer = struct {
         kind: TokenKind,
     ) ?Token {
         const len = keyword.len;
-        const lexeme = self.source[start..self.loc.buf.end];
+        const lexeme = self.source[start..self.loc.span.end];
 
-        const is_exact_match = self.loc.buf.end - start == len and
+        const is_exact_match = self.loc.span.end - start == len and
             std.mem.eql(u8, lexeme, keyword);
 
         if (!is_exact_match) return null;
 
         const end_loc = TokenLoc{
             .filename = self.loc.filename,
-            .buf = .{
+            .span = .{
                 .start = start,
-                .end = self.loc.buf.end,
+                .end = self.loc.span.end,
             },
             .src = .{
                 .line = self.loc.src.line,
@@ -277,9 +277,9 @@ pub const Lexer = struct {
     fn handleNumber(self: *Lexer, base: enum { Decimal, Hex, Octal, Binary }) LexerError!Token {
         const offset = if (base == .Decimal) @as(usize, 0) else 2;
         const mark = if (base == .Decimal)
-            self.loc.buf.start
+            self.loc.span.start
         else
-            self.loc.buf.end - offset;
+            self.loc.span.end - offset;
         const col_offset = self.loc.src.col - offset;
 
         if (base != .Decimal) {
@@ -395,13 +395,13 @@ pub const Lexer = struct {
                 }
             }
 
-            const lexeme = self.source[mark..self.loc.buf.end];
+            const lexeme = self.source[mark..self.loc.span.end];
 
             return Token.init(.LitFloat, lexeme, .{
                 .filename = self.loc.filename,
-                .buf = .{
+                .span = .{
                     .start = mark,
-                    .end = self.loc.buf.end,
+                    .end = self.loc.span.end,
                 },
                 .src = .{
                     .line = self.loc.src.line,
@@ -410,13 +410,13 @@ pub const Lexer = struct {
             });
         }
 
-        const lexeme = self.source[mark..self.loc.buf.end];
+        const lexeme = self.source[mark..self.loc.span.end];
 
         return Token.init(.LitInt, lexeme, .{
             .filename = self.loc.filename,
-            .buf = .{
+            .span = .{
                 .start = mark,
-                .end = self.loc.buf.end,
+                .end = self.loc.span.end,
             },
             .src = .{
                 .line = self.loc.src.line,
@@ -444,7 +444,7 @@ pub const Lexer = struct {
         }
 
         // Save the starting position of the hex digits
-        const escape_start = self.loc.buf.end;
+        const escape_start = self.loc.span.end;
         const escape_col = self.loc.src.col;
 
         var unicode_value: u21 = 0;
@@ -461,7 +461,7 @@ pub const Lexer = struct {
 
         if (self.peek()) |next| {
             if (next != '}') {
-                self.loc.buf.start = escape_start;
+                self.loc.span.start = escape_start;
                 self.loc.src.col = escape_col;
 
                 return error.InvalidUnicodeEscapeSequence;
@@ -469,21 +469,21 @@ pub const Lexer = struct {
 
             self.advance();
         } else {
-            self.loc.buf.start = escape_start;
+            self.loc.span.start = escape_start;
             self.loc.src.col = escape_col;
 
             return error.InvalidUnicodeEscapeSequence;
         }
 
         if (digit_count == 0) {
-            self.loc.buf.start = escape_start;
+            self.loc.span.start = escape_start;
             self.loc.src.col = escape_col;
 
             return error.InvalidUnicodeEscapeSequence;
         }
 
         if (!isValidUnicodeCodepoint(unicode_value)) {
-            self.loc.buf.start = escape_start - 2;
+            self.loc.span.start = escape_start - 2;
             self.loc.src.col = escape_col - 2;
 
             return error.CodePointOutOfRange;
@@ -496,16 +496,16 @@ pub const Lexer = struct {
     pub fn nextToken(self: *Lexer) LexerError!Token {
         self.skipWhitespace();
 
-        const buf_start = self.loc.buf.start;
+        const buf_start = self.loc.span.start;
         const start_line = self.loc.src.line;
         const start_col = self.loc.src.col;
 
         const c = self.peek() orelse {
             const end_loc = TokenLoc{
                 .filename = self.loc.filename,
-                .buf = .{
+                .span = .{
                     .start = buf_start,
-                    .end = self.loc.buf.start,
+                    .end = self.loc.span.start,
                 },
                 .src = .{
                     .line = start_line,
@@ -523,9 +523,9 @@ pub const Lexer = struct {
                 if (self.peek() == null) {
                     const end_loc = TokenLoc{
                         .filename = self.loc.filename,
-                        .buf = .{
+                        .span = .{
                             .start = buf_start,
-                            .end = self.loc.buf.end,
+                            .end = self.loc.span.end,
                         },
                         .src = .{
                             .line = start_line,
@@ -533,7 +533,7 @@ pub const Lexer = struct {
                         },
                     };
 
-                    return Token.init(.TypedHole, "?", end_loc);
+                    return Token.init(.Hole, "?", end_loc);
                 }
 
                 return error.InvalidIdentifier;
@@ -568,12 +568,12 @@ pub const Lexer = struct {
                 }
 
                 const kind = if (is_doc) TokenKind.DocComment else TokenKind.Comment;
-                const lexeme = self.source[mark..self.loc.buf.end];
+                const lexeme = self.source[mark..self.loc.span.end];
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -643,12 +643,12 @@ pub const Lexer = struct {
 
                                 if (!found_end) return error.UnterminatedStrLiteral;
 
-                                const lexeme = self.source[mark..self.loc.buf.end];
+                                const lexeme = self.source[mark..self.loc.span.end];
                                 const end_loc = TokenLoc{
                                     .filename = self.loc.filename,
-                                    .buf = .{
+                                    .span = .{
                                         .start = mark,
-                                        .end = self.loc.buf.end,
+                                        .end = self.loc.span.end,
                                     },
                                     .src = .{
                                         .line = start_line,
@@ -660,12 +660,12 @@ pub const Lexer = struct {
                             }
                         }
 
-                        const lexeme = self.source[mark..self.loc.buf.end];
+                        const lexeme = self.source[mark..self.loc.span.end];
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = mark,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -713,12 +713,12 @@ pub const Lexer = struct {
 
                 if (!found_closing_quote) return error.UnterminatedStrLiteral;
 
-                const lexeme = self.source[mark..self.loc.buf.end];
+                const lexeme = self.source[mark..self.loc.span.end];
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = mark,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -776,12 +776,12 @@ pub const Lexer = struct {
 
                 if (char_count > 1) return error.MultipleCharsInLiteral;
 
-                const lexeme = self.source[mark..self.loc.buf.end];
+                const lexeme = self.source[mark..self.loc.span.end];
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = mark,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -800,9 +800,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -820,9 +820,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -836,9 +836,9 @@ pub const Lexer = struct {
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -857,9 +857,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -875,9 +875,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -891,9 +891,9 @@ pub const Lexer = struct {
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -912,9 +912,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -930,9 +930,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -946,9 +946,9 @@ pub const Lexer = struct {
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -967,9 +967,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -985,9 +985,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -1001,9 +1001,9 @@ pub const Lexer = struct {
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1022,9 +1022,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -1040,9 +1040,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -1058,9 +1058,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -1076,9 +1076,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -1092,9 +1092,9 @@ pub const Lexer = struct {
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1113,9 +1113,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -1131,9 +1131,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -1147,9 +1147,9 @@ pub const Lexer = struct {
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1168,9 +1168,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -1184,9 +1184,9 @@ pub const Lexer = struct {
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1205,9 +1205,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -1223,9 +1223,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -1239,9 +1239,9 @@ pub const Lexer = struct {
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1256,9 +1256,9 @@ pub const Lexer = struct {
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1277,9 +1277,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -1293,9 +1293,9 @@ pub const Lexer = struct {
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1310,9 +1310,9 @@ pub const Lexer = struct {
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1333,9 +1333,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -1343,15 +1343,15 @@ pub const Lexer = struct {
                             },
                         };
 
-                        return Token.init(.OpDoubleDot, "..", end_loc);
+                        return Token.init(.OpExpand, "..", end_loc);
                     }
                 }
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1366,9 +1366,9 @@ pub const Lexer = struct {
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1376,16 +1376,16 @@ pub const Lexer = struct {
                     },
                 };
 
-                return Token.init(.DelLCurly, "{", end_loc);
+                return Token.init(.DelLeftBrace, "{", end_loc);
             },
             '}' => {
                 self.advance();
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1393,7 +1393,7 @@ pub const Lexer = struct {
                     },
                 };
 
-                return Token.init(.DelRCurly, "}", end_loc);
+                return Token.init(.DelRightBrace, "}", end_loc);
             },
             '=' => {
                 self.advance();
@@ -1404,9 +1404,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -1422,9 +1422,9 @@ pub const Lexer = struct {
 
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -1438,9 +1438,9 @@ pub const Lexer = struct {
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1448,16 +1448,16 @@ pub const Lexer = struct {
                     },
                 };
 
-                return Token.init(.OpAssign, "=", end_loc);
+                return Token.init(.OpEqual, "=", end_loc);
             },
             '(' => {
                 self.advance();
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1465,16 +1465,16 @@ pub const Lexer = struct {
                     },
                 };
 
-                return Token.init(.DelLParen, "(", end_loc);
+                return Token.init(.DelLeftParen, "(", end_loc);
             },
             ')' => {
                 self.advance();
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1482,16 +1482,16 @@ pub const Lexer = struct {
                     },
                 };
 
-                return Token.init(.DelRParen, ")", end_loc);
+                return Token.init(.DelRightParen, ")", end_loc);
             },
             '[' => {
                 self.advance();
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1499,16 +1499,16 @@ pub const Lexer = struct {
                     },
                 };
 
-                return Token.init(.DelLBrack, "[", end_loc);
+                return Token.init(.DelLeftBracket, "[", end_loc);
             },
             ']' => {
                 self.advance();
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1516,7 +1516,7 @@ pub const Lexer = struct {
                     },
                 };
 
-                return Token.init(.DelRBrack, "]", end_loc);
+                return Token.init(.DelRightBracket, "]", end_loc);
             },
             '0' => {
                 self.advance();
@@ -1542,12 +1542,12 @@ pub const Lexer = struct {
                     }
                 }
 
-                const lexeme = self.source[buf_start..self.loc.buf.end];
+                const lexeme = self.source[buf_start..self.loc.span.end];
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1565,12 +1565,12 @@ pub const Lexer = struct {
                     self.advance();
 
                     if (self.peek() == null) {
-                        const lexeme = self.source[buf_start..self.loc.buf.end];
+                        const lexeme = self.source[buf_start..self.loc.span.end];
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
-                            .buf = .{
+                            .span = .{
                                 .start = buf_start,
-                                .end = self.loc.buf.end,
+                                .end = self.loc.span.end,
                             },
                             .src = .{
                                 .line = start_line,
@@ -1604,12 +1604,12 @@ pub const Lexer = struct {
                                     }
                                 }
 
-                                const lexeme = self.source[buf_start..self.loc.buf.end];
+                                const lexeme = self.source[buf_start..self.loc.span.end];
                                 const end_loc = TokenLoc{
                                     .filename = self.loc.filename,
-                                    .buf = .{
+                                    .span = .{
                                         .start = buf_start,
-                                        .end = self.loc.buf.end,
+                                        .end = self.loc.span.end,
                                     },
                                     .src = .{
                                         .line = start_line,
@@ -1622,9 +1622,9 @@ pub const Lexer = struct {
                             else => {
                                 const end_loc = TokenLoc{
                                     .filename = self.loc.filename,
-                                    .buf = .{
+                                    .span = .{
                                         .start = buf_start,
-                                        .end = self.loc.buf.end,
+                                        .end = self.loc.span.end,
                                     },
                                     .src = .{
                                         .line = start_line,
@@ -1639,9 +1639,9 @@ pub const Lexer = struct {
 
                     const end_loc = TokenLoc{
                         .filename = self.loc.filename,
-                        .buf = .{
+                        .span = .{
                             .start = buf_start,
-                            .end = self.loc.buf.end,
+                            .end = self.loc.span.end,
                         },
                         .src = .{
                             .line = start_line,
@@ -1693,14 +1693,14 @@ pub const Lexer = struct {
                 if (self.checkExactMatch(buf_start, "using", .KwUsing)) |token| return token;
                 if (self.checkExactMatch(buf_start, "when", .KwWhen)) |token| return token;
 
-                const lexeme = self.source[buf_start..self.loc.buf.end];
+                const lexeme = self.source[buf_start..self.loc.span.end];
                 const first_char = lexeme[0];
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1717,12 +1717,12 @@ pub const Lexer = struct {
             else => {
                 self.advance();
 
-                const lexeme = self.source[buf_start..self.loc.buf.end];
+                const lexeme = self.source[buf_start..self.loc.span.end];
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .buf = .{
+                    .span = .{
                         .start = buf_start,
-                        .end = self.loc.buf.end,
+                        .end = self.loc.span.end,
                     },
                     .src = .{
                         .line = start_line,
@@ -1791,12 +1791,12 @@ test "[delimiter]" {
         .{ .source = ":", .kind = .DelColon, .lexeme = ":" },
         .{ .source = ",", .kind = .DelComma, .lexeme = "," },
         .{ .source = ".", .kind = .DelDot, .lexeme = "." },
-        .{ .source = "[", .kind = .DelLBrack, .lexeme = "[" },
-        .{ .source = "{", .kind = .DelLCurly, .lexeme = "{" },
-        .{ .source = "(", .kind = .DelLParen, .lexeme = "(" },
-        .{ .source = "]", .kind = .DelRBrack, .lexeme = "]" },
-        .{ .source = "}", .kind = .DelRCurly, .lexeme = "}" },
-        .{ .source = ")", .kind = .DelRParen, .lexeme = ")" },
+        .{ .source = "[", .kind = .DelLeftBracket, .lexeme = "[" },
+        .{ .source = "{", .kind = .DelLeftBrace, .lexeme = "{" },
+        .{ .source = "(", .kind = .DelLeftParen, .lexeme = "(" },
+        .{ .source = "]", .kind = .DelRightBracket, .lexeme = "]" },
+        .{ .source = "}", .kind = .DelRightBrace, .lexeme = "}" },
+        .{ .source = ")", .kind = .DelRightParen, .lexeme = ")" },
     };
 
     for (cases) |case| {
@@ -1834,12 +1834,12 @@ test "[symbol]" {
 test "[operator]" {
     const cases = [_]TestCase{
         .{ .source = "++", .kind = .OpListConcat, .lexeme = "++" },
-        .{ .source = "..", .kind = .OpDoubleDot, .lexeme = ".." },
+        .{ .source = "..", .kind = .OpExpand, .lexeme = ".." },
         .{ .source = "::", .kind = .OpCons, .lexeme = "::" },
         .{ .source = "<<", .kind = .OpComposeLeft, .lexeme = "<<" },
         .{ .source = "<>", .kind = .OpStrConcat, .lexeme = "<>" },
         .{ .source = "<|", .kind = .OpPipeLeft, .lexeme = "<|" },
-        .{ .source = "=", .kind = .OpAssign, .lexeme = "=" },
+        .{ .source = "=", .kind = .OpEqual, .lexeme = "=" },
         .{ .source = ">>", .kind = .OpComposeRight, .lexeme = ">>" },
         .{ .source = "\\", .kind = .OpLambda, .lexeme = "\\" },
         .{ .source = "|>", .kind = .OpPipeRight, .lexeme = "|>" },
@@ -1924,7 +1924,7 @@ test "[logical operator] (boolean)" {
 
 test "[special]" {
     const cases = [_]TestCase{
-        .{ .source = "?", .kind = .TypedHole, .lexeme = "?" },
+        .{ .source = "?", .kind = .Hole, .lexeme = "?" },
     };
 
     for (cases) |case| {
@@ -2356,42 +2356,42 @@ test "type variant" {
     const expected_tokens = [_]Token{
         Token.init(.KwType, "type", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 0, .end = 4 },
+            .span = .{ .start = 0, .end = 4 },
             .src = .{ .line = 1, .col = 1 },
         }),
         Token.init(.UpperIdent, "FooBar", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 5, .end = 11 },
+            .span = .{ .start = 5, .end = 11 },
             .src = .{ .line = 1, .col = 6 },
         }),
-        Token.init(.OpAssign, "=", .{
+        Token.init(.OpEqual, "=", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 12, .end = 13 },
+            .span = .{ .start = 12, .end = 13 },
             .src = .{ .line = 1, .col = 13 },
         }),
         Token.init(.SymPipe, "|", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 14, .end = 15 },
+            .span = .{ .start = 14, .end = 15 },
             .src = .{ .line = 1, .col = 15 },
         }),
         Token.init(.UpperIdent, "Foo", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 16, .end = 19 },
+            .span = .{ .start = 16, .end = 19 },
             .src = .{ .line = 1, .col = 17 },
         }),
         Token.init(.SymPipe, "|", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 20, .end = 21 },
+            .span = .{ .start = 20, .end = 21 },
             .src = .{ .line = 1, .col = 21 },
         }),
         Token.init(.UpperIdent, "Bar", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 22, .end = 25 },
+            .span = .{ .start = 22, .end = 25 },
             .src = .{ .line = 1, .col = 23 },
         }),
         Token.init(.Eof, "", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 25, .end = 25 },
+            .span = .{ .start = 25, .end = 25 },
             .src = .{ .line = 1, .col = 26 },
         }),
     };
@@ -2403,8 +2403,8 @@ test "type variant" {
 
         try testing.expectEqual(expected.kind, token.kind);
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try testing.expectEqual(expected.loc.buf.start, token.loc.buf.start);
-        try testing.expectEqual(expected.loc.buf.end, token.loc.buf.end);
+        try testing.expectEqual(expected.loc.span.start, token.loc.span.start);
+        try testing.expectEqual(expected.loc.span.end, token.loc.span.end);
         try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
         try testing.expectEqual(expected.loc.src.col, token.loc.src.col);
     }
@@ -2416,32 +2416,32 @@ test "type alias" {
     const expected_tokens = [_]Token{
         Token.init(.KwType, "type", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 0, .end = 4 },
+            .span = .{ .start = 0, .end = 4 },
             .src = .{ .line = 1, .col = 1 },
         }),
         Token.init(.KwAlias, "alias", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 5, .end = 10 },
+            .span = .{ .start = 5, .end = 10 },
             .src = .{ .line = 1, .col = 6 },
         }),
         Token.init(.UpperIdent, "Seconds", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 11, .end = 18 },
+            .span = .{ .start = 11, .end = 18 },
             .src = .{ .line = 1, .col = 12 },
         }),
-        Token.init(.OpAssign, "=", .{
+        Token.init(.OpEqual, "=", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 19, .end = 20 },
+            .span = .{ .start = 19, .end = 20 },
             .src = .{ .line = 1, .col = 20 },
         }),
         Token.init(.UpperIdent, "Int", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 21, .end = 24 },
+            .span = .{ .start = 21, .end = 24 },
             .src = .{ .line = 1, .col = 22 },
         }),
         Token.init(.Eof, "", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 24, .end = 24 },
+            .span = .{ .start = 24, .end = 24 },
             .src = .{ .line = 1, .col = 25 },
         }),
     };
@@ -2453,8 +2453,8 @@ test "type alias" {
 
         try testing.expectEqual(expected.kind, token.kind);
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try testing.expectEqual(expected.loc.buf.start, token.loc.buf.start);
-        try testing.expectEqual(expected.loc.buf.end, token.loc.buf.end);
+        try testing.expectEqual(expected.loc.span.start, token.loc.span.start);
+        try testing.expectEqual(expected.loc.span.end, token.loc.span.end);
         try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
         try testing.expectEqual(expected.loc.src.col, token.loc.src.col);
     }
@@ -2466,67 +2466,67 @@ test "record type" {
     const expected_tokens = [_]Token{
         Token.init(.KwType, "type", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 0, .end = 4 },
+            .span = .{ .start = 0, .end = 4 },
             .src = .{ .line = 1, .col = 1 },
         }),
         Token.init(.UpperIdent, "FooBar", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 5, .end = 11 },
+            .span = .{ .start = 5, .end = 11 },
             .src = .{ .line = 1, .col = 6 },
         }),
-        Token.init(.OpAssign, "=", .{
+        Token.init(.OpEqual, "=", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 12, .end = 13 },
+            .span = .{ .start = 12, .end = 13 },
             .src = .{ .line = 1, .col = 13 },
         }),
-        Token.init(.DelLCurly, "{", .{
+        Token.init(.DelLeftBrace, "{", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 14, .end = 15 },
+            .span = .{ .start = 14, .end = 15 },
             .src = .{ .line = 1, .col = 15 },
         }),
         Token.init(.LowerIdent, "foo", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 16, .end = 19 },
+            .span = .{ .start = 16, .end = 19 },
             .src = .{ .line = 1, .col = 17 },
         }),
         Token.init(.DelColon, ":", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 20, .end = 21 },
+            .span = .{ .start = 20, .end = 21 },
             .src = .{ .line = 1, .col = 21 },
         }),
         Token.init(.UpperIdent, "Int", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 22, .end = 25 },
+            .span = .{ .start = 22, .end = 25 },
             .src = .{ .line = 1, .col = 23 },
         }),
         Token.init(.DelComma, ",", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 25, .end = 26 },
+            .span = .{ .start = 25, .end = 26 },
             .src = .{ .line = 1, .col = 26 },
         }),
         Token.init(.LowerIdent, "bar", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 27, .end = 30 },
+            .span = .{ .start = 27, .end = 30 },
             .src = .{ .line = 1, .col = 28 },
         }),
         Token.init(.DelColon, ":", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 31, .end = 32 },
+            .span = .{ .start = 31, .end = 32 },
             .src = .{ .line = 1, .col = 32 },
         }),
         Token.init(.UpperIdent, "String", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 33, .end = 39 },
+            .span = .{ .start = 33, .end = 39 },
             .src = .{ .line = 1, .col = 34 },
         }),
-        Token.init(.DelRCurly, "}", .{
+        Token.init(.DelRightBrace, "}", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 40, .end = 41 },
+            .span = .{ .start = 40, .end = 41 },
             .src = .{ .line = 1, .col = 41 },
         }),
         Token.init(.Eof, "", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 41, .end = 41 },
+            .span = .{ .start = 41, .end = 41 },
             .src = .{ .line = 1, .col = 42 },
         }),
     };
@@ -2538,8 +2538,8 @@ test "record type" {
 
         try testing.expectEqual(expected.kind, token.kind);
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try testing.expectEqual(expected.loc.buf.start, token.loc.buf.start);
-        try testing.expectEqual(expected.loc.buf.end, token.loc.buf.end);
+        try testing.expectEqual(expected.loc.span.start, token.loc.span.start);
+        try testing.expectEqual(expected.loc.span.end, token.loc.span.end);
         try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
         try testing.expectEqual(expected.loc.src.col, token.loc.src.col);
     }
@@ -2551,67 +2551,67 @@ test "module definition" {
     const expected_tokens = [_]Token{
         Token.init(.KwModule, "module", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 0, .end = 6 },
+            .span = .{ .start = 0, .end = 6 },
             .src = .{ .line = 1, .col = 1 },
         }),
         Token.init(.UpperIdent, "Foo", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 7, .end = 10 },
+            .span = .{ .start = 7, .end = 10 },
             .src = .{ .line = 1, .col = 8 },
         }),
         Token.init(.KwExposing, "exposing", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 11, .end = 19 },
+            .span = .{ .start = 11, .end = 19 },
             .src = .{ .line = 1, .col = 12 },
         }),
-        Token.init(.DelLParen, "(", .{
+        Token.init(.DelLeftParen, "(", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 20, .end = 21 },
+            .span = .{ .start = 20, .end = 21 },
             .src = .{ .line = 1, .col = 21 },
         }),
         Token.init(.UpperIdent, "Foo", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 21, .end = 24 },
+            .span = .{ .start = 21, .end = 24 },
             .src = .{ .line = 1, .col = 22 },
         }),
-        Token.init(.DelLParen, "(", .{
+        Token.init(.DelLeftParen, "(", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 24, .end = 25 },
+            .span = .{ .start = 24, .end = 25 },
             .src = .{ .line = 1, .col = 25 },
         }),
-        Token.init(.OpDoubleDot, "..", .{
+        Token.init(.OpExpand, "..", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 25, .end = 27 },
+            .span = .{ .start = 25, .end = 27 },
             .src = .{ .line = 1, .col = 26 },
         }),
-        Token.init(.DelRParen, ")", .{
+        Token.init(.DelRightParen, ")", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 27, .end = 28 },
+            .span = .{ .start = 27, .end = 28 },
             .src = .{ .line = 1, .col = 28 },
         }),
         Token.init(.DelComma, ",", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 28, .end = 29 },
+            .span = .{ .start = 28, .end = 29 },
             .src = .{ .line = 1, .col = 29 },
         }),
         Token.init(.LowerIdent, "bar", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 30, .end = 33 },
+            .span = .{ .start = 30, .end = 33 },
             .src = .{ .line = 1, .col = 31 },
         }),
-        Token.init(.DelRParen, ")", .{
+        Token.init(.DelRightParen, ")", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 33, .end = 34 },
+            .span = .{ .start = 33, .end = 34 },
             .src = .{ .line = 1, .col = 34 },
         }),
         Token.init(.KwEnd, "end", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 35, .end = 38 },
+            .span = .{ .start = 35, .end = 38 },
             .src = .{ .line = 1, .col = 36 },
         }),
         Token.init(.Eof, "", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 38, .end = 38 },
+            .span = .{ .start = 38, .end = 38 },
             .src = .{ .line = 1, .col = 39 },
         }),
     };
@@ -2623,8 +2623,8 @@ test "module definition" {
 
         try testing.expectEqual(expected.kind, token.kind);
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try testing.expectEqual(expected.loc.buf.start, token.loc.buf.start);
-        try testing.expectEqual(expected.loc.buf.end, token.loc.buf.end);
+        try testing.expectEqual(expected.loc.span.start, token.loc.span.start);
+        try testing.expectEqual(expected.loc.span.end, token.loc.span.end);
         try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
         try testing.expectEqual(expected.loc.src.col, token.loc.src.col);
     }
@@ -2636,87 +2636,87 @@ test "top level function definition" {
     const expected_tokens = [_]Token{
         Token.init(.KwLet, "let", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 0, .end = 3 },
+            .span = .{ .start = 0, .end = 3 },
             .src = .{ .line = 1, .col = 1 },
         }),
         Token.init(.LowerIdent, "add", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 4, .end = 7 },
+            .span = .{ .start = 4, .end = 7 },
             .src = .{ .line = 1, .col = 5 },
         }),
         Token.init(.DelColon, ":", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 8, .end = 9 },
+            .span = .{ .start = 8, .end = 9 },
             .src = .{ .line = 1, .col = 9 },
         }),
         Token.init(.UpperIdent, "Int", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 10, .end = 13 },
+            .span = .{ .start = 10, .end = 13 },
             .src = .{ .line = 1, .col = 11 },
         }),
         Token.init(.SymArrowRight, "->", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 14, .end = 16 },
+            .span = .{ .start = 14, .end = 16 },
             .src = .{ .line = 1, .col = 15 },
         }),
         Token.init(.UpperIdent, "Int", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 17, .end = 20 },
+            .span = .{ .start = 17, .end = 20 },
             .src = .{ .line = 1, .col = 18 },
         }),
         Token.init(.SymArrowRight, "->", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 21, .end = 23 },
+            .span = .{ .start = 21, .end = 23 },
             .src = .{ .line = 1, .col = 22 },
         }),
         Token.init(.UpperIdent, "Int", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 24, .end = 27 },
+            .span = .{ .start = 24, .end = 27 },
             .src = .{ .line = 1, .col = 25 },
         }),
-        Token.init(.OpAssign, "=", .{
+        Token.init(.OpEqual, "=", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 28, .end = 29 },
+            .span = .{ .start = 28, .end = 29 },
             .src = .{ .line = 1, .col = 29 },
         }),
         Token.init(.OpLambda, "\\", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 30, .end = 31 },
+            .span = .{ .start = 30, .end = 31 },
             .src = .{ .line = 1, .col = 31 },
         }),
         Token.init(.LowerIdent, "x", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 31, .end = 32 },
+            .span = .{ .start = 31, .end = 32 },
             .src = .{ .line = 1, .col = 32 },
         }),
         Token.init(.LowerIdent, "y", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 33, .end = 34 },
+            .span = .{ .start = 33, .end = 34 },
             .src = .{ .line = 1, .col = 34 },
         }),
         Token.init(.SymDoubleArrowRight, "=>", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 35, .end = 37 },
+            .span = .{ .start = 35, .end = 37 },
             .src = .{ .line = 1, .col = 36 },
         }),
         Token.init(.LowerIdent, "x", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 38, .end = 39 },
+            .span = .{ .start = 38, .end = 39 },
             .src = .{ .line = 1, .col = 39 },
         }),
         Token.init(.OpIntAdd, "+", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 40, .end = 41 },
+            .span = .{ .start = 40, .end = 41 },
             .src = .{ .line = 1, .col = 41 },
         }),
         Token.init(.LowerIdent, "y", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 42, .end = 43 },
+            .span = .{ .start = 42, .end = 43 },
             .src = .{ .line = 1, .col = 43 },
         }),
         Token.init(.Eof, "", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 43, .end = 43 },
+            .span = .{ .start = 43, .end = 43 },
             .src = .{ .line = 1, .col = 44 },
         }),
     };
@@ -2728,8 +2728,8 @@ test "top level function definition" {
 
         try testing.expectEqual(expected.kind, token.kind);
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try testing.expectEqual(expected.loc.buf.start, token.loc.buf.start);
-        try testing.expectEqual(expected.loc.buf.end, token.loc.buf.end);
+        try testing.expectEqual(expected.loc.span.start, token.loc.span.start);
+        try testing.expectEqual(expected.loc.span.end, token.loc.span.end);
         try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
         try testing.expectEqual(expected.loc.src.col, token.loc.src.col);
     }
@@ -2741,77 +2741,77 @@ test "pattern matching" {
     const expected_tokens = [_]Token{
         Token.init(.KwMatch, "match", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 0, .end = 5 },
+            .span = .{ .start = 0, .end = 5 },
             .src = .{ .line = 1, .col = 1 },
         }),
         Token.init(.LowerIdent, "x", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 6, .end = 7 },
+            .span = .{ .start = 6, .end = 7 },
             .src = .{ .line = 1, .col = 7 },
         }),
         Token.init(.KwOn, "on", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 8, .end = 10 },
+            .span = .{ .start = 8, .end = 10 },
             .src = .{ .line = 1, .col = 9 },
         }),
         Token.init(.SymPipe, "|", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 11, .end = 12 },
+            .span = .{ .start = 11, .end = 12 },
             .src = .{ .line = 1, .col = 12 },
         }),
         Token.init(.UpperIdent, "Foo", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 13, .end = 16 },
+            .span = .{ .start = 13, .end = 16 },
             .src = .{ .line = 1, .col = 14 },
         }),
         Token.init(.SymDoubleArrowRight, "=>", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 17, .end = 19 },
+            .span = .{ .start = 17, .end = 19 },
             .src = .{ .line = 1, .col = 18 },
         }),
         Token.init(.LitInt, "1", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 20, .end = 21 },
+            .span = .{ .start = 20, .end = 21 },
             .src = .{ .line = 1, .col = 21 },
         }),
         Token.init(.SymPipe, "|", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 22, .end = 23 },
+            .span = .{ .start = 22, .end = 23 },
             .src = .{ .line = 1, .col = 23 },
         }),
         Token.init(.UpperIdent, "Bar", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 24, .end = 27 },
+            .span = .{ .start = 24, .end = 27 },
             .src = .{ .line = 1, .col = 25 },
         }),
         Token.init(.SymDoubleArrowRight, "=>", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 28, .end = 30 },
+            .span = .{ .start = 28, .end = 30 },
             .src = .{ .line = 1, .col = 29 },
         }),
         Token.init(.LitInt, "2", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 31, .end = 32 },
+            .span = .{ .start = 31, .end = 32 },
             .src = .{ .line = 1, .col = 32 },
         }),
         Token.init(.SymUnderscore, "_", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 33, .end = 34 },
+            .span = .{ .start = 33, .end = 34 },
             .src = .{ .line = 1, .col = 34 },
         }),
         Token.init(.SymDoubleArrowRight, "=>", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 35, .end = 37 },
+            .span = .{ .start = 35, .end = 37 },
             .src = .{ .line = 1, .col = 36 },
         }),
         Token.init(.LitInt, "3", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 38, .end = 39 },
+            .span = .{ .start = 38, .end = 39 },
             .src = .{ .line = 1, .col = 39 },
         }),
         Token.init(.Eof, "", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 39, .end = 39 },
+            .span = .{ .start = 39, .end = 39 },
             .src = .{ .line = 1, .col = 40 },
         }),
     };
@@ -2823,8 +2823,8 @@ test "pattern matching" {
 
         try testing.expectEqual(expected.kind, token.kind);
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try testing.expectEqual(expected.loc.buf.start, token.loc.buf.start);
-        try testing.expectEqual(expected.loc.buf.end, token.loc.buf.end);
+        try testing.expectEqual(expected.loc.span.start, token.loc.span.start);
+        try testing.expectEqual(expected.loc.span.end, token.loc.span.end);
         try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
         try testing.expectEqual(expected.loc.src.col, token.loc.src.col);
     }
@@ -2836,42 +2836,42 @@ test "let/in block" {
     const expected_tokens = [_]Token{
         Token.init(.KwLet, "let", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 0, .end = 3 },
+            .span = .{ .start = 0, .end = 3 },
             .src = .{ .line = 1, .col = 1 },
         }),
         Token.init(.LowerIdent, "x", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 4, .end = 5 },
+            .span = .{ .start = 4, .end = 5 },
             .src = .{ .line = 1, .col = 5 },
         }),
         Token.init(.DelColon, ":", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 6, .end = 7 },
+            .span = .{ .start = 6, .end = 7 },
             .src = .{ .line = 1, .col = 7 },
         }),
         Token.init(.UpperIdent, "Int", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 8, .end = 11 },
+            .span = .{ .start = 8, .end = 11 },
             .src = .{ .line = 1, .col = 9 },
         }),
-        Token.init(.OpAssign, "=", .{
+        Token.init(.OpEqual, "=", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 12, .end = 13 },
+            .span = .{ .start = 12, .end = 13 },
             .src = .{ .line = 1, .col = 13 },
         }),
         Token.init(.LitInt, "42", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 14, .end = 16 },
+            .span = .{ .start = 14, .end = 16 },
             .src = .{ .line = 1, .col = 15 },
         }),
         Token.init(.KwIn, "in", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 17, .end = 19 },
+            .span = .{ .start = 17, .end = 19 },
             .src = .{ .line = 1, .col = 18 },
         }),
         Token.init(.Eof, "", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 19, .end = 19 },
+            .span = .{ .start = 19, .end = 19 },
             .src = .{ .line = 1, .col = 20 },
         }),
     };
@@ -2883,8 +2883,8 @@ test "let/in block" {
 
         try testing.expectEqual(expected.kind, token.kind);
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try testing.expectEqual(expected.loc.buf.start, token.loc.buf.start);
-        try testing.expectEqual(expected.loc.buf.end, token.loc.buf.end);
+        try testing.expectEqual(expected.loc.span.start, token.loc.span.start);
+        try testing.expectEqual(expected.loc.span.end, token.loc.span.end);
         try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
         try testing.expectEqual(expected.loc.src.col, token.loc.src.col);
     }
@@ -2896,47 +2896,47 @@ test "if/then/else expression" {
     const expected_tokens = [_]Token{
         Token.init(.KwIf, "if", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 0, .end = 2 },
+            .span = .{ .start = 0, .end = 2 },
             .src = .{ .line = 1, .col = 1 },
         }),
         Token.init(.LowerIdent, "x", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 3, .end = 4 },
+            .span = .{ .start = 3, .end = 4 },
             .src = .{ .line = 1, .col = 4 },
         }),
         Token.init(.OpEquality, "==", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 5, .end = 7 },
+            .span = .{ .start = 5, .end = 7 },
             .src = .{ .line = 1, .col = 6 },
         }),
         Token.init(.LitInt, "1", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 8, .end = 9 },
+            .span = .{ .start = 8, .end = 9 },
             .src = .{ .line = 1, .col = 9 },
         }),
         Token.init(.KwThen, "then", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 10, .end = 14 },
+            .span = .{ .start = 10, .end = 14 },
             .src = .{ .line = 1, .col = 11 },
         }),
         Token.init(.UpperIdent, "True", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 15, .end = 19 },
+            .span = .{ .start = 15, .end = 19 },
             .src = .{ .line = 1, .col = 16 },
         }),
         Token.init(.KwElse, "else", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 20, .end = 24 },
+            .span = .{ .start = 20, .end = 24 },
             .src = .{ .line = 1, .col = 21 },
         }),
         Token.init(.UpperIdent, "False", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 25, .end = 30 },
+            .span = .{ .start = 25, .end = 30 },
             .src = .{ .line = 1, .col = 26 },
         }),
         Token.init(.Eof, "", .{
             .filename = TEST_FILE,
-            .buf = .{ .start = 30, .end = 30 },
+            .span = .{ .start = 30, .end = 30 },
             .src = .{ .line = 1, .col = 31 },
         }),
     };
@@ -2948,8 +2948,8 @@ test "if/then/else expression" {
 
         try testing.expectEqual(expected.kind, token.kind);
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
-        try testing.expectEqual(expected.loc.buf.start, token.loc.buf.start);
-        try testing.expectEqual(expected.loc.buf.end, token.loc.buf.end);
+        try testing.expectEqual(expected.loc.span.start, token.loc.span.start);
+        try testing.expectEqual(expected.loc.span.end, token.loc.span.end);
         try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
         try testing.expectEqual(expected.loc.src.col, token.loc.src.col);
     }

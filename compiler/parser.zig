@@ -4,20 +4,20 @@ const ast = @import("ast.zig");
 const lexer = @import("lexer.zig");
 
 pub const ParseError = error{
-    UnexpectedToken,
     EmptyLambdaParams,
     InvalidCharLiteral,
     InvalidFloatLiteral,
     InvalidIntLiteral,
     InvalidStrLiteral,
+    UnexpectedToken,
 };
 
 pub const ParserError = ParseError || lexer.LexerError || std.mem.Allocator.Error;
 
 pub const Parser = struct {
     lex: *lexer.Lexer,
-    allocator: std.mem.Allocator,
     current_token: lexer.Token,
+    allocator: std.mem.Allocator,
 
     /// Represents the possible associativity rules for operators.
     /// Determines how operators of the same precedence are grouped.
@@ -73,7 +73,7 @@ pub const Parser = struct {
                 .precedence = 9,
                 .associativity = .Right,
             },
-            .OpDoubleDot => .{
+            .OpExpand => .{
                 .precedence = 8,
                 .associativity = .Right,
             },
@@ -110,7 +110,7 @@ pub const Parser = struct {
                 .associativity = .Right,
             },
             // Lowest precedence (loosest binding)
-            .OpAssign => .{
+            .OpEqual => .{
                 .precedence = 0,
                 .associativity = .None,
             },
@@ -120,16 +120,17 @@ pub const Parser = struct {
 
     /// Initializes a new Parser instance.
     ///
-    /// - `lex`: Pointer to the lexer instance.
     /// - `allocator`: Memory allocator for the parser.
-    pub fn init(lex: *lexer.Lexer, allocator: std.mem.Allocator) !*Parser {
+    /// - `lex`: Pointer to the lexer instance.
+    // pub fn init(lex: *lexer.Lexer, allocator: std.mem.Allocator) !*Parser {
+    pub fn init(allocator: std.mem.Allocator, lex: *lexer.Lexer) !*Parser {
         const parser = try allocator.create(Parser);
         const first_token = try lex.nextToken();
 
         parser.* = .{
             .lex = lex,
-            .allocator = allocator,
             .current_token = first_token,
+            .allocator = allocator,
         };
 
         return parser;
@@ -433,12 +434,12 @@ pub const Parser = struct {
 
                 node.* = .{ .upper_identifier = identifier };
             },
-            .DelLParen => {
+            .DelLeftParen => {
                 try self.advance();
 
                 const expr = try self.parseExpression();
 
-                _ = try self.expect(lexer.TokenKind.DelRParen);
+                _ = try self.expect(lexer.TokenKind.DelRightParen);
 
                 return expr;
             },
@@ -594,7 +595,7 @@ pub const Parser = struct {
             type_annotation = try self.parseFunctionType();
         }
 
-        _ = try self.expect(lexer.TokenKind.OpAssign);
+        _ = try self.expect(lexer.TokenKind.OpEqual);
         const value = try self.parseExpression();
 
         const node = try self.allocator.create(ast.Node);
@@ -744,9 +745,9 @@ pub const Parser = struct {
         }
 
         // Handle parenthesized type expressions
-        if (try self.match(lexer.TokenKind.DelLParen)) {
+        if (try self.match(lexer.TokenKind.DelLeftParen)) {
             const inner_type = try self.parseTypeExpression();
-            _ = try self.expect(lexer.TokenKind.DelRParen);
+            _ = try self.expect(lexer.TokenKind.DelRightParen);
 
             return inner_type;
         }
@@ -861,7 +862,7 @@ test "[comment]" {
 
     const source = "# This is a regular comment";
     var lex = lexer.Lexer.init(source, TEST_FILE);
-    var parser = try Parser.init(&lex, allocator);
+    var parser = try Parser.init(allocator, &lex);
     defer parser.deinit();
 
     const node = try parser.parseComment();
@@ -884,7 +885,7 @@ test "[doc_comment]" {
 
     const source = "## This is a doc comment";
     var lex = lexer.Lexer.init(source, TEST_FILE);
-    var parser = try Parser.init(&lex, allocator);
+    var parser = try Parser.init(allocator, &lex);
     defer parser.deinit();
 
     const node = try parser.parseDocComment();
@@ -896,9 +897,6 @@ test "[doc_comment]" {
     try testing.expect(node.* == .doc_comment);
 
     const comment = node.doc_comment;
-    try testing.expectEqual(lexer.TokenKind.DocComment, comment.token.kind);
-    try testing.expectEqualStrings(source, comment.content);
-
     try testing.expectEqual(lexer.TokenKind.DocComment, comment.token.kind);
     try testing.expectEqualStrings(source, comment.content);
 }
@@ -931,7 +929,7 @@ test "[int_literal]" {
 
     for (cases) |case| {
         var lex = lexer.Lexer.init(case.source, TEST_FILE);
-        var parser = try Parser.init(&lex, allocator);
+        var parser = try Parser.init(allocator, &lex);
         defer parser.deinit();
 
         const lit = try parser.parseIntLiteral();
@@ -962,7 +960,7 @@ test "[float_literal]" {
 
     for (cases) |case| {
         var lex = lexer.Lexer.init(case.source, TEST_FILE);
-        var parser = try Parser.init(&lex, allocator);
+        var parser = try Parser.init(allocator, &lex);
         defer parser.deinit();
 
         const lit = try parser.parseFloatLiteral();
@@ -1031,7 +1029,7 @@ test "[str_literal]" {
 
     for (cases) |case| {
         var lex = lexer.Lexer.init(case.source, TEST_FILE);
-        var parser = try Parser.init(&lex, allocator);
+        var parser = try Parser.init(allocator, &lex);
         defer parser.deinit();
 
         const lit = try parser.parseStrLiteral();
@@ -1075,7 +1073,7 @@ test "[char_literal]" {
 
     for (cases) |case| {
         var lex = lexer.Lexer.init(case.source, TEST_FILE);
-        var parser = try Parser.init(&lex, allocator);
+        var parser = try Parser.init(allocator, &lex);
         defer parser.deinit();
 
         const lit = try parser.parseCharLiteral();
@@ -1105,7 +1103,7 @@ test "[lower_identifier]" {
 
     for (cases) |case| {
         var lex = lexer.Lexer.init(case.source, TEST_FILE);
-        var parser = try Parser.init(&lex, allocator);
+        var parser = try Parser.init(allocator, &lex);
         defer parser.deinit();
 
         const ident = try parser.parseLowerIdentifier();
@@ -1136,7 +1134,7 @@ test "[upper_identifier]" {
 
     for (cases) |case| {
         var lex = lexer.Lexer.init(case.source, TEST_FILE);
-        var parser = try Parser.init(&lex, allocator);
+        var parser = try Parser.init(allocator, &lex);
         defer parser.deinit();
 
         const ident = try parser.parseUpperIdentifier();
@@ -1154,7 +1152,7 @@ test "[unary_expr]" {
 
     const source = "-42";
     var lex = lexer.Lexer.init(source, TEST_FILE);
-    var parser = try Parser.init(&lex, allocator);
+    var parser = try Parser.init(allocator, &lex);
     defer parser.deinit();
 
     const expr = try parser.parseSimpleExpr();
@@ -1179,7 +1177,7 @@ test "[arithmetic_expr]" {
 
     const source = "42 + 24";
     var lex = lexer.Lexer.init(source, TEST_FILE);
-    var parser = try Parser.init(&lex, allocator);
+    var parser = try Parser.init(allocator, &lex);
     defer parser.deinit();
 
     const expr = try parser.parseExpression();
@@ -1223,7 +1221,7 @@ test "[comparison_expr]" {
 
     for (cases) |case| {
         var lex = lexer.Lexer.init(case.source, TEST_FILE);
-        var parser = try Parser.init(&lex, allocator);
+        var parser = try Parser.init(allocator, &lex);
         defer parser.deinit();
 
         const expr = try parser.parseExpression();
@@ -1262,7 +1260,7 @@ test "[logical_expr]" {
 
     for (cases) |case| {
         var lex = lexer.Lexer.init(case.source, TEST_FILE);
-        var parser = try Parser.init(&lex, allocator);
+        var parser = try Parser.init(allocator, &lex);
         defer parser.deinit();
 
         const expr = try parser.parseExpression();
@@ -1377,7 +1375,7 @@ test "[operator precedence]" {
 
     for (cases) |case| {
         var lex = lexer.Lexer.init(case.source, TEST_FILE);
-        var parser = try Parser.init(&lex, allocator);
+        var parser = try Parser.init(allocator, &lex);
         defer parser.deinit();
 
         const expr = try parser.parseExpression();
@@ -1410,7 +1408,7 @@ test "[operator precedence] (structural)" {
 
     {
         var lex = lexer.Lexer.init("1 + 2 * 3", TEST_FILE);
-        var parser = try Parser.init(&lex, allocator);
+        var parser = try Parser.init(allocator, &lex);
         defer parser.deinit();
 
         const expr = try parser.parseExpression();
@@ -1442,7 +1440,7 @@ test "[operator precedence] (structural)" {
 
     {
         var lex = lexer.Lexer.init("1 * 2 + 3 == 4", TEST_FILE);
-        var parser = try Parser.init(&lex, allocator);
+        var parser = try Parser.init(allocator, &lex);
         defer parser.deinit();
 
         const expr = try parser.parseExpression();
@@ -1488,7 +1486,7 @@ test "[lambda_expr]" {
 
     const source = "\\x => x + 1";
     var lex = lexer.Lexer.init(source, TEST_FILE);
-    var parser = try Parser.init(&lex, allocator);
+    var parser = try Parser.init(allocator, &lex);
     defer parser.deinit();
 
     const expr = try parser.parseExpression();
@@ -1510,7 +1508,7 @@ test "[if_then_else_stmt]" {
 
     const source = "if x > 0 then 1 else -1";
     var lex = lexer.Lexer.init(source, TEST_FILE);
-    var parser = try Parser.init(&lex, allocator);
+    var parser = try Parser.init(allocator, &lex);
     defer parser.deinit();
 
     const node = try parser.parseIfThenElse();
@@ -1554,7 +1552,7 @@ test "[function_decl] (simple)" {
     // Test a simple function declaration without type annotation
     const source = "let add = \\x y => x + y";
     var lex = lexer.Lexer.init(source, TEST_FILE);
-    var parser = try Parser.init(&lex, allocator);
+    var parser = try Parser.init(allocator, &lex);
     defer parser.deinit();
 
     const node = try parser.parseFunctionDecl();
@@ -1600,7 +1598,7 @@ test "[function_decl] (w/ type annotation)" {
     // Test function declaration with type annotation
     const source = "let inc : Int -> Int = \\x => x + 1";
     var lex = lexer.Lexer.init(source, TEST_FILE);
-    var parser = try Parser.init(&lex, allocator);
+    var parser = try Parser.init(allocator, &lex);
     defer parser.deinit();
 
     const node = try parser.parseFunctionDecl();
