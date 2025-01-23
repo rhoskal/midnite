@@ -4,6 +4,7 @@ const lexer = @import("lexer.zig");
 
 /// Represents a regular, single line comment.
 pub const CommentNode = struct {
+    /// The content of the comment, excluding the comment marker.
     content: []const u8,
 
     /// The token representing the start of this declaration.
@@ -12,6 +13,7 @@ pub const CommentNode = struct {
 
 /// Represents a documentation comment that will be processed as markdown.
 pub const DocCommentNode = struct {
+    /// The content of the documentation comment, excluding the comment marker.
     content: []const u8,
 
     /// The token representing the start of this declaration.
@@ -20,6 +22,7 @@ pub const DocCommentNode = struct {
 
 /// Represents a literal integer value.
 pub const IntLiteralNode = struct {
+    /// The parsed integer value.
     value: i64,
 
     /// The token representing the start of this declaration.
@@ -28,6 +31,7 @@ pub const IntLiteralNode = struct {
 
 /// Represents a literal floating-point value.
 pub const FloatLiteralNode = struct {
+    /// The parsed floating-point value.
     value: f64,
 
     /// The token representing the start of this declaration.
@@ -36,6 +40,7 @@ pub const FloatLiteralNode = struct {
 
 /// Represents a string literal value.
 pub const StrLiteralNode = struct {
+    /// The parsed string value with escape sequences processed.
     value: []const u8,
 
     /// The token representing the start of this declaration.
@@ -44,6 +49,7 @@ pub const StrLiteralNode = struct {
 
 /// Represents a multiline string literal value.
 pub const MultilineStrLiteralNode = struct {
+    /// The parsed multiline string value with escape sequences processed.
     value: []const u8,
 
     /// The token representing the start of this declaration.
@@ -52,6 +58,7 @@ pub const MultilineStrLiteralNode = struct {
 
 /// Represents a char literal value.
 pub const CharLiteralNode = struct {
+    /// The Unicode codepoint value of the character.
     value: u21,
 
     /// The token representing the start of this declaration.
@@ -65,6 +72,7 @@ pub const CharLiteralNode = struct {
 /// - `[]` (empty list)
 /// - `[True, False, True]`
 pub const ListNode = struct {
+    /// Array of pointers to the AST nodes representing list elements.
     elements: std.ArrayList(*Node),
 
     /// The token representing the start of this declaration.
@@ -73,10 +81,13 @@ pub const ListNode = struct {
 
 /// Common structure for binary operations.
 pub const BinaryOp = struct {
+    /// The AST node for the left operand.
     left: *Node,
 
+    /// The token representing the operator.
     operator: lexer.Token,
 
+    /// The AST node for the right operand.
     right: *Node,
 };
 
@@ -105,8 +116,10 @@ pub const ComparisonExprNode = BinaryOp;
 /// Examples:
 /// - Negation: (-)
 pub const UnaryExprNode = struct {
+    /// The token representing the operator.
     operator: lexer.Token,
 
+    /// The AST node representing the operand.
     operand: *Node,
 };
 
@@ -118,8 +131,10 @@ pub const UnaryExprNode = struct {
 /// - `match list on | [] => 0 | x :: xs => 1 + length xs`
 /// - `match result on | Ok v => v | Err e => default`
 pub const MatchExprNode = struct {
+    /// The AST node representing the value being matched.
     value: *Node,
 
+    /// Array of match cases to test against.
     cases: std.ArrayList(MatchCase),
 
     /// The token representing the start of this declaration.
@@ -129,18 +144,29 @@ pub const MatchExprNode = struct {
 /// A single pattern matching case with an optional guard condition.
 /// When pattern matches and guard evaluates true, the expression is evaluated.
 pub const MatchCase = struct {
+    /// The pattern to match against.
     pattern: *PatternNode,
 
+    /// The expression to evaluate if pattern matches.
     expression: *Node,
 
+    /// Optional guard condition that must be true for match to succeed.
     guard: ?*GuardNode,
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
-/// Pattern matching constructs that can appear in match expressions.
-/// Includes literals, variables, constructors, list patterns, and wildcards.
+/// Pattern matching constructs used in match expressions.
+/// Represents different kinds of patterns like literals, variables,
+/// constructors, list patterns, and wildcards.
+///
+/// Examples:
+/// - `_` matches anything
+/// - `42` matches literal integer
+/// - `Some x` matches constructor with variable
+/// - `head :: tail` matches list with head and tail
+/// - `[]` matches empty list
 pub const PatternNode = union(enum) {
     wildcard: struct {
         token: lexer.Token,
@@ -150,24 +176,41 @@ pub const PatternNode = union(enum) {
     char_literal: CharLiteralNode,
     string_literal: StrLiteralNode,
     list: struct {
+        /// Array of pattern nodes for matching against list elements.
         elements: std.ArrayList(*PatternNode),
+
+        /// The token representing the start of the list pattern
         token: lexer.Token,
     },
     variable: struct {
+        /// The name of the variable to bind.
         name: []const u8,
+
+        /// The token representing the variable.
         token: lexer.Token,
     },
     constructor: struct {
+        /// The name of the constructor.
         name: []const u8,
+
+        /// Array of patterns for matching constructor arguments.
         args: std.ArrayList(*PatternNode),
+
+        /// The token representing the constructor.
         token: lexer.Token,
     },
     empty_list: struct {
+        /// The token representing the empty list pattern.
         token: lexer.Token,
     },
     cons: struct {
+        /// Pattern for matching the head element.
         head: *PatternNode,
+
+        /// Pattern for matching the tail list.
         tail: *PatternNode,
+
+        /// The token representing the cons pattern.
         token: lexer.Token,
     },
 };
@@ -179,6 +222,7 @@ pub const PatternNode = union(enum) {
 /// - `when x > 0`
 /// - `when is_valid? name`
 pub const GuardNode = struct {
+    /// The AST node representing the boolean condition.
     condition: *Node,
 
     /// The token representing the start of this declaration.
@@ -194,10 +238,13 @@ pub const GuardNode = struct {
 /// - `if empty? list then None else Some (head list)`
 /// - `if even? n then n / 2 else 3 * n + 1`
 pub const IfThenElseStmtNode = struct {
+    /// The AST node representing the boolean condition.
     condition: *Node,
 
+    /// The AST node representing the expression to evaluate if condition is true.
     then_branch: *Node,
 
+    /// The AST node representing the expression to evaluate if condition is false.
     else_branch: *Node,
 };
 
@@ -206,10 +253,7 @@ pub const IfThenElseStmtNode = struct {
 /// Examples:
 /// - `Int -> Int -> Int`
 pub const FunctionTypeNode = struct {
-    /// The parameter types in order.
-    /// For curried functions like `Int -> Int -> Int`,
-    /// this would contain `[Int, Int, Int]` where the last
-    /// one is the return type.
+    /// Array of AST nodes representing parameter types, with last being return type.
     param_types: std.ArrayList(*Node),
 
     /// The token representing the start of this declaration.
@@ -221,8 +265,10 @@ pub const FunctionTypeNode = struct {
 /// Examples:
 /// - `\x y => x + y`
 pub const LambdaExprNode = struct {
+    /// Array of parameter names.
     params: std.ArrayList([]const u8),
 
+    /// The AST node representing the function body expression.
     body: *Node,
 
     /// The token representing the start of this declaration.
@@ -236,23 +282,27 @@ pub const LambdaExprNode = struct {
 /// - `let add : Int -> Int -> Int = \x y => x + y`
 /// - `let compose : (b -> c) -> (a -> b) -> a -> c = \f g x => f (g x)`
 pub const FunctionDeclNode = struct {
+    /// The name of the function being declared.
     name: []const u8,
 
+    /// Optional AST node representing the type annotation.
     type_annotation: ?*Node,
 
     // doc_comments: []*DocCommentNode,
 
+    /// The AST node representing the function's implementation.
     value: *Node,
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
-/// Represents a foreign function declaration that links to external code.
-/// Maps an internal function name and type signature to an external symbol name.
+/// A declaration that links a function to external code, specifying both
+/// the internal name/type and external symbol to link against.
 ///
 /// Example:
-/// - `foreign bitwise_and : Int -> Int -> Int = "zig_bitwise_and"`
+/// - `foreign sqrt : Float -> Float = "c_sqrt"`
+/// - `foreign print : String -> Unit = "c_print"`
 pub const ForeignFunctionDeclNode = struct {
     /// The internal name used to refer to this function.
     name: []const u8,
@@ -269,6 +319,7 @@ pub const ForeignFunctionDeclNode = struct {
 
 /// Represents a lowercase identifier reference (variable names, function names, etc).
 pub const LowerIdentifierNode = struct {
+    /// The text of the identifier.
     name: []const u8,
 
     /// The token representing the start of this declaration.
@@ -277,6 +328,7 @@ pub const LowerIdentifierNode = struct {
 
 /// Represents an uppercase identifier reference (type names, type constructors, etc).
 pub const UpperIdentifierNode = struct {
+    /// The text of the identifier.
     name: []const u8,
 
     /// The token representing the start of this declaration.
@@ -290,10 +342,13 @@ pub const UpperIdentifierNode = struct {
 /// - `1 :: [2, 3]` evaluates to `[1, 2, 3]`
 /// - `x :: xs` pattern matches head and tail of list
 pub const ConsExprNode = struct {
+    /// The AST node representing the element to prepend.
     head: *Node,
 
+    /// The token representing the cons operator.
     operator: lexer.Token,
 
+    /// The AST node representing the target list.
     tail: *Node,
 };
 
@@ -318,10 +373,13 @@ pub const ListConcatExprNode = BinaryOp;
 /// - `f >> g` applies g after f (forward composition)
 /// - `f << g` applies f after g (backward composition)
 pub const CompositionExprNode = struct {
+    /// The AST node representing the first function in the composition.
     first: *Node,
 
+    /// The token representing the composition operator.
     operator: lexer.Token,
 
+    /// The AST node representing the second function in the composition.
     second: *Node,
 };
 
@@ -332,10 +390,13 @@ pub const CompositionExprNode = struct {
 /// - `x |> f` applies f to x (forward pipe)
 /// - `f <| x` applies f to x (backward pipe)
 pub const PipeExprNode = struct {
+    /// The AST node representing the value being piped.
     value: *Node,
 
+    /// The token representing the pipe operator.
     operator: lexer.Token,
 
+    /// The AST node representing the function receiving the piped value.
     func: *Node,
 };
 
@@ -347,8 +408,10 @@ pub const PipeExprNode = struct {
 /// - `exposing (func1, Type1, Type2(..))`
 /// - `exposing ()`
 pub const ExportSpecNode = struct {
+    /// Whether all items are being exposed (..).
     exposing_all: bool,
 
+    /// Optional array of specific items being exposed.
     items: ?std.ArrayList(ExportItem),
 
     /// The token representing the start of this declaration.
@@ -356,8 +419,10 @@ pub const ExportSpecNode = struct {
 };
 
 pub const ExportItem = struct {
+    /// The name of the item being exported.
     name: []const u8,
 
+    /// Whether to expose constructors for exported types.
     expose_constructors: bool,
 
     /// The token representing the start of this declaration.
@@ -372,6 +437,7 @@ pub const ExportItem = struct {
 /// - `MyModule.SubModule`
 /// - `Std.List`
 pub const ModulePathNode = struct {
+    /// Array of identifiers forming the module path.
     segments: std.ArrayList([]const u8),
 
     /// The token representing the start of this declaration.
@@ -387,10 +453,13 @@ pub const ModulePathNode = struct {
 /// - `module Std.List exposing (map, filter) ... end`
 /// - `module Parser exposing (Parser, run, map) ... end`
 pub const ModuleDeclNode = struct {
+    /// The fully qualified path of the module.
     path: ModulePathNode,
 
+    /// Specification of which items to expose from the module.
     exports: ExportSpecNode,
 
+    /// Array of AST nodes representing the module's contents.
     declarations: std.ArrayList(*Node),
 
     /// The token representing the start of this declaration.
@@ -416,20 +485,26 @@ pub const ImportSpecNode = struct {
     };
 
     const RenameItem = struct {
+        /// The original name of the imported item.
         old_name: []const u8,
 
+        /// The new name to use locally.
         new_name: []const u8,
 
         /// The token representing the start of this declaration.
         token: lexer.Token,
     };
 
+    /// The module path being imported.
     path: ModulePathNode,
 
+    /// The kind of import being performed.
     kind: ImportKind,
 
+    /// Optional alias name for the imported module.
     alias: ?[]const u8,
 
+    /// Optional list of items being imported or renamed.
     items: ?std.ArrayList(union(enum) {
         name: []const u8,
         rename: RenameItem,
@@ -447,13 +522,20 @@ pub const ImportSpecNode = struct {
 /// - `include Data.List`
 /// - `include Parser.Internal`
 pub const IncludeNode = struct {
+    /// The module path being included.
     path: ModulePathNode,
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
-/// Represents a typed hole - a placeholder for a type that should be inferred.
+/// Represents a typed hole - a placeholder in code where type inference
+/// should determine the appropriate type. Useful during development
+/// and for type-driven development.
+///
+/// Examples:
+/// - `?` marks a hole to be filled
+/// - `let x : ? = expr` requests type inference
 pub const TypedHoleNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
@@ -468,8 +550,10 @@ pub const TypedHoleNode = struct {
 /// - `Entry k v` (two type parameters)
 /// - `Node a (Tree a)` (nested type parameters)
 pub const VariantConstructorNode = struct {
+    /// The name of the constructor.
     name: []const u8,
 
+    /// Array of AST nodes representing the constructor's parameter types.
     params: std.ArrayList(*Node),
 
     /// The token representing the start of this declaration.
@@ -486,10 +570,13 @@ pub const VariantConstructorNode = struct {
 /// - `type Tree a = Leaf | Branch (Tree a) a (Tree a)`
 /// - `type Result e a = Err e | Ok a`
 pub const VariantTypeNode = struct {
+    /// The name of the variant type.
     name: []const u8,
 
+    /// Array of type parameter names.
     type_params: std.ArrayList([]const u8),
 
+    /// Array of constructors defined for this type.
     constructors: std.ArrayList(VariantConstructorNode),
 
     /// The token representing the start of this declaration.
@@ -505,8 +592,10 @@ pub const VariantTypeNode = struct {
 /// - `type alias Reader r a = r -> a`
 /// - `type alias Parser = String -> Maybe Expr`
 pub const TypeAliasNode = struct {
+    /// The name of the type alias.
     name: []const u8,
 
+    /// The AST node representing the aliased type.
     value: *Node,
 
     /// The token representing the start of this declaration.
@@ -516,6 +605,7 @@ pub const TypeAliasNode = struct {
 /// The root AST node containing a sequence of top-level declarations like
 /// function definitions, type declarations, imports, and module definitions.
 pub const ProgramNode = struct {
+    /// Array of AST nodes representing top-level declarations.
     statements: std.ArrayList(*Node),
 
     /// The token representing the start of this declaration.
