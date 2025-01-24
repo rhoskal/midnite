@@ -2528,3 +2528,590 @@ test "[IncludeNode]" {
     try testing.expectEqualStrings("Std", include.path.segments.items[0]);
     try testing.expectEqualStrings("List", include.path.segments.items[1]);
 }
+
+test "[MatchExprNode] (basic literal/constructor)" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // match opt on | Some x => x | None => 0
+
+    const value = try allocator.create(Node);
+    value.* = .{
+        .upper_identifier = .{
+            .name = "Some",
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "Some",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    // Create patterns
+    var cases = std.ArrayList(MatchCase).init(allocator);
+
+    // Case 1: Some x => x
+    const some_pattern = try allocator.create(PatternNode);
+    var some_args = std.ArrayList(*PatternNode).init(allocator);
+
+    const var_pattern = try allocator.create(PatternNode);
+    var_pattern.* = .{
+        .variable = .{
+            .name = "x",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "x",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try some_args.append(var_pattern);
+
+    some_pattern.* = .{
+        .constructor = .{
+            .name = "Some",
+            .args = some_args,
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "Some",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const some_expr = try allocator.create(Node);
+    some_expr.* = .{
+        .lower_identifier = .{
+            .name = "x",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "x",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try cases.append(.{
+        .pattern = some_pattern,
+        .expression = some_expr,
+        .guard = null,
+        .token = .{
+            .kind = .{ .symbol = .Pipe },
+            .lexeme = "|",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    });
+
+    // Case 2: None => 0
+    const none_pattern = try allocator.create(PatternNode);
+    none_pattern.* = .{
+        .constructor = .{
+            .name = "None",
+            .args = std.ArrayList(*PatternNode).init(allocator),
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "None",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const none_expr = try allocator.create(Node);
+    none_expr.* = .{
+        .int_literal = .{
+            .value = 0,
+            .token = .{
+                .kind = .{ .literal = .Int },
+                .lexeme = "0",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try cases.append(.{
+        .pattern = none_pattern,
+        .expression = none_expr,
+        .guard = null,
+        .token = .{
+            .kind = .{ .symbol = .Pipe },
+            .lexeme = "|",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    });
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
+        .match_expr = .{
+            .value = value,
+            .cases = cases,
+            .token = .{
+                .kind = .{ .keyword = .Match },
+                .lexeme = "match",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 5 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const match = node.match_expr;
+    try testing.expectEqual(@as(usize, 2), match.cases.items.len);
+    try testing.expectEqualStrings("Some", match.cases.items[0].pattern.constructor.name);
+    try testing.expectEqualStrings("x", match.cases.items[0].pattern.constructor.args.items[0].variable.name);
+    try testing.expectEqualStrings("None", match.cases.items[1].pattern.constructor.name);
+    try testing.expectEqual(@as(usize, 0), match.cases.items[1].pattern.constructor.args.items.len);
+}
+
+test "[MatchExprNode] (list pattern with cons)" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // match list on | head :: tail => head | [] => 0
+
+    // Value to match on (a list variable)
+    const value = try allocator.create(Node);
+    value.* = .{
+        .lower_identifier = .{
+            .name = "list",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "list",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    var cases = std.ArrayList(MatchCase).init(allocator);
+
+    // Case 1: head :: tail => head
+    const head_pattern = try allocator.create(PatternNode);
+    head_pattern.* = .{
+        .variable = .{
+            .name = "head",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "head",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const tail_pattern = try allocator.create(PatternNode);
+    tail_pattern.* = .{
+        .variable = .{
+            .name = "tail",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "tail",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const cons_pattern = try allocator.create(PatternNode);
+    cons_pattern.* = .{
+        .cons = .{
+            .head = head_pattern,
+            .tail = tail_pattern,
+            .token = .{
+                .kind = .{ .operator = .Cons },
+                .lexeme = "::",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 2 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const head_expr = try allocator.create(Node);
+    head_expr.* = .{
+        .lower_identifier = .{
+            .name = "head",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "head",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try cases.append(.{
+        .pattern = cons_pattern,
+        .expression = head_expr,
+        .guard = null,
+        .token = .{
+            .kind = .{ .symbol = .Pipe },
+            .lexeme = "|",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    });
+
+    // Case 2: [] => 0
+    const empty_pattern = try allocator.create(PatternNode);
+    empty_pattern.* = .{ .empty_list = .{
+        .token = .{
+            .kind = .{ .delimiter = .LeftBracket },
+            .lexeme = "[]",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 2 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    } };
+
+    const zero_expr = try allocator.create(Node);
+    zero_expr.* = .{
+        .int_literal = .{
+            .value = 0,
+            .token = .{
+                .kind = .{ .literal = .Int },
+                .lexeme = "0",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try cases.append(.{
+        .pattern = empty_pattern,
+        .expression = zero_expr,
+        .guard = null,
+        .token = .{
+            .kind = .{ .symbol = .Pipe },
+            .lexeme = "|",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    });
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
+        .match_expr = .{
+            .value = value,
+            .cases = cases,
+            .token = .{
+                .kind = .{ .keyword = .Match },
+                .lexeme = "match",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 5 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const match = node.match_expr;
+    try testing.expectEqual(@as(usize, 2), match.cases.items.len);
+
+    // Test cons pattern
+    const cons_case = match.cases.items[0];
+    try testing.expect(cons_case.pattern.* == .cons);
+    try testing.expectEqualStrings("head", cons_case.pattern.cons.head.variable.name);
+    try testing.expectEqualStrings("tail", cons_case.pattern.cons.tail.variable.name);
+
+    // Test empty list pattern
+    const empty_case = match.cases.items[1];
+    try testing.expect(empty_case.pattern.* == .empty_list);
+}
+
+test "[MatchExprNode] (with guards)" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // match x on | n when n > 0 => "positive" | n => "non-positive"
+
+    const value = try allocator.create(Node);
+    value.* = .{
+        .lower_identifier = .{
+            .name = "x",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "x",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    var cases = std.ArrayList(MatchCase).init(allocator);
+
+    // Case 1: n when n > 0 => "positive"
+    const n_pattern = try allocator.create(PatternNode);
+    n_pattern.* = .{
+        .variable = .{
+            .name = "n",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "n",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    // Build n > 0 guard expression
+    const n_ref = try allocator.create(Node);
+    n_ref.* = .{
+        .lower_identifier = .{
+            .name = "n",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "n",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const zero = try allocator.create(Node);
+    zero.* = .{
+        .int_literal = .{
+            .value = 0,
+            .token = .{
+                .kind = .{ .literal = .Int },
+                .lexeme = "0",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const guard_expr = try allocator.create(Node);
+    guard_expr.* = .{
+        .comparison_expr = .{
+            .left = n_ref,
+            .operator = .{
+                .kind = .{ .operator = .GreaterThan },
+                .lexeme = ">",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+            .right = zero,
+        },
+    };
+
+    const guard = try allocator.create(GuardNode);
+    guard.* = .{
+        .condition = guard_expr,
+        .token = .{
+            .kind = .{ .keyword = .When },
+            .lexeme = "when",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 4 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const positive_expr = try allocator.create(Node);
+    positive_expr.* = .{
+        .str_literal = .{
+            .value = try allocator.dupe(u8, "positive"),
+            .token = .{
+                .kind = .{ .literal = .String },
+                .lexeme = "\"positive\"",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 10 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try cases.append(.{
+        .pattern = n_pattern,
+        .expression = positive_expr,
+        .guard = guard,
+        .token = .{
+            .kind = .{ .symbol = .Pipe },
+            .lexeme = "|",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    });
+
+    // Case 2: n => "non-positive"
+    const n2_pattern = try allocator.create(PatternNode);
+    n2_pattern.* = .{
+        .variable = .{
+            .name = "n",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "n",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const non_positive_expr = try allocator.create(Node);
+    non_positive_expr.* = .{
+        .str_literal = .{
+            .value = try allocator.dupe(u8, "non-positive"),
+            .token = .{
+                .kind = .{ .literal = .String },
+                .lexeme = "\"non-positive\"",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 14 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try cases.append(.{
+        .pattern = n2_pattern,
+        .expression = non_positive_expr,
+        .guard = null,
+        .token = .{
+            .kind = .{ .symbol = .Pipe },
+            .lexeme = "|",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    });
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
+        .match_expr = .{
+            .value = value,
+            .cases = cases,
+            .token = .{
+                .kind = .{ .keyword = .Match },
+                .lexeme = "match",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 5 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const match = node.match_expr;
+    try testing.expectEqual(@as(usize, 2), match.cases.items.len);
+
+    // Test guarded case
+    const guarded_case = match.cases.items[0];
+    try testing.expect(guarded_case.pattern.* == .variable);
+    try testing.expectEqualStrings("n", guarded_case.pattern.variable.name);
+    try testing.expect(guarded_case.guard != null);
+    try testing.expectEqualStrings("positive", guarded_case.expression.str_literal.value);
+
+    // Test catch-all case
+    const catchall_case = match.cases.items[1];
+    try testing.expect(catchall_case.pattern.* == .variable);
+    try testing.expectEqualStrings("n", catchall_case.pattern.variable.name);
+    try testing.expect(catchall_case.guard == null);
+    try testing.expectEqualStrings("non-positive", catchall_case.expression.str_literal.value);
+}
