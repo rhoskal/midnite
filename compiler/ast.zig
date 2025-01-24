@@ -2040,10 +2040,8 @@ test "[CompositionExprNode]" {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    // f >> g (forward composition)
-
-    const first = try allocator.create(Node);
-    first.* = .{
+    const f = try allocator.create(Node);
+    f.* = .{
         .lower_identifier = .{
             .name = "f",
             .token = lexer.Token{
@@ -2058,8 +2056,8 @@ test "[CompositionExprNode]" {
         },
     };
 
-    const second = try allocator.create(Node);
-    second.* = .{
+    const g = try allocator.create(Node);
+    g.* = .{
         .lower_identifier = .{
             .name = "g",
             .token = lexer.Token{
@@ -2080,45 +2078,83 @@ test "[CompositionExprNode]" {
         allocator.destroy(compose);
     }
 
-    compose.* = .{
-        .composition_expr = .{
-            .first = first,
-            .operator = lexer.Token{
-                .kind = lexer.TokenKind{ .operator = .ComposeRight },
-                .lexeme = ">>",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 2, .end = 4 },
-                    .src = .{ .line = 1, .col = 3 },
+    {
+        // f >> g (compose right)
+
+        compose.* = .{
+            .composition_expr = .{
+                .first = f,
+                .operator = lexer.Token{
+                    .kind = lexer.TokenKind{ .operator = .ComposeRight },
+                    .lexeme = ">>",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 2, .end = 4 },
+                        .src = .{ .line = 1, .col = 3 },
+                    },
                 },
+                .second = g,
             },
-            .second = second,
-        },
-    };
+        };
 
-    const expr = compose.composition_expr;
+        const expr = compose.composition_expr;
 
-    // Verify the structure
-    try testing.expectEqual(lexer.TokenKind{ .operator = .ComposeRight }, expr.operator.kind);
-    try testing.expectEqualStrings(">>", expr.operator.lexeme);
+        // Verify the structure
+        try testing.expectEqual(lexer.TokenKind{ .operator = .ComposeRight }, expr.operator.kind);
+        try testing.expectEqualStrings(">>", expr.operator.lexeme);
 
-    // Verify first function (f)
-    try testing.expect(expr.first.* == .lower_identifier);
-    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.first.lower_identifier.token.kind);
-    try testing.expectEqualStrings("f", expr.first.lower_identifier.name);
+        // Verify first function (f)
+        try testing.expect(expr.first.* == .lower_identifier);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.first.lower_identifier.token.kind);
+        try testing.expectEqualStrings("f", expr.first.lower_identifier.name);
 
-    // Verify second function (g)
-    try testing.expect(expr.second.* == .lower_identifier);
-    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.second.lower_identifier.token.kind);
-    try testing.expectEqualStrings("g", expr.second.lower_identifier.name);
+        // Verify second function (g)
+        try testing.expect(expr.second.* == .lower_identifier);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.second.lower_identifier.token.kind);
+        try testing.expectEqualStrings("g", expr.second.lower_identifier.name);
+    }
+
+    {
+        // g << f (compose left)
+
+        compose.* = .{
+            .composition_expr = .{
+                .first = g,
+                .operator = lexer.Token{
+                    .kind = lexer.TokenKind{ .operator = .ComposeLeft },
+                    .lexeme = "<<",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 2, .end = 4 },
+                        .src = .{ .line = 1, .col = 3 },
+                    },
+                },
+                .second = f,
+            },
+        };
+
+        const expr = compose.composition_expr;
+
+        // Verify the structure
+        try testing.expectEqual(lexer.TokenKind{ .operator = .ComposeLeft }, expr.operator.kind);
+        try testing.expectEqualStrings("<<", expr.operator.lexeme);
+
+        // Verify first function (g)
+        try testing.expect(expr.first.* == .lower_identifier);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.first.lower_identifier.token.kind);
+        try testing.expectEqualStrings("g", expr.first.lower_identifier.name);
+
+        // Verify second function (f)
+        try testing.expect(expr.second.* == .lower_identifier);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.second.lower_identifier.token.kind);
+        try testing.expectEqualStrings("f", expr.second.lower_identifier.name);
+    }
 }
 
 test "[PipeExprNode]" {
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
-
-    // x |> f (forward pipe)
 
     const value = try allocator.create(Node);
     value.* = .{
@@ -2158,35 +2194,254 @@ test "[PipeExprNode]" {
         allocator.destroy(pipe);
     }
 
-    pipe.* = .{
-        .pipe_expr = .{
-            .value = value,
-            .operator = lexer.Token{
-                .kind = lexer.TokenKind{ .operator = .PipeRight },
-                .lexeme = "|>",
+    {
+        // x |> f (pipe right)
+
+        pipe.* = .{
+            .pipe_expr = .{
+                .value = value,
+                .operator = lexer.Token{
+                    .kind = lexer.TokenKind{ .operator = .PipeRight },
+                    .lexeme = "|>",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 2, .end = 4 },
+                        .src = .{ .line = 1, .col = 3 },
+                    },
+                },
+                .func = func,
+            },
+        };
+
+        const expr = pipe.pipe_expr;
+
+        // Verify the structure
+        try testing.expectEqual(lexer.TokenKind{ .operator = .PipeRight }, expr.operator.kind);
+        try testing.expectEqualStrings("|>", expr.operator.lexeme);
+
+        // Verify value being piped (x)
+        try testing.expect(expr.value.* == .lower_identifier);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.value.lower_identifier.token.kind);
+        try testing.expectEqualStrings("x", expr.value.lower_identifier.name);
+
+        // Verify function (f)
+        try testing.expect(expr.func.* == .lower_identifier);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.func.lower_identifier.token.kind);
+        try testing.expectEqualStrings("f", expr.func.lower_identifier.name);
+    }
+
+    {
+        // f <| x (pipe left)
+
+        pipe.* = .{
+            .pipe_expr = .{
+                .value = value,
+                .operator = lexer.Token{
+                    .kind = lexer.TokenKind{ .operator = .PipeLeft },
+                    .lexeme = "<|",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 2, .end = 4 },
+                        .src = .{ .line = 1, .col = 3 },
+                    },
+                },
+                .func = func,
+            },
+        };
+
+        const expr = pipe.pipe_expr;
+
+        // Verify the structure
+        try testing.expectEqual(lexer.TokenKind{ .operator = .PipeLeft }, expr.operator.kind);
+        try testing.expectEqualStrings("<|", expr.operator.lexeme);
+
+        // Verify value being piped (x)
+        try testing.expect(expr.value.* == .lower_identifier);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.value.lower_identifier.token.kind);
+        try testing.expectEqualStrings("x", expr.value.lower_identifier.name);
+
+        // Verify function (f)
+        try testing.expect(expr.func.* == .lower_identifier);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.func.lower_identifier.token.kind);
+        try testing.expectEqualStrings("f", expr.func.lower_identifier.name);
+    }
+}
+
+test "[TypeAliasNode]" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    // type alias UserId = String
+
+    const value = try allocator.create(Node);
+    value.* = .{
+        .upper_identifier = .{
+            .name = "String",
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "String",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .span = .{ .start = 2, .end = 4 },
-                    .src = .{ .line = 1, .col = 3 },
+                    .span = .{ .start = 20, .end = 26 },
+                    .src = .{ .line = 1, .col = 21 },
                 },
             },
-            .func = func,
         },
     };
 
-    const expr = pipe.pipe_expr;
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
+        .type_alias = .{
+            .name = "UserId",
+            .value = value,
+            .token = .{
+                .kind = .{ .keyword = .Type },
+                .lexeme = "type",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
 
     // Verify the structure
-    try testing.expectEqual(lexer.TokenKind{ .operator = .PipeRight }, expr.operator.kind);
-    try testing.expectEqualStrings("|>", expr.operator.lexeme);
+    try testing.expectEqual(lexer.TokenKind{ .keyword = .Type }, node.type_alias.token.kind);
+    try testing.expectEqualStrings("type", node.type_alias.token.lexeme);
+    try testing.expectEqualStrings("UserId", node.type_alias.name);
 
-    // Verify value being piped (x)
-    try testing.expect(expr.value.* == .lower_identifier);
-    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.value.lower_identifier.token.kind);
-    try testing.expectEqualStrings("x", expr.value.lower_identifier.name);
+    // Verify the value node (String type)
+    try testing.expect(node.type_alias.value.* == .upper_identifier);
+    const value_node = node.type_alias.value.upper_identifier;
+    try testing.expectEqualStrings("String", value_node.name);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, value_node.token.kind);
+    try testing.expectEqualStrings("String", value_node.token.lexeme);
+}
 
-    // Verify function (f)
-    try testing.expect(expr.func.* == .lower_identifier);
-    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.func.lower_identifier.token.kind);
-    try testing.expectEqualStrings("f", expr.func.lower_identifier.name);
+test "[VariantTypeNode]" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    // First constructor: Err e
+    var err_params = std.ArrayList(*Node).init(allocator);
+    const err_param = try allocator.create(Node);
+    err_param.* = .{
+        .lower_identifier = .{
+            .name = "e",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "e",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 0 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try err_params.append(err_param);
+
+    // Second constructor: Ok a
+    var ok_params = std.ArrayList(*Node).init(allocator);
+    const ok_param = try allocator.create(Node);
+    ok_param.* = .{
+        .lower_identifier = .{
+            .name = "a",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "a",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 0 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try ok_params.append(ok_param);
+
+    // Create constructors list
+    var constructors = std.ArrayList(VariantConstructorNode).init(allocator);
+    try constructors.append(.{
+        .name = "Err",
+        .params = err_params,
+        .token = .{
+            .kind = .{ .identifier = .Upper },
+            .lexeme = "Err",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 0 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    });
+    try constructors.append(.{
+        .name = "Ok",
+        .params = ok_params,
+        .token = .{
+            .kind = .{ .identifier = .Upper },
+            .lexeme = "Ok",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 0 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    });
+
+    // Create type parameters list
+    var type_params = std.ArrayList([]const u8).init(allocator);
+    try type_params.append(try allocator.dupe(u8, "e"));
+    try type_params.append(try allocator.dupe(u8, "a"));
+
+    // Create the variant type node
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
+        .variant_type = .{
+            .name = "Result",
+            .type_params = type_params,
+            .constructors = constructors,
+            .token = .{
+                .kind = .{ .keyword = .Type },
+                .lexeme = "type",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 0 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try testing.expectEqualStrings("Result", node.variant_type.name);
+    try testing.expectEqual(@as(usize, 2), node.variant_type.type_params.items.len);
+    try testing.expectEqualStrings("e", node.variant_type.type_params.items[0]);
+    try testing.expectEqualStrings("a", node.variant_type.type_params.items[1]);
+
+    try testing.expectEqual(@as(usize, 2), node.variant_type.constructors.items.len);
+    try testing.expectEqualStrings("Err", node.variant_type.constructors.items[0].name);
+    try testing.expectEqualStrings("Ok", node.variant_type.constructors.items[1].name);
+
+    const err_constructor = node.variant_type.constructors.items[0];
+    try testing.expectEqual(@as(usize, 1), err_constructor.params.items.len);
+    try testing.expectEqualStrings("e", err_constructor.params.items[0].lower_identifier.name);
+
+    const ok_constructor = node.variant_type.constructors.items[1];
+    try testing.expectEqual(@as(usize, 1), ok_constructor.params.items.len);
+    try testing.expectEqualStrings("a", ok_constructor.params.items[0].lower_identifier.name);
 }
