@@ -2487,6 +2487,8 @@ test "[IncludeNode]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
+    // include Std.List
+
     var segments = std.ArrayList([]const u8).init(allocator);
     try segments.append(try allocator.dupe(u8, "Std"));
     try segments.append(try allocator.dupe(u8, "List"));

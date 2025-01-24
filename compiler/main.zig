@@ -24,24 +24,23 @@ pub fn main() !void {
         return err;
     };
 
-    var lex = lexer.Lexer.init(source, file);
+    var l = lexer.Lexer.init(source, file);
     const stderr = std.io.getStdErr().writer();
 
     while (true) {
-        const token = lex.nextToken() catch |err| {
-            const report = diagnostics.Diagnostic.create(err, lex.loc, lex.source);
+        const token = l.nextToken() catch |err| {
+            const report = diagnostics.Diagnostic.create(err, l.loc, l.source);
             try report.format(stderr);
             std.process.exit(1);
         };
 
-        if (token.kind == .Eof) break;
+        if (std.meta.eql(token.kind, .{ .special = .Eof })) break;
 
         const stdout = std.io.getStdOut().writer();
         try stdout.print("Token: {s} ({any})\n", .{ token.lexeme, token.kind });
     }
 
-    const p = try parser.Parser.init(&lex, allocator);
+    const p = try parser.Parser.init(allocator, &l);
     const ast = try p.parseProgram();
-    std.debug.print("\nAST:\n", .{});
-    std.debug.print("{}\n", .{ast});
+    std.debug.print("\n{}\n", .{ast});
 }

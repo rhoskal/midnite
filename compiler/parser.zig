@@ -883,6 +883,55 @@ pub const Parser = struct {
         return node;
     }
 
+    /// Parses an include declaration which imports and re-exports all contents from a module.
+    /// The module path consists of one or more uppercase identifiers separated by dots.
+    ///
+    /// Syntax:
+    /// include ModulePath
+    /// ModulePath = UpperIdent ("." UpperIdent)*
+    ///
+    /// Examples:
+    /// - `include MyModule`
+    /// - `include Std.List`
+    /// - `include Parser.Internal.Utils`
+    fn parseInclude(self: *Parser) ParserError!*ast.Node {
+        const token = try self.expect(lexer.TokenKind{ .keyword = .Include });
+
+        var segments = std.ArrayList([]const u8).init(self.allocator);
+        errdefer {
+            for (segments.items) |seg| {
+                self.allocator.free(seg);
+            }
+
+            segments.deinit();
+        }
+
+        const first_segment = try self.parseUpperIdentifier();
+        const first_duped = try self.allocator.dupe(u8, first_segment.name);
+        try segments.append(first_duped);
+
+        while (try self.match(lexer.TokenKind{ .delimiter = .Dot })) {
+            const next_segment = try self.parseUpperIdentifier();
+            const next_duped = try self.allocator.dupe(u8, next_segment.name);
+            try segments.append(next_duped);
+        }
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer self.allocator.destroy(node);
+
+        node.* = .{
+            .include = .{
+                .path = .{
+                    .segments = segments,
+                    .token = token,
+                },
+                .token = token,
+            },
+        };
+
+        return node;
+    }
+
     /// Parses a conditional expression with a required 'then' and 'else' branch.
     /// The condition must evaluate to a boolean value. If true, the 'then' branch
     /// is evaluated; otherwise, the 'else' branch is evaluated.
@@ -930,7 +979,7 @@ pub const Parser = struct {
         switch (self.current_token.kind) {
             .keyword => |kw| switch (kw) {
                 .Foreign => return self.parseForeignFunctionDecl(),
-                // .Include => return self.parseInclude(),
+                .Include => return self.parseInclude(),
                 .Let => return self.parseFunctionDecl(),
                 // .Module => return self.parseModuleDecl(),
                 // .Open => return self.parseImportSpec(),
@@ -965,7 +1014,7 @@ pub const Parser = struct {
             statements.deinit();
         }
 
-        while (self.current_token.kind != lexer.TokenKind{ .special = .Eof }) {
+        while (!self.check(lexer.TokenKind{ .special = .Eof })) {
             const stmt = try self.parseTopLevel();
             try statements.append(stmt);
         }
@@ -1848,4 +1897,28 @@ test "[foreign_function_decl]" {
     try testing.expect(type_annotation.param_types.items[1].* == .upper_identifier);
     try testing.expectEqualStrings("Float", type_annotation.param_types.items[0].upper_identifier.name);
     try testing.expectEqualStrings("Float", type_annotation.param_types.items[1].upper_identifier.name);
+}
+
+test "[include]" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const source = "include Std.List";
+    var l = lexer.Lexer.init(source, TEST_FILE);
+    var parser = try Parser.init(allocator, &l);
+    defer parser.deinit();
+
+    const node = try parser.parseInclude();
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    try testing.expect(node.* == .include);
+
+    const include = node.include;
+    try testing.expectEqual(@as(usize, 2), include.path.segments.items.len);
+    try testing.expectEqualStrings("Std", include.path.segments.items[0]);
+    try testing.expectEqualStrings("List", include.path.segments.items[1]);
 }

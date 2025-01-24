@@ -14,12 +14,12 @@ pub const Diagnostic = struct {
         const problem = getProblemMessage(err);
         const hint = getHintMessage(err);
 
-        var line_start: usize = loc.buf.start;
+        var line_start: usize = loc.span.start;
         while (line_start > 0 and source[line_start - 1] != '\n') {
             line_start -= 1;
         }
 
-        var line_end: usize = loc.buf.end;
+        var line_end: usize = loc.span.end;
         while (line_end < source.len and source[line_end] != '\n') {
             line_end += 1;
         }
@@ -158,7 +158,7 @@ pub const Diagnostic = struct {
             try writer.plain(" ");
         }
 
-        const span_length = self.loc.buf.end - self.loc.buf.start;
+        const span_length = self.loc.span.end - self.loc.span.start;
         var j: usize = 0;
         while (j < span_length) : (j += 1) {
             try writer.styled(term.Color.Red, "^");
