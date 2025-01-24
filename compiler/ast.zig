@@ -707,6 +707,8 @@ pub const Node = union(enum) {
             .cons_expr => |*expr| {
                 expr.head.deinit(allocator);
                 expr.tail.deinit(allocator);
+                allocator.destroy(expr.head);
+                allocator.destroy(expr.tail);
             },
             .lambda_expr => |*expr| {
                 expr.params.deinit();
@@ -775,8 +777,8 @@ pub const Node = union(enum) {
             },
             .foreign_function_decl => |*decl| {
                 decl.type_annotation.deinit(allocator);
-                allocator.free(decl.name);
                 allocator.destroy(decl.type_annotation);
+                allocator.free(decl.external_name);
             },
             .function_decl => |*decl| {
                 if (decl.type_annotation) |type_annotation| {
@@ -794,7 +796,6 @@ pub const Node = union(enum) {
                 }
 
                 ftype.param_types.deinit();
-                allocator.destroy(ftype);
             },
             .module_decl => |*decl| {
                 for (decl.path.segments.items) |segment| {
@@ -861,13 +862,10 @@ pub const Node = union(enum) {
                 path.segments.deinit();
             },
             .type_alias => |*alias| {
-                allocator.free(alias.name);
                 alias.value.deinit(allocator);
                 allocator.destroy(alias.value);
             },
             .variant_type => |*vtype| {
-                allocator.free(vtype.name);
-
                 for (vtype.type_params.items) |param| {
                     allocator.free(param);
                 }
@@ -904,16 +902,12 @@ pub const Node = union(enum) {
             .float_literal,
             .char_literal,
             .empty_list,
+            .variable,
             => {},
             .string_literal => |lit| {
                 allocator.free(lit.value);
             },
-            .variable => |variable| {
-                allocator.free(variable.name);
-            },
             .constructor => |*con| {
-                allocator.free(con.name);
-
                 for (con.args.items) |arg| {
                     deinitPattern(allocator, arg);
                     allocator.destroy(arg);
