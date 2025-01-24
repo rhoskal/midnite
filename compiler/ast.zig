@@ -4,43 +4,64 @@ const lexer = @import("lexer.zig");
 
 /// Represents a regular, single line comment.
 pub const CommentNode = struct {
+    /// The content of the comment, excluding the comment marker.
     content: []const u8,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Represents a documentation comment that will be processed as markdown.
 pub const DocCommentNode = struct {
+    /// The content of the documentation comment, excluding the comment marker.
     content: []const u8,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Represents a literal integer value.
 pub const IntLiteralNode = struct {
+    /// The parsed integer value.
     value: i64,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Represents a literal floating-point value.
 pub const FloatLiteralNode = struct {
+    /// The parsed floating-point value.
     value: f64,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Represents a string literal value.
 pub const StrLiteralNode = struct {
+    /// The parsed string value with escape sequences processed.
     value: []const u8,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Represents a multiline string literal value.
 pub const MultilineStrLiteralNode = struct {
+    /// The parsed multiline string value with escape sequences processed.
     value: []const u8,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Represents a char literal value.
 pub const CharLiteralNode = struct {
+    /// The Unicode codepoint value of the character.
     value: u21,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -51,14 +72,22 @@ pub const CharLiteralNode = struct {
 /// - `[]` (empty list)
 /// - `[True, False, True]`
 pub const ListNode = struct {
+    /// Array of pointers to the AST nodes representing list elements.
     elements: std.ArrayList(*Node),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Common structure for binary operations.
 pub const BinaryOp = struct {
+    /// The AST node for the left operand.
     left: *Node,
+
+    /// The token representing the operator.
     operator: lexer.Token,
+
+    /// The AST node for the right operand.
     right: *Node,
 };
 
@@ -87,7 +116,10 @@ pub const ComparisonExprNode = BinaryOp;
 /// Examples:
 /// - Negation: (-)
 pub const UnaryExprNode = struct {
+    /// The token representing the operator.
     operator: lexer.Token,
+
+    /// The AST node representing the operand.
     operand: *Node,
 };
 
@@ -99,22 +131,42 @@ pub const UnaryExprNode = struct {
 /// - `match list on | [] => 0 | x :: xs => 1 + length xs`
 /// - `match result on | Ok v => v | Err e => default`
 pub const MatchExprNode = struct {
+    /// The AST node representing the value being matched.
     value: *Node,
+
+    /// Array of match cases to test against.
     cases: std.ArrayList(MatchCase),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// A single pattern matching case with an optional guard condition.
 /// When pattern matches and guard evaluates true, the expression is evaluated.
 pub const MatchCase = struct {
+    /// The pattern to match against.
     pattern: *PatternNode,
+
+    /// The expression to evaluate if pattern matches.
     expression: *Node,
+
+    /// Optional guard condition that must be true for match to succeed.
     guard: ?*GuardNode,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
-/// Pattern matching constructs that can appear in match expressions.
-/// Includes literals, variables, constructors, list patterns, and wildcards.
+/// Pattern matching constructs used in match expressions.
+/// Represents different kinds of patterns like literals, variables,
+/// constructors, list patterns, and wildcards.
+///
+/// Examples:
+/// - `_` matches anything
+/// - `42` matches literal integer
+/// - `Some x` matches constructor with variable
+/// - `head :: tail` matches list with head and tail
+/// - `[]` matches empty list
 pub const PatternNode = union(enum) {
     wildcard: struct {
         token: lexer.Token,
@@ -124,24 +176,41 @@ pub const PatternNode = union(enum) {
     char_literal: CharLiteralNode,
     string_literal: StrLiteralNode,
     list: struct {
+        /// Array of pattern nodes for matching against list elements.
         elements: std.ArrayList(*PatternNode),
+
+        /// The token representing the start of the list pattern
         token: lexer.Token,
     },
     variable: struct {
+        /// The name of the variable to bind.
         name: []const u8,
+
+        /// The token representing the variable.
         token: lexer.Token,
     },
     constructor: struct {
+        /// The name of the constructor.
         name: []const u8,
+
+        /// Array of patterns for matching constructor arguments.
         args: std.ArrayList(*PatternNode),
+
+        /// The token representing the constructor.
         token: lexer.Token,
     },
     empty_list: struct {
+        /// The token representing the empty list pattern.
         token: lexer.Token,
     },
     cons: struct {
+        /// Pattern for matching the head element.
         head: *PatternNode,
+
+        /// Pattern for matching the tail list.
         tail: *PatternNode,
+
+        /// The token representing the cons pattern.
         token: lexer.Token,
     },
 };
@@ -153,7 +222,10 @@ pub const PatternNode = union(enum) {
 /// - `when x > 0`
 /// - `when is_valid? name`
 pub const GuardNode = struct {
+    /// The AST node representing the boolean condition.
     condition: *Node,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -166,8 +238,13 @@ pub const GuardNode = struct {
 /// - `if empty? list then None else Some (head list)`
 /// - `if even? n then n / 2 else 3 * n + 1`
 pub const IfThenElseStmtNode = struct {
+    /// The AST node representing the boolean condition.
     condition: *Node,
+
+    /// The AST node representing the expression to evaluate if condition is true.
     then_branch: *Node,
+
+    /// The AST node representing the expression to evaluate if condition is false.
     else_branch: *Node,
 };
 
@@ -176,11 +253,10 @@ pub const IfThenElseStmtNode = struct {
 /// Examples:
 /// - `Int -> Int -> Int`
 pub const FunctionTypeNode = struct {
-    /// The parameter types in order.
-    /// For curried functions like `Int -> Int -> Int`,
-    /// this would contain `[Int, Int, Int]` where the last
-    /// one is the return type.
+    /// Array of AST nodes representing parameter types, with last being return type.
     param_types: std.ArrayList(*Node),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -189,8 +265,13 @@ pub const FunctionTypeNode = struct {
 /// Examples:
 /// - `\x y => x + y`
 pub const LambdaExprNode = struct {
+    /// Array of parameter names.
     params: std.ArrayList([]const u8),
+
+    /// The AST node representing the function body expression.
     body: *Node,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -201,22 +282,56 @@ pub const LambdaExprNode = struct {
 /// - `let add : Int -> Int -> Int = \x y => x + y`
 /// - `let compose : (b -> c) -> (a -> b) -> a -> c = \f g x => f (g x)`
 pub const FunctionDeclNode = struct {
+    /// The name of the function being declared.
     name: []const u8,
+
+    /// Optional AST node representing the type annotation.
     type_annotation: ?*Node,
+
     // doc_comments: []*DocCommentNode,
+
+    /// The AST node representing the function's implementation.
     value: *Node,
+
+    /// The token representing the start of this declaration.
+    token: lexer.Token,
+};
+
+/// A declaration that links a function to external code, specifying both
+/// the internal name/type and external symbol to link against.
+///
+/// Example:
+/// - `foreign sqrt : Float -> Float = "c_sqrt"`
+/// - `foreign print : String -> Unit = "c_print"`
+pub const ForeignFunctionDeclNode = struct {
+    /// The internal name used to refer to this function.
+    name: []const u8,
+
+    /// The function's type signature.
+    type_annotation: *Node,
+
+    /// The external symbol name to link against.
+    external_name: []const u8,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Represents a lowercase identifier reference (variable names, function names, etc).
 pub const LowerIdentifierNode = struct {
+    /// The text of the identifier.
     name: []const u8,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// Represents an uppercase identifier reference (type names, type constructors, etc).
 pub const UpperIdentifierNode = struct {
+    /// The text of the identifier.
     name: []const u8,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -227,8 +342,13 @@ pub const UpperIdentifierNode = struct {
 /// - `1 :: [2, 3]` evaluates to `[1, 2, 3]`
 /// - `x :: xs` pattern matches head and tail of list
 pub const ConsExprNode = struct {
+    /// The AST node representing the element to prepend.
     head: *Node,
+
+    /// The token representing the cons operator.
     operator: lexer.Token,
+
+    /// The AST node representing the target list.
     tail: *Node,
 };
 
@@ -253,8 +373,13 @@ pub const ListConcatExprNode = BinaryOp;
 /// - `f >> g` applies g after f (forward composition)
 /// - `f << g` applies f after g (backward composition)
 pub const CompositionExprNode = struct {
+    /// The AST node representing the first function in the composition.
     first: *Node,
+
+    /// The token representing the composition operator.
     operator: lexer.Token,
+
+    /// The AST node representing the second function in the composition.
     second: *Node,
 };
 
@@ -265,8 +390,13 @@ pub const CompositionExprNode = struct {
 /// - `x |> f` applies f to x (forward pipe)
 /// - `f <| x` applies f to x (backward pipe)
 pub const PipeExprNode = struct {
+    /// The AST node representing the value being piped.
     value: *Node,
+
+    /// The token representing the pipe operator.
     operator: lexer.Token,
+
+    /// The AST node representing the function receiving the piped value.
     func: *Node,
 };
 
@@ -278,14 +408,24 @@ pub const PipeExprNode = struct {
 /// - `exposing (func1, Type1, Type2(..))`
 /// - `exposing ()`
 pub const ExportSpecNode = struct {
+    /// Whether all items are being exposed (..).
     exposing_all: bool,
+
+    /// Optional array of specific items being exposed.
     items: ?std.ArrayList(ExportItem),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 pub const ExportItem = struct {
+    /// The name of the item being exported.
     name: []const u8,
+
+    /// Whether to expose constructors for exported types.
     expose_constructors: bool,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -297,7 +437,10 @@ pub const ExportItem = struct {
 /// - `MyModule.SubModule`
 /// - `Std.List`
 pub const ModulePathNode = struct {
+    /// Array of identifiers forming the module path.
     segments: std.ArrayList([]const u8),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -310,9 +453,16 @@ pub const ModulePathNode = struct {
 /// - `module Std.List exposing (map, filter) ... end`
 /// - `module Parser exposing (Parser, run, map) ... end`
 pub const ModuleDeclNode = struct {
+    /// The fully qualified path of the module.
     path: ModulePathNode,
+
+    /// Specification of which items to expose from the module.
     exports: ExportSpecNode,
+
+    /// Array of AST nodes representing the module's contents.
     declarations: std.ArrayList(*Node),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -335,18 +485,32 @@ pub const ImportSpecNode = struct {
     };
 
     const RenameItem = struct {
+        /// The original name of the imported item.
         old_name: []const u8,
+
+        /// The new name to use locally.
         new_name: []const u8,
+
+        /// The token representing the start of this declaration.
         token: lexer.Token,
     };
 
+    /// The module path being imported.
     path: ModulePathNode,
+
+    /// The kind of import being performed.
     kind: ImportKind,
+
+    /// Optional alias name for the imported module.
     alias: ?[]const u8,
+
+    /// Optional list of items being imported or renamed.
     items: ?std.ArrayList(union(enum) {
         name: []const u8,
         rename: RenameItem,
     }),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -358,12 +522,22 @@ pub const ImportSpecNode = struct {
 /// - `include Data.List`
 /// - `include Parser.Internal`
 pub const IncludeNode = struct {
+    /// The module path being included.
     path: ModulePathNode,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
-/// Represents a typed hole - a placeholder for a type that should be inferred.
+/// Represents a typed hole - a placeholder in code where type inference
+/// should determine the appropriate type. Useful during development
+/// and for type-driven development.
+///
+/// Examples:
+/// - `?` marks a hole to be filled
+/// - `let x : ? = expr` requests type inference
 pub const TypedHoleNode = struct {
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -376,8 +550,13 @@ pub const TypedHoleNode = struct {
 /// - `Entry k v` (two type parameters)
 /// - `Node a (Tree a)` (nested type parameters)
 pub const VariantConstructorNode = struct {
+    /// The name of the constructor.
     name: []const u8,
+
+    /// Array of AST nodes representing the constructor's parameter types.
     params: std.ArrayList(*Node),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -391,9 +570,16 @@ pub const VariantConstructorNode = struct {
 /// - `type Tree a = Leaf | Branch (Tree a) a (Tree a)`
 /// - `type Result e a = Err e | Ok a`
 pub const VariantTypeNode = struct {
+    /// The name of the variant type.
     name: []const u8,
+
+    /// Array of type parameter names.
     type_params: std.ArrayList([]const u8),
+
+    /// Array of constructors defined for this type.
     constructors: std.ArrayList(VariantConstructorNode),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -406,15 +592,23 @@ pub const VariantTypeNode = struct {
 /// - `type alias Reader r a = r -> a`
 /// - `type alias Parser = String -> Maybe Expr`
 pub const TypeAliasNode = struct {
+    /// The name of the type alias.
     name: []const u8,
+
+    /// The AST node representing the aliased type.
     value: *Node,
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
 /// The root AST node containing a sequence of top-level declarations like
 /// function definitions, type declarations, imports, and module definitions.
 pub const ProgramNode = struct {
+    /// Array of AST nodes representing top-level declarations.
     statements: std.ArrayList(*Node),
+
+    /// The token representing the start of this declaration.
     token: lexer.Token,
 };
 
@@ -451,6 +645,7 @@ pub const Node = union(enum) {
     if_then_else_stmt: IfThenElseStmtNode,
 
     // Declarations
+    foreign_function_decl: ForeignFunctionDeclNode,
     function_decl: FunctionDeclNode,
     module_decl: ModuleDeclNode,
 
@@ -512,6 +707,8 @@ pub const Node = union(enum) {
             .cons_expr => |*expr| {
                 expr.head.deinit(allocator);
                 expr.tail.deinit(allocator);
+                allocator.destroy(expr.head);
+                allocator.destroy(expr.tail);
             },
             .lambda_expr => |*expr| {
                 expr.params.deinit();
@@ -578,6 +775,11 @@ pub const Node = union(enum) {
                 allocator.destroy(stmt.else_branch);
                 allocator.destroy(stmt.then_branch);
             },
+            .foreign_function_decl => |*decl| {
+                decl.type_annotation.deinit(allocator);
+                allocator.destroy(decl.type_annotation);
+                allocator.free(decl.external_name);
+            },
             .function_decl => |*decl| {
                 if (decl.type_annotation) |type_annotation| {
                     type_annotation.deinit(allocator);
@@ -594,7 +796,6 @@ pub const Node = union(enum) {
                 }
 
                 ftype.param_types.deinit();
-                allocator.destroy(ftype);
             },
             .module_decl => |*decl| {
                 for (decl.path.segments.items) |segment| {
@@ -661,13 +862,10 @@ pub const Node = union(enum) {
                 path.segments.deinit();
             },
             .type_alias => |*alias| {
-                allocator.free(alias.name);
                 alias.value.deinit(allocator);
                 allocator.destroy(alias.value);
             },
             .variant_type => |*vtype| {
-                allocator.free(vtype.name);
-
                 for (vtype.type_params.items) |param| {
                     allocator.free(param);
                 }
@@ -704,16 +902,12 @@ pub const Node = union(enum) {
             .float_literal,
             .char_literal,
             .empty_list,
+            .variable,
             => {},
             .string_literal => |lit| {
                 allocator.free(lit.value);
             },
-            .variable => |variable| {
-                allocator.free(variable.name);
-            },
             .constructor => |*con| {
-                allocator.free(con.name);
-
                 for (con.args.items) |arg| {
                     deinitPattern(allocator, arg);
                     allocator.destroy(arg);
@@ -1087,6 +1281,90 @@ test "[IfThenElseStmtNode]" {
     try testing.expect(if_then_else.if_then_else_stmt.else_branch.* == .upper_identifier);
     try testing.expectEqualStrings("False", if_then_else.if_then_else_stmt.else_branch.upper_identifier.name);
     try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, if_then_else.if_then_else_stmt.else_branch.upper_identifier.token.kind);
+}
+
+test "[ForeignFunctionDeclNode]" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    // foreign sqrt : Float -> Float = "c_sqrt"
+
+    const type_node = try allocator.create(Node);
+    const float_type1 = try allocator.create(Node);
+    const float_type2 = try allocator.create(Node);
+
+    var param_types = std.ArrayList(*Node).init(allocator);
+    try param_types.append(float_type1);
+    try param_types.append(float_type2);
+
+    float_type1.* = .{
+        .upper_identifier = .{
+            .name = "Float",
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "Float",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 5 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    float_type2.* = .{
+        .upper_identifier = .{
+            .name = "Float",
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "Float",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 5 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    type_node.* = .{
+        .function_type = .{
+            .param_types = param_types,
+            .token = .{
+                .kind = .{ .symbol = .ArrowRight },
+                .lexeme = "->",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 2 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const foreign_func = try allocator.create(Node);
+    foreign_func.* = .{
+        .foreign_function_decl = .{
+            .name = "sqrt",
+            .type_annotation = type_node,
+            .external_name = try allocator.dupe(u8, "c_sqrt"),
+            .token = .{
+                .kind = .{ .keyword = .Foreign },
+                .lexeme = "foreign",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 7 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const decl = foreign_func.foreign_function_decl;
+    try testing.expectEqualStrings("sqrt", decl.name);
+    try testing.expectEqualStrings("c_sqrt", decl.external_name);
+    try testing.expectEqual(@as(usize, 2), decl.type_annotation.function_type.param_types.items.len);
 }
 
 test "[FunctionTypeNode]" {
@@ -1762,10 +2040,8 @@ test "[CompositionExprNode]" {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    // f >> g (forward composition)
-
-    const first = try allocator.create(Node);
-    first.* = .{
+    const f = try allocator.create(Node);
+    f.* = .{
         .lower_identifier = .{
             .name = "f",
             .token = lexer.Token{
@@ -1780,8 +2056,8 @@ test "[CompositionExprNode]" {
         },
     };
 
-    const second = try allocator.create(Node);
-    second.* = .{
+    const g = try allocator.create(Node);
+    g.* = .{
         .lower_identifier = .{
             .name = "g",
             .token = lexer.Token{
@@ -1802,45 +2078,83 @@ test "[CompositionExprNode]" {
         allocator.destroy(compose);
     }
 
-    compose.* = .{
-        .composition_expr = .{
-            .first = first,
-            .operator = lexer.Token{
-                .kind = lexer.TokenKind{ .operator = .ComposeRight },
-                .lexeme = ">>",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 2, .end = 4 },
-                    .src = .{ .line = 1, .col = 3 },
+    {
+        // f >> g (compose right)
+
+        compose.* = .{
+            .composition_expr = .{
+                .first = f,
+                .operator = lexer.Token{
+                    .kind = lexer.TokenKind{ .operator = .ComposeRight },
+                    .lexeme = ">>",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 2, .end = 4 },
+                        .src = .{ .line = 1, .col = 3 },
+                    },
                 },
+                .second = g,
             },
-            .second = second,
-        },
-    };
+        };
 
-    const expr = compose.composition_expr;
+        const expr = compose.composition_expr;
 
-    // Verify the structure
-    try testing.expectEqual(lexer.TokenKind{ .operator = .ComposeRight }, expr.operator.kind);
-    try testing.expectEqualStrings(">>", expr.operator.lexeme);
+        // Verify the structure
+        try testing.expectEqual(lexer.TokenKind{ .operator = .ComposeRight }, expr.operator.kind);
+        try testing.expectEqualStrings(">>", expr.operator.lexeme);
 
-    // Verify first function (f)
-    try testing.expect(expr.first.* == .lower_identifier);
-    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.first.lower_identifier.token.kind);
-    try testing.expectEqualStrings("f", expr.first.lower_identifier.name);
+        // Verify first function (f)
+        try testing.expect(expr.first.* == .lower_identifier);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.first.lower_identifier.token.kind);
+        try testing.expectEqualStrings("f", expr.first.lower_identifier.name);
 
-    // Verify second function (g)
-    try testing.expect(expr.second.* == .lower_identifier);
-    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.second.lower_identifier.token.kind);
-    try testing.expectEqualStrings("g", expr.second.lower_identifier.name);
+        // Verify second function (g)
+        try testing.expect(expr.second.* == .lower_identifier);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.second.lower_identifier.token.kind);
+        try testing.expectEqualStrings("g", expr.second.lower_identifier.name);
+    }
+
+    {
+        // g << f (compose left)
+
+        compose.* = .{
+            .composition_expr = .{
+                .first = g,
+                .operator = lexer.Token{
+                    .kind = lexer.TokenKind{ .operator = .ComposeLeft },
+                    .lexeme = "<<",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 2, .end = 4 },
+                        .src = .{ .line = 1, .col = 3 },
+                    },
+                },
+                .second = f,
+            },
+        };
+
+        const expr = compose.composition_expr;
+
+        // Verify the structure
+        try testing.expectEqual(lexer.TokenKind{ .operator = .ComposeLeft }, expr.operator.kind);
+        try testing.expectEqualStrings("<<", expr.operator.lexeme);
+
+        // Verify first function (g)
+        try testing.expect(expr.first.* == .lower_identifier);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.first.lower_identifier.token.kind);
+        try testing.expectEqualStrings("g", expr.first.lower_identifier.name);
+
+        // Verify second function (f)
+        try testing.expect(expr.second.* == .lower_identifier);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.second.lower_identifier.token.kind);
+        try testing.expectEqualStrings("f", expr.second.lower_identifier.name);
+    }
 }
 
 test "[PipeExprNode]" {
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
-
-    // x |> f (forward pipe)
 
     const value = try allocator.create(Node);
     value.* = .{
@@ -1880,35 +2194,924 @@ test "[PipeExprNode]" {
         allocator.destroy(pipe);
     }
 
-    pipe.* = .{
-        .pipe_expr = .{
-            .value = value,
-            .operator = lexer.Token{
-                .kind = lexer.TokenKind{ .operator = .PipeRight },
-                .lexeme = "|>",
+    {
+        // x |> f (pipe right)
+
+        pipe.* = .{
+            .pipe_expr = .{
+                .value = value,
+                .operator = lexer.Token{
+                    .kind = lexer.TokenKind{ .operator = .PipeRight },
+                    .lexeme = "|>",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 2, .end = 4 },
+                        .src = .{ .line = 1, .col = 3 },
+                    },
+                },
+                .func = func,
+            },
+        };
+
+        const expr = pipe.pipe_expr;
+
+        // Verify the structure
+        try testing.expectEqual(lexer.TokenKind{ .operator = .PipeRight }, expr.operator.kind);
+        try testing.expectEqualStrings("|>", expr.operator.lexeme);
+
+        // Verify value being piped (x)
+        try testing.expect(expr.value.* == .lower_identifier);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.value.lower_identifier.token.kind);
+        try testing.expectEqualStrings("x", expr.value.lower_identifier.name);
+
+        // Verify function (f)
+        try testing.expect(expr.func.* == .lower_identifier);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.func.lower_identifier.token.kind);
+        try testing.expectEqualStrings("f", expr.func.lower_identifier.name);
+    }
+
+    {
+        // f <| x (pipe left)
+
+        pipe.* = .{
+            .pipe_expr = .{
+                .value = value,
+                .operator = lexer.Token{
+                    .kind = lexer.TokenKind{ .operator = .PipeLeft },
+                    .lexeme = "<|",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 2, .end = 4 },
+                        .src = .{ .line = 1, .col = 3 },
+                    },
+                },
+                .func = func,
+            },
+        };
+
+        const expr = pipe.pipe_expr;
+
+        // Verify the structure
+        try testing.expectEqual(lexer.TokenKind{ .operator = .PipeLeft }, expr.operator.kind);
+        try testing.expectEqualStrings("<|", expr.operator.lexeme);
+
+        // Verify value being piped (x)
+        try testing.expect(expr.value.* == .lower_identifier);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.value.lower_identifier.token.kind);
+        try testing.expectEqualStrings("x", expr.value.lower_identifier.name);
+
+        // Verify function (f)
+        try testing.expect(expr.func.* == .lower_identifier);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.func.lower_identifier.token.kind);
+        try testing.expectEqualStrings("f", expr.func.lower_identifier.name);
+    }
+}
+
+test "[TypeAliasNode]" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    // type alias UserId = String
+
+    const value = try allocator.create(Node);
+    value.* = .{
+        .upper_identifier = .{
+            .name = "String",
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "String",
                 .loc = .{
                     .filename = TEST_FILE,
-                    .span = .{ .start = 2, .end = 4 },
-                    .src = .{ .line = 1, .col = 3 },
+                    .span = .{ .start = 20, .end = 26 },
+                    .src = .{ .line = 1, .col = 21 },
                 },
             },
-            .func = func,
         },
     };
 
-    const expr = pipe.pipe_expr;
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
+        .type_alias = .{
+            .name = "UserId",
+            .value = value,
+            .token = .{
+                .kind = .{ .keyword = .Type },
+                .lexeme = "type",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
 
     // Verify the structure
-    try testing.expectEqual(lexer.TokenKind{ .operator = .PipeRight }, expr.operator.kind);
-    try testing.expectEqualStrings("|>", expr.operator.lexeme);
+    try testing.expectEqual(lexer.TokenKind{ .keyword = .Type }, node.type_alias.token.kind);
+    try testing.expectEqualStrings("type", node.type_alias.token.lexeme);
+    try testing.expectEqualStrings("UserId", node.type_alias.name);
 
-    // Verify value being piped (x)
-    try testing.expect(expr.value.* == .lower_identifier);
-    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.value.lower_identifier.token.kind);
-    try testing.expectEqualStrings("x", expr.value.lower_identifier.name);
+    // Verify the value node (String type)
+    try testing.expect(node.type_alias.value.* == .upper_identifier);
+    const value_node = node.type_alias.value.upper_identifier;
+    try testing.expectEqualStrings("String", value_node.name);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, value_node.token.kind);
+    try testing.expectEqualStrings("String", value_node.token.lexeme);
+}
 
-    // Verify function (f)
-    try testing.expect(expr.func.* == .lower_identifier);
-    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.func.lower_identifier.token.kind);
-    try testing.expectEqualStrings("f", expr.func.lower_identifier.name);
+test "[VariantTypeNode]" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    // First constructor: Err e
+    var err_params = std.ArrayList(*Node).init(allocator);
+    const err_param = try allocator.create(Node);
+    err_param.* = .{
+        .lower_identifier = .{
+            .name = "e",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "e",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 0 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try err_params.append(err_param);
+
+    // Second constructor: Ok a
+    var ok_params = std.ArrayList(*Node).init(allocator);
+    const ok_param = try allocator.create(Node);
+    ok_param.* = .{
+        .lower_identifier = .{
+            .name = "a",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "a",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 0 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try ok_params.append(ok_param);
+
+    // Create constructors list
+    var constructors = std.ArrayList(VariantConstructorNode).init(allocator);
+    try constructors.append(.{
+        .name = "Err",
+        .params = err_params,
+        .token = .{
+            .kind = .{ .identifier = .Upper },
+            .lexeme = "Err",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 0 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    });
+    try constructors.append(.{
+        .name = "Ok",
+        .params = ok_params,
+        .token = .{
+            .kind = .{ .identifier = .Upper },
+            .lexeme = "Ok",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 0 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    });
+
+    // Create type parameters list
+    var type_params = std.ArrayList([]const u8).init(allocator);
+    try type_params.append(try allocator.dupe(u8, "e"));
+    try type_params.append(try allocator.dupe(u8, "a"));
+
+    // Create the variant type node
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
+        .variant_type = .{
+            .name = "Result",
+            .type_params = type_params,
+            .constructors = constructors,
+            .token = .{
+                .kind = .{ .keyword = .Type },
+                .lexeme = "type",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 0 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try testing.expectEqualStrings("Result", node.variant_type.name);
+    try testing.expectEqual(@as(usize, 2), node.variant_type.type_params.items.len);
+    try testing.expectEqualStrings("e", node.variant_type.type_params.items[0]);
+    try testing.expectEqualStrings("a", node.variant_type.type_params.items[1]);
+
+    try testing.expectEqual(@as(usize, 2), node.variant_type.constructors.items.len);
+    try testing.expectEqualStrings("Err", node.variant_type.constructors.items[0].name);
+    try testing.expectEqualStrings("Ok", node.variant_type.constructors.items[1].name);
+
+    const err_constructor = node.variant_type.constructors.items[0];
+    try testing.expectEqual(@as(usize, 1), err_constructor.params.items.len);
+    try testing.expectEqualStrings("e", err_constructor.params.items[0].lower_identifier.name);
+
+    const ok_constructor = node.variant_type.constructors.items[1];
+    try testing.expectEqual(@as(usize, 1), ok_constructor.params.items.len);
+    try testing.expectEqualStrings("a", ok_constructor.params.items[0].lower_identifier.name);
+}
+
+test "[ModulePathNode]" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var segments = std.ArrayList([]const u8).init(allocator);
+    try segments.append(try allocator.dupe(u8, "Std"));
+    try segments.append(try allocator.dupe(u8, "List"));
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
+        .module_path = .{
+            .segments = segments,
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "Std",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 3 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const path = node.module_path;
+    try testing.expectEqual(@as(usize, 2), path.segments.items.len);
+    try testing.expectEqualStrings("Std", path.segments.items[0]);
+    try testing.expectEqualStrings("List", path.segments.items[1]);
+}
+
+test "[IncludeNode]" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var segments = std.ArrayList([]const u8).init(allocator);
+    try segments.append(try allocator.dupe(u8, "Std"));
+    try segments.append(try allocator.dupe(u8, "List"));
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
+        .include = .{
+            .path = .{
+                .segments = segments,
+                .token = .{
+                    .kind = .{ .identifier = .Upper },
+                    .lexeme = "Std",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 8, .end = 12 },
+                        .src = .{ .line = 1, .col = 9 },
+                    },
+                },
+            },
+            .token = .{
+                .kind = .{ .keyword = .Include },
+                .lexeme = "include",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 7 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const include = node.include;
+    try testing.expectEqual(@as(usize, 2), include.path.segments.items.len);
+    try testing.expectEqualStrings("Std", include.path.segments.items[0]);
+    try testing.expectEqualStrings("List", include.path.segments.items[1]);
+}
+
+test "[MatchExprNode] (basic literal/constructor)" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // match opt on | Some x => x | None => 0
+
+    const value = try allocator.create(Node);
+    value.* = .{
+        .upper_identifier = .{
+            .name = "Some",
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "Some",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    // Create patterns
+    var cases = std.ArrayList(MatchCase).init(allocator);
+
+    // Case 1: Some x => x
+    const some_pattern = try allocator.create(PatternNode);
+    var some_args = std.ArrayList(*PatternNode).init(allocator);
+
+    const var_pattern = try allocator.create(PatternNode);
+    var_pattern.* = .{
+        .variable = .{
+            .name = "x",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "x",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try some_args.append(var_pattern);
+
+    some_pattern.* = .{
+        .constructor = .{
+            .name = "Some",
+            .args = some_args,
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "Some",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const some_expr = try allocator.create(Node);
+    some_expr.* = .{
+        .lower_identifier = .{
+            .name = "x",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "x",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try cases.append(.{
+        .pattern = some_pattern,
+        .expression = some_expr,
+        .guard = null,
+        .token = .{
+            .kind = .{ .symbol = .Pipe },
+            .lexeme = "|",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    });
+
+    // Case 2: None => 0
+    const none_pattern = try allocator.create(PatternNode);
+    none_pattern.* = .{
+        .constructor = .{
+            .name = "None",
+            .args = std.ArrayList(*PatternNode).init(allocator),
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "None",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const none_expr = try allocator.create(Node);
+    none_expr.* = .{
+        .int_literal = .{
+            .value = 0,
+            .token = .{
+                .kind = .{ .literal = .Int },
+                .lexeme = "0",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try cases.append(.{
+        .pattern = none_pattern,
+        .expression = none_expr,
+        .guard = null,
+        .token = .{
+            .kind = .{ .symbol = .Pipe },
+            .lexeme = "|",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    });
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
+        .match_expr = .{
+            .value = value,
+            .cases = cases,
+            .token = .{
+                .kind = .{ .keyword = .Match },
+                .lexeme = "match",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 5 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const match = node.match_expr;
+    try testing.expectEqual(@as(usize, 2), match.cases.items.len);
+    try testing.expectEqualStrings("Some", match.cases.items[0].pattern.constructor.name);
+    try testing.expectEqualStrings("x", match.cases.items[0].pattern.constructor.args.items[0].variable.name);
+    try testing.expectEqualStrings("None", match.cases.items[1].pattern.constructor.name);
+    try testing.expectEqual(@as(usize, 0), match.cases.items[1].pattern.constructor.args.items.len);
+}
+
+test "[MatchExprNode] (list pattern with cons)" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // match list on | head :: tail => head | [] => 0
+
+    // Value to match on (a list variable)
+    const value = try allocator.create(Node);
+    value.* = .{
+        .lower_identifier = .{
+            .name = "list",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "list",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    var cases = std.ArrayList(MatchCase).init(allocator);
+
+    // Case 1: head :: tail => head
+    const head_pattern = try allocator.create(PatternNode);
+    head_pattern.* = .{
+        .variable = .{
+            .name = "head",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "head",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const tail_pattern = try allocator.create(PatternNode);
+    tail_pattern.* = .{
+        .variable = .{
+            .name = "tail",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "tail",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const cons_pattern = try allocator.create(PatternNode);
+    cons_pattern.* = .{
+        .cons = .{
+            .head = head_pattern,
+            .tail = tail_pattern,
+            .token = .{
+                .kind = .{ .operator = .Cons },
+                .lexeme = "::",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 2 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const head_expr = try allocator.create(Node);
+    head_expr.* = .{
+        .lower_identifier = .{
+            .name = "head",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "head",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try cases.append(.{
+        .pattern = cons_pattern,
+        .expression = head_expr,
+        .guard = null,
+        .token = .{
+            .kind = .{ .symbol = .Pipe },
+            .lexeme = "|",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    });
+
+    // Case 2: [] => 0
+    const empty_pattern = try allocator.create(PatternNode);
+    empty_pattern.* = .{ .empty_list = .{
+        .token = .{
+            .kind = .{ .delimiter = .LeftBracket },
+            .lexeme = "[]",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 2 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    } };
+
+    const zero_expr = try allocator.create(Node);
+    zero_expr.* = .{
+        .int_literal = .{
+            .value = 0,
+            .token = .{
+                .kind = .{ .literal = .Int },
+                .lexeme = "0",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try cases.append(.{
+        .pattern = empty_pattern,
+        .expression = zero_expr,
+        .guard = null,
+        .token = .{
+            .kind = .{ .symbol = .Pipe },
+            .lexeme = "|",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    });
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
+        .match_expr = .{
+            .value = value,
+            .cases = cases,
+            .token = .{
+                .kind = .{ .keyword = .Match },
+                .lexeme = "match",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 5 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const match = node.match_expr;
+    try testing.expectEqual(@as(usize, 2), match.cases.items.len);
+
+    // Test cons pattern
+    const cons_case = match.cases.items[0];
+    try testing.expect(cons_case.pattern.* == .cons);
+    try testing.expectEqualStrings("head", cons_case.pattern.cons.head.variable.name);
+    try testing.expectEqualStrings("tail", cons_case.pattern.cons.tail.variable.name);
+
+    // Test empty list pattern
+    const empty_case = match.cases.items[1];
+    try testing.expect(empty_case.pattern.* == .empty_list);
+}
+
+test "[MatchExprNode] (with guards)" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // match x on | n when n > 0 => "positive" | n => "non-positive"
+
+    const value = try allocator.create(Node);
+    value.* = .{
+        .lower_identifier = .{
+            .name = "x",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "x",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    var cases = std.ArrayList(MatchCase).init(allocator);
+
+    // Case 1: n when n > 0 => "positive"
+    const n_pattern = try allocator.create(PatternNode);
+    n_pattern.* = .{
+        .variable = .{
+            .name = "n",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "n",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    // Build n > 0 guard expression
+    const n_ref = try allocator.create(Node);
+    n_ref.* = .{
+        .lower_identifier = .{
+            .name = "n",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "n",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const zero = try allocator.create(Node);
+    zero.* = .{
+        .int_literal = .{
+            .value = 0,
+            .token = .{
+                .kind = .{ .literal = .Int },
+                .lexeme = "0",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const guard_expr = try allocator.create(Node);
+    guard_expr.* = .{
+        .comparison_expr = .{
+            .left = n_ref,
+            .operator = .{
+                .kind = .{ .operator = .GreaterThan },
+                .lexeme = ">",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+            .right = zero,
+        },
+    };
+
+    const guard = try allocator.create(GuardNode);
+    guard.* = .{
+        .condition = guard_expr,
+        .token = .{
+            .kind = .{ .keyword = .When },
+            .lexeme = "when",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 4 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const positive_expr = try allocator.create(Node);
+    positive_expr.* = .{
+        .str_literal = .{
+            .value = try allocator.dupe(u8, "positive"),
+            .token = .{
+                .kind = .{ .literal = .String },
+                .lexeme = "\"positive\"",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 10 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try cases.append(.{
+        .pattern = n_pattern,
+        .expression = positive_expr,
+        .guard = guard,
+        .token = .{
+            .kind = .{ .symbol = .Pipe },
+            .lexeme = "|",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    });
+
+    // Case 2: n => "non-positive"
+    const n2_pattern = try allocator.create(PatternNode);
+    n2_pattern.* = .{
+        .variable = .{
+            .name = "n",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "n",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const non_positive_expr = try allocator.create(Node);
+    non_positive_expr.* = .{
+        .str_literal = .{
+            .value = try allocator.dupe(u8, "non-positive"),
+            .token = .{
+                .kind = .{ .literal = .String },
+                .lexeme = "\"non-positive\"",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 14 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    try cases.append(.{
+        .pattern = n2_pattern,
+        .expression = non_positive_expr,
+        .guard = null,
+        .token = .{
+            .kind = .{ .symbol = .Pipe },
+            .lexeme = "|",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    });
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
+        .match_expr = .{
+            .value = value,
+            .cases = cases,
+            .token = .{
+                .kind = .{ .keyword = .Match },
+                .lexeme = "match",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 5 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const match = node.match_expr;
+    try testing.expectEqual(@as(usize, 2), match.cases.items.len);
+
+    // Test guarded case
+    const guarded_case = match.cases.items[0];
+    try testing.expect(guarded_case.pattern.* == .variable);
+    try testing.expectEqualStrings("n", guarded_case.pattern.variable.name);
+    try testing.expect(guarded_case.guard != null);
+    try testing.expectEqualStrings("positive", guarded_case.expression.str_literal.value);
+
+    // Test catch-all case
+    const catchall_case = match.cases.items[1];
+    try testing.expect(catchall_case.pattern.* == .variable);
+    try testing.expectEqualStrings("n", catchall_case.pattern.variable.name);
+    try testing.expect(catchall_case.guard == null);
+    try testing.expectEqualStrings("non-positive", catchall_case.expression.str_literal.value);
 }

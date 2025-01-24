@@ -465,9 +465,7 @@ pub const Parser = struct {
                 },
             },
             .operator => |op| switch (op) {
-                .Lambda => {
-                    return try self.parseLambdaExpr();
-                },
+                .Lambda => return try self.parseLambdaExpr(),
                 else => {
                     self.allocator.destroy(node);
 
@@ -519,6 +517,10 @@ pub const Parser = struct {
     /// correctly structured expression trees.
     fn parseBinaryExpr(self: *Parser, min_precedence: u8) ParserError!*ast.Node {
         var left = try self.parseSimpleExpr();
+        errdefer {
+            left.deinit(self.allocator);
+            self.allocator.destroy(left);
+        }
 
         while (true) {
             const op_info = if (Parser.getOperatorInfo(self.current_token.kind)) |info| info else break;
@@ -536,8 +538,18 @@ pub const Parser = struct {
             };
 
             const right = try self.parseBinaryExpr(next_min);
+            errdefer {
+                right.deinit(self.allocator);
+                self.allocator.destroy(right);
+            }
 
             const node = try self.allocator.create(ast.Node);
+            errdefer {
+                right.deinit(self.allocator);
+                self.allocator.destroy(right);
+                self.allocator.destroy(node);
+            }
+
             node.* = switch (operator.kind) {
                 .operator => |op| switch (op) {
                     .Exp,
@@ -639,6 +651,10 @@ pub const Parser = struct {
             try self.advance();
 
             type_annotation = try self.parseFunctionType();
+            errdefer {
+                type_annotation.deinit(self.allocator);
+                self.allocator.destroy(type_annotation);
+            }
         }
 
         _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
@@ -653,6 +669,8 @@ pub const Parser = struct {
                 ta.deinit(self.allocator);
                 self.allocator.destroy(ta);
             }
+
+            self.allocator.destroy(node);
         }
 
         node.* = .{
@@ -694,11 +712,18 @@ pub const Parser = struct {
 
         _ = try self.expect(lexer.TokenKind{ .symbol = .DoubleArrowRight });
         const body = try self.parseExpression();
+        errdefer {
+            params.deinit();
+            body.deinit(self.allocator);
+            self.allocator.destroy(body);
+        }
 
         const node = try self.allocator.create(ast.Node);
         errdefer {
+            params.deinit();
             body.deinit(self.allocator);
             self.allocator.destroy(body);
+            self.allocator.destroy(node);
         }
 
         node.* = .{
@@ -733,10 +758,20 @@ pub const Parser = struct {
         }
 
         const first_type = try self.parseTypeExpression();
+        errdefer {
+            first_type.deinit(self.allocator);
+            self.allocator.destroy(first_type);
+        }
+
         try param_types.append(first_type);
 
         while (try self.match(lexer.TokenKind{ .symbol = .ArrowRight })) {
             const param_type = try self.parseTypeExpression();
+            errdefer {
+                param_type.deinit(self.allocator);
+                self.allocator.destroy(param_type);
+            }
+
             try param_types.append(param_type);
         }
 
@@ -766,6 +801,8 @@ pub const Parser = struct {
             const type_name = try self.expect(lexer.TokenKind{ .identifier = .Upper });
 
             const node = try self.allocator.create(ast.Node);
+            errdefer self.allocator.destroy(node);
+
             node.* = .{
                 .upper_identifier = .{
                     .name = type_name.lexeme,
@@ -781,6 +818,8 @@ pub const Parser = struct {
             const type_var = try self.expect(lexer.TokenKind{ .identifier = .Lower });
 
             const node = try self.allocator.create(ast.Node);
+            errdefer self.allocator.destroy(node);
+
             node.* = .{
                 .lower_identifier = .{
                     .name = type_var.lexeme,
@@ -794,12 +833,54 @@ pub const Parser = struct {
         // Handle parenthesized type expressions
         if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
             const inner_type = try self.parseTypeExpression();
+            errdefer {
+                inner_type.deinit(self.allocator);
+                self.allocator.destroy(inner_type);
+            }
             _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
 
             return inner_type;
         }
 
         return error.UnexpectedToken;
+    }
+
+    /// Parses a foreign function declaration that links to external code.
+    /// The declaration specifies an internal function name and type signature
+    /// along with the external symbol name to link against.
+    ///
+    /// Format:
+    /// foreign <name> : <type> = "<external_name>"
+    ///
+    /// Examples:
+    /// - `foreign sqrt : Float -> Float = "c_sqrt"`
+    /// - `foreign print : String -> Unit = "c_print"`
+    fn parseForeignFunctionDecl(self: *Parser) ParserError!*ast.Node {
+        const start_token = self.current_token;
+
+        _ = try self.expect(lexer.TokenKind{ .keyword = .Foreign });
+        const name = try self.parseLowerIdentifier();
+
+        _ = try self.expect(lexer.TokenKind{ .delimiter = .Colon });
+        const type_annotation = try self.parseFunctionType();
+        errdefer type_annotation.deinit(self.allocator);
+
+        _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
+        const external_name = try self.parseStrLiteral();
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer self.allocator.destroy(node);
+
+        node.* = .{
+            .foreign_function_decl = .{
+                .name = name.name,
+                .type_annotation = type_annotation,
+                .external_name = external_name.value,
+                .token = start_token,
+            },
+        };
+
+        return node;
     }
 
     /// Parses a conditional expression with a required 'then' and 'else' branch.
@@ -844,6 +925,34 @@ pub const Parser = struct {
         return node;
     }
 
+    /// Parses a single top-level declaration based on the current token.
+    fn parseTopLevel(self: *Parser) ParserError!*ast.Node {
+        switch (self.current_token.kind) {
+            .keyword => |kw| switch (kw) {
+                .Foreign => return self.parseForeignFunctionDecl(),
+                // .Include => return self.parseInclude(),
+                .Let => return self.parseFunctionDecl(),
+                // .Module => return self.parseModuleDecl(),
+                // .Open => return self.parseImportSpec(),
+                // .Type => {
+                //     try self.advance();
+
+                //     if (self.check(.KwAlias)) {
+                //         return self.parseTypeAlias();
+                //     } else {
+                //         return self.parseVariantType();
+                //     }
+                // },
+                else => return error.UnexpectedToken,
+            },
+            .comment => |c| switch (c) {
+                .Doc => return self.parseDocComment(),
+                .Regular => return self.parseComment(),
+            },
+            else => return error.UnexpectedToken,
+        }
+    }
+
     /// Parses a complete program, which consists of a sequence of top-level declarations.
     pub fn parseProgram(self: *Parser) ParserError!*ast.Node {
         var statements = std.ArrayList(*ast.Node).init(self.allocator);
@@ -872,29 +981,6 @@ pub const Parser = struct {
         };
 
         return node;
-    }
-
-    /// Parses a single top-level declaration based on the current token.
-    fn parseTopLevel(self: *Parser) ParserError!*ast.Node {
-        switch (self.current_token.kind) {
-            .KwLet => return self.parseFunctionDecl(),
-            // .KwForeign => return self.parseForeignFunctionDecl(),
-            // .KwType => {
-            //     try self.advance();
-
-            //     if (self.check(.KwAlias)) {
-            //         return self.parseTypeAlias();
-            //     } else {
-            //         return self.parseVariantType();
-            //     }
-            // },
-            // .KwModule => return self.parseModuleDecl(),
-            // .KwOpen => return self.parseImportSpec(),
-            // .KwInclude => return self.parseInclude(),
-            .Comment => return self.parseComment(),
-            .DocComment => return self.parseDocComment(),
-            else => return error.UnexpectedToken,
-        }
     }
 };
 
@@ -1726,4 +1812,40 @@ test "[function_decl] (w/ type annotation)" {
     try testing.expect(body.right.* == .int_literal);
     try testing.expectEqualStrings("x", body.left.lower_identifier.name);
     try testing.expectEqual(@as(i64, 1), body.right.int_literal.value);
+}
+
+test "[foreign_function_decl]" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    // foreign sqrt : Float -> Float = "c_sqrt"
+
+    const source = "foreign sqrt : Float -> Float = \"c_sqrt\"";
+    var l = lexer.Lexer.init(source, TEST_FILE);
+    var parser = try Parser.init(allocator, &l);
+    defer parser.deinit();
+
+    const node = try parser.parseForeignFunctionDecl();
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    try testing.expect(node.* == .foreign_function_decl);
+
+    const decl = node.foreign_function_decl;
+
+    try testing.expectEqualStrings("sqrt", decl.name);
+    try testing.expectEqualStrings("c_sqrt", decl.external_name);
+
+    try testing.expect(decl.type_annotation.* == .function_type);
+    const type_annotation = decl.type_annotation.function_type;
+    try testing.expectEqual(@as(usize, 2), type_annotation.param_types.items.len);
+
+    // Check both param types are Float
+    try testing.expect(type_annotation.param_types.items[0].* == .upper_identifier);
+    try testing.expect(type_annotation.param_types.items[1].* == .upper_identifier);
+    try testing.expectEqualStrings("Float", type_annotation.param_types.items[0].upper_identifier.name);
+    try testing.expectEqualStrings("Float", type_annotation.param_types.items[1].upper_identifier.name);
 }
