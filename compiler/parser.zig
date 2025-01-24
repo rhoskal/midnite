@@ -517,6 +517,10 @@ pub const Parser = struct {
     /// correctly structured expression trees.
     fn parseBinaryExpr(self: *Parser, min_precedence: u8) ParserError!*ast.Node {
         var left = try self.parseSimpleExpr();
+        errdefer {
+            left.deinit(self.allocator);
+            self.allocator.destroy(left);
+        }
 
         while (true) {
             const op_info = if (Parser.getOperatorInfo(self.current_token.kind)) |info| info else break;
@@ -534,8 +538,18 @@ pub const Parser = struct {
             };
 
             const right = try self.parseBinaryExpr(next_min);
+            errdefer {
+                right.deinit(self.allocator);
+                self.allocator.destroy(right);
+            }
 
             const node = try self.allocator.create(ast.Node);
+            errdefer {
+                right.deinit(self.allocator);
+                self.allocator.destroy(right);
+                self.allocator.destroy(node);
+            }
+
             node.* = switch (operator.kind) {
                 .operator => |op| switch (op) {
                     .Exp,
@@ -637,6 +651,10 @@ pub const Parser = struct {
             try self.advance();
 
             type_annotation = try self.parseFunctionType();
+            errdefer {
+                type_annotation.deinit(self.allocator);
+                self.allocator.destroy(type_annotation);
+            }
         }
 
         _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
@@ -651,6 +669,8 @@ pub const Parser = struct {
                 ta.deinit(self.allocator);
                 self.allocator.destroy(ta);
             }
+
+            self.allocator.destroy(node);
         }
 
         node.* = .{
@@ -692,11 +712,18 @@ pub const Parser = struct {
 
         _ = try self.expect(lexer.TokenKind{ .symbol = .DoubleArrowRight });
         const body = try self.parseExpression();
+        errdefer {
+            params.deinit();
+            body.deinit(self.allocator);
+            self.allocator.destroy(body);
+        }
 
         const node = try self.allocator.create(ast.Node);
         errdefer {
+            params.deinit();
             body.deinit(self.allocator);
             self.allocator.destroy(body);
+            self.allocator.destroy(node);
         }
 
         node.* = .{
@@ -731,10 +758,20 @@ pub const Parser = struct {
         }
 
         const first_type = try self.parseTypeExpression();
+        errdefer {
+            first_type.deinit(self.allocator);
+            self.allocator.destroy(first_type);
+        }
+
         try param_types.append(first_type);
 
         while (try self.match(lexer.TokenKind{ .symbol = .ArrowRight })) {
             const param_type = try self.parseTypeExpression();
+            errdefer {
+                param_type.deinit(self.allocator);
+                self.allocator.destroy(param_type);
+            }
+
             try param_types.append(param_type);
         }
 
@@ -764,6 +801,8 @@ pub const Parser = struct {
             const type_name = try self.expect(lexer.TokenKind{ .identifier = .Upper });
 
             const node = try self.allocator.create(ast.Node);
+            errdefer self.allocator.destroy(node);
+
             node.* = .{
                 .upper_identifier = .{
                     .name = type_name.lexeme,
@@ -779,6 +818,8 @@ pub const Parser = struct {
             const type_var = try self.expect(lexer.TokenKind{ .identifier = .Lower });
 
             const node = try self.allocator.create(ast.Node);
+            errdefer self.allocator.destroy(node);
+
             node.* = .{
                 .lower_identifier = .{
                     .name = type_var.lexeme,
@@ -792,6 +833,10 @@ pub const Parser = struct {
         // Handle parenthesized type expressions
         if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
             const inner_type = try self.parseTypeExpression();
+            errdefer {
+                inner_type.deinit(self.allocator);
+                self.allocator.destroy(inner_type);
+            }
             _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
 
             return inner_type;
