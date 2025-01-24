@@ -2445,3 +2445,86 @@ test "[VariantTypeNode]" {
     try testing.expectEqual(@as(usize, 1), ok_constructor.params.items.len);
     try testing.expectEqualStrings("a", ok_constructor.params.items[0].lower_identifier.name);
 }
+
+test "[ModulePathNode]" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var segments = std.ArrayList([]const u8).init(allocator);
+    try segments.append(try allocator.dupe(u8, "Std"));
+    try segments.append(try allocator.dupe(u8, "List"));
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
+        .module_path = .{
+            .segments = segments,
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "Std",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 3 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const path = node.module_path;
+    try testing.expectEqual(@as(usize, 2), path.segments.items.len);
+    try testing.expectEqualStrings("Std", path.segments.items[0]);
+    try testing.expectEqualStrings("List", path.segments.items[1]);
+}
+
+test "[IncludeNode]" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var segments = std.ArrayList([]const u8).init(allocator);
+    try segments.append(try allocator.dupe(u8, "Std"));
+    try segments.append(try allocator.dupe(u8, "List"));
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
+        .include = .{
+            .path = .{
+                .segments = segments,
+                .token = .{
+                    .kind = .{ .identifier = .Upper },
+                    .lexeme = "Std",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 8, .end = 12 },
+                        .src = .{ .line = 1, .col = 9 },
+                    },
+                },
+            },
+            .token = .{
+                .kind = .{ .keyword = .Include },
+                .lexeme = "include",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 7 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const include = node.include;
+    try testing.expectEqual(@as(usize, 2), include.path.segments.items.len);
+    try testing.expectEqualStrings("Std", include.path.segments.items[0]);
+    try testing.expectEqualStrings("List", include.path.segments.items[1]);
+}
