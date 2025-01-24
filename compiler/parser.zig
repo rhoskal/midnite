@@ -845,6 +845,44 @@ pub const Parser = struct {
         return error.UnexpectedToken;
     }
 
+    /// Parses a foreign function declaration that links to external code.
+    /// The declaration specifies an internal function name and type signature
+    /// along with the external symbol name to link against.
+    ///
+    /// Format:
+    /// foreign <name> : <type> = "<external_name>"
+    ///
+    /// Examples:
+    /// - `foreign sqrt : Float -> Float = "c_sqrt"`
+    /// - `foreign print : String -> Unit = "c_print"`
+    fn parseForeignFunctionDecl(self: *Parser) ParserError!*ast.Node {
+        const start_token = self.current_token;
+
+        _ = try self.expect(lexer.TokenKind{ .keyword = .Foreign });
+        const name = try self.parseLowerIdentifier();
+
+        _ = try self.expect(lexer.TokenKind{ .delimiter = .Colon });
+        const type_annotation = try self.parseFunctionType();
+        errdefer type_annotation.deinit(self.allocator);
+
+        _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
+        const external_name = try self.parseStrLiteral();
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer self.allocator.destroy(node);
+
+        node.* = .{
+            .foreign_function_decl = .{
+                .name = name.name,
+                .type_annotation = type_annotation,
+                .external_name = external_name.value,
+                .token = start_token,
+            },
+        };
+
+        return node;
+    }
+
     /// Parses a conditional expression with a required 'then' and 'else' branch.
     /// The condition must evaluate to a boolean value. If true, the 'then' branch
     /// is evaluated; otherwise, the 'else' branch is evaluated.
