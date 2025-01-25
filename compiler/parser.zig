@@ -1038,6 +1038,7 @@ const testing = std.testing;
 const TEST_FILE = "test.mox";
 
 test "[comment]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1047,20 +1048,27 @@ test "[comment]" {
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
 
+    // Action
     const node = try parser.parseComment();
     defer {
         node.deinit(allocator);
         allocator.destroy(node);
     }
 
+    // Assertions
+    // Check that the node type is correctly identified as a comment
     try testing.expect(node.* == .comment);
 
+    // Validate the comment token and its properties
     const comment = node.comment;
     try testing.expectEqual(lexer.TokenKind{ .comment = .Regular }, comment.token.kind);
+
+    // Ensure the content of the comment matches the source
     try testing.expectEqualStrings(source, comment.content);
 }
 
 test "[doc_comment]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1070,16 +1078,22 @@ test "[doc_comment]" {
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
 
+    // Action
     const node = try parser.parseDocComment();
     defer {
         node.deinit(allocator);
         allocator.destroy(node);
     }
 
+    // Assertions
+    // Check that the node type is correctly identified as a doc comment
     try testing.expect(node.* == .doc_comment);
 
+    // Validate the comment token and its properties
     const comment = node.doc_comment;
     try testing.expectEqual(lexer.TokenKind{ .comment = .Doc }, comment.token.kind);
+
+    // Ensure the content of the comment matches the source
     try testing.expectEqualStrings(source, comment.content);
 }
 
@@ -1105,6 +1119,7 @@ test "[int_literal]" {
         .{ .source = "0b1010_1010", .expected = 170 },
     };
 
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1114,10 +1129,17 @@ test "[int_literal]" {
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
 
+        // Action
         const lit = try parser.parseIntLiteral();
 
+        // Assertions
+        // Validate the literal token and its properties
         try testing.expectEqual(lexer.TokenKind{ .literal = .Int }, lit.token.kind);
+
+        // Ensure the lexeme matches the source string
         try testing.expectEqualStrings(case.source, lit.token.lexeme);
+
+        // Verify that the parsed integer value matches the expected value
         try testing.expectEqual(case.expected, lit.value);
     }
 }
@@ -1136,6 +1158,7 @@ test "[float_literal]" {
         .{ .source = "1_234.567_89", .expected = 1234.56789 },
     };
 
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1145,10 +1168,17 @@ test "[float_literal]" {
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
 
+        // Action
         const lit = try parser.parseFloatLiteral();
 
+        // Assertions
+        // Validate the literal token and its properties
         try testing.expectEqual(lexer.TokenKind{ .literal = .Float }, lit.token.kind);
+
+        // Ensure the lexeme matches the source string
         try testing.expectEqualStrings(case.source, lit.token.lexeme);
+
+        // Verify that the parsed float value matches the expected value
         try testing.expectEqual(case.expected, lit.value);
     }
 }
@@ -1205,6 +1235,7 @@ test "[str_literal]" {
         .{ .source = "\"Escaped\\tand\\u{1F496}direct💖mixed\"", .expected = "Escaped\tand💖direct💖mixed" },
     };
 
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1214,11 +1245,18 @@ test "[str_literal]" {
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
 
+        // Action
         const lit = try parser.parseStrLiteral();
         defer allocator.free(lit.value);
 
+        // Assertions
+        // Validate the literal token and its properties
         try testing.expectEqual(lexer.TokenKind{ .literal = .String }, lit.token.kind);
+
+        // Ensure the lexeme matches the source string
         try testing.expectEqualStrings(case.source, lit.token.lexeme);
+
+        // Verify that the parsed string value matches the expected value
         try testing.expectEqualStrings(case.expected, lit.value);
     }
 }
@@ -1249,6 +1287,7 @@ test "[char_literal]" {
         .{ .source = "'😀'", .expected = 0x1F600 },
     };
 
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1258,10 +1297,17 @@ test "[char_literal]" {
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
 
+        // Action
         const lit = try parser.parseCharLiteral();
 
+        // Assertions
+        // Validate the literal token and its properties
         try testing.expectEqual(lexer.TokenKind{ .literal = .Char }, lit.token.kind);
+
+        // Ensure the lexeme matches the source string
         try testing.expectEqualStrings(case.source, lit.token.lexeme);
+
+        // Verify that the parsed char value matches the expected value
         try testing.expectEqual(case.expected, lit.value);
     }
 }
@@ -1279,6 +1325,7 @@ test "[lower_identifier]" {
         .{ .source = "foo_bar", .expected = "foo_bar" },
     };
 
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1288,10 +1335,17 @@ test "[lower_identifier]" {
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
 
+        // Action
         const ident = try parser.parseLowerIdentifier();
 
+        // Assertions
+        // Verify that the token is recognized as a lower identifier
         try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, ident.token.kind);
+
+        // Ensure the lexeme matches the source string
         try testing.expectEqualStrings(case.source, ident.token.lexeme);
+
+        // Verify the parsed identifier name matches the expected name
         try testing.expectEqualStrings(case.expected, ident.name);
     }
 }
@@ -1310,6 +1364,7 @@ test "[upper_identifier]" {
         .{ .source = "Foo_Bar", .expected = "Foo_Bar" },
     };
 
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1319,15 +1374,23 @@ test "[upper_identifier]" {
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
 
+        // Action
         const ident = try parser.parseUpperIdentifier();
 
+        // Assertions
+        // Verify that the token is recognized as an upper identifier
         try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, ident.token.kind);
+
+        // Ensure the lexeme matches the source string
         try testing.expectEqualStrings(case.source, ident.token.lexeme);
+
+        // Verify the parsed identifier name matches the expected name
         try testing.expectEqualStrings(case.expected, ident.name);
     }
 }
 
 test "[unary_expr]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1337,22 +1400,32 @@ test "[unary_expr]" {
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
 
+    // Action
     const expr = try parser.parseSimpleExpr();
     defer {
         expr.deinit(allocator);
         allocator.destroy(expr);
     }
 
+    // Assertions
+    // Ensure the expression is identified as a unary expression
     try testing.expect(expr.* == .unary_expr);
+
+    // Validate the operator in the unary expression
     try testing.expectEqual(lexer.TokenKind{ .operator = .IntSub }, expr.unary_expr.operator.kind);
     try testing.expectEqualStrings("-", expr.unary_expr.operator.lexeme);
 
     const operand = expr.unary_expr.operand;
+
+    // Ensure the operand is an integer literal
     try testing.expect(operand.* == .int_literal);
+
+    // Verify the integer value of the operand is correct
     try testing.expect(operand.int_literal.value == 42);
 }
 
 test "[arithmetic_expr]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1362,25 +1435,39 @@ test "[arithmetic_expr]" {
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
 
+    // Action
     const expr = try parser.parseExpression();
     defer {
         expr.deinit(allocator);
         allocator.destroy(expr);
     }
 
+    // Assertions
+    // Ensure the expression is identified as an arithmetic expression
     try testing.expect(expr.* == .arithmetic_expr);
+
+    // Validate the operator in the arithmetic expression
     try testing.expectEqual(lexer.TokenKind{ .operator = .IntAdd }, expr.arithmetic_expr.operator.kind);
 
     const left = expr.arithmetic_expr.left;
+
+    // Ensure the left operand is an integer literal
     try testing.expect(left.* == .int_literal);
+
+    // Verify the integer value of the left operand is correct
     try testing.expect(left.int_literal.value == 42);
 
     const right = expr.arithmetic_expr.right;
+
+    // Ensure the right operand is an integer literal
     try testing.expect(right.* == .int_literal);
+
+    // Verify the integer value of the right operand is correct
     try testing.expect(right.int_literal.value == 24);
 }
 
 test "[comparison_expr]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1436,26 +1523,40 @@ test "[comparison_expr]" {
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
 
+        // Action
         const expr = try parser.parseExpression();
         defer {
             expr.deinit(allocator);
             allocator.destroy(expr);
         }
 
+        // Assertions
+        // Ensure the expression is identified as a comparison expression
         try testing.expect(expr.* == .comparison_expr);
+
+        // Validate that the operator in the comparison expression matches the expected operator
         try testing.expectEqual(case.op, expr.comparison_expr.operator.kind);
 
         const left = expr.comparison_expr.left;
+
+        // Ensure the left operand is an integer literal
         try testing.expect(left.* == .int_literal);
+
+        // Verify the value of the left operand matches the expected value
         try testing.expectEqual(case.left_val, left.int_literal.value);
 
         const right = expr.comparison_expr.right;
+
+        // Ensure the right operand is an integer literal
         try testing.expect(right.* == .int_literal);
+
+        // Verify the value of the right operand matches the expected value
         try testing.expectEqual(case.right_val, right.int_literal.value);
     }
 }
 
 test "[logical_expr]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1481,26 +1582,40 @@ test "[logical_expr]" {
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
 
+        // Action
         const expr = try parser.parseExpression();
         defer {
             expr.deinit(allocator);
             allocator.destroy(expr);
         }
 
+        // Assertions
+        // Ensure the expression is identified as a logical expression
         try testing.expect(expr.* == .logical_expr);
+
+        // Validate that the operator in the logical expression matches the expected operator
         try testing.expectEqual(case.op, expr.logical_expr.operator.kind);
 
         const left = expr.logical_expr.left;
+
+        // Ensure the left operand is a lower identifier
         try testing.expect(left.* == .lower_identifier);
+
+        // Verify the name of the left operand matches the expected value
         try testing.expectEqualStrings("true", left.lower_identifier.name);
 
         const right = expr.logical_expr.right;
+
+        // Ensure the right operand is a lower identifier
         try testing.expect(right.* == .lower_identifier);
+
+        // Verify the name of the right operand matches the expected value
         try testing.expectEqualStrings("false", right.lower_identifier.name);
     }
 }
 
 test "[operator precedence]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1596,22 +1711,28 @@ test "[operator precedence]" {
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
 
+        // Action
         const expr = try parser.parseExpression();
         defer {
             expr.deinit(allocator);
             allocator.destroy(expr);
         }
 
+        // Assertions
+        // Ensure the root type of the expression matches the expected type from the test case
         try testing.expectEqual(case.root_type, std.meta.activeTag(expr.*));
 
         switch (expr.*) {
             .arithmetic_expr => |aexpr| {
+                // Validate the operator in an arithmetic expression
                 try testing.expectEqual(case.root_op, aexpr.operator.kind);
             },
             .logical_expr => |lexpr| {
+                // Validate the operator in a logical expression
                 try testing.expectEqual(case.root_op, lexpr.operator.kind);
             },
             .comparison_expr => |cexpr| {
+                // Validate the operator in a comparison expression
                 try testing.expectEqual(case.root_op, cexpr.operator.kind);
             },
             else => unreachable,
@@ -1620,6 +1741,7 @@ test "[operator precedence]" {
 }
 
 test "[operator precedence] (structural)" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1629,29 +1751,41 @@ test "[operator precedence] (structural)" {
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
 
+        // Action
         const expr = try parser.parseExpression();
         defer {
             expr.deinit(allocator);
             allocator.destroy(expr);
         }
 
-        // Should be structured as: (1 + (2 * 3))
+        // Assertions
+        // The expression should be structured as: (1 + (2 * 3))
+
+        // Validate the root expression is an arithmetic expression with addition as the operator
         try testing.expect(expr.* == .arithmetic_expr);
         try testing.expectEqual(lexer.TokenKind{ .operator = .IntAdd }, expr.arithmetic_expr.operator.kind);
 
         const left = expr.arithmetic_expr.left;
+
+        // Ensure the left operand is an integer literal with value 1
         try testing.expect(left.* == .int_literal);
         try testing.expectEqual(@as(i64, 1), left.int_literal.value);
 
         const right = expr.arithmetic_expr.right;
+
+        // Ensure the right operand is an arithmetic expression with multiplication as the operator
         try testing.expect(right.* == .arithmetic_expr);
         try testing.expectEqual(lexer.TokenKind{ .operator = .IntMul }, right.arithmetic_expr.operator.kind);
 
         const mul_left = right.arithmetic_expr.left;
+
+        // Ensure the left operand of the multiplication is an integer literal with value 2
         try testing.expect(mul_left.* == .int_literal);
         try testing.expectEqual(@as(i64, 2), mul_left.int_literal.value);
 
         const mul_right = right.arithmetic_expr.right;
+
+        // Ensure the right operand of the multiplication is an integer literal with value 3
         try testing.expect(mul_right.* == .int_literal);
         try testing.expectEqual(@as(i64, 3), mul_right.int_literal.value);
     }
@@ -1661,43 +1795,60 @@ test "[operator precedence] (structural)" {
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
 
+        // Action
         const expr = try parser.parseExpression();
         defer {
             expr.deinit(allocator);
             allocator.destroy(expr);
         }
 
-        // Should be structured as: ((1 * 2 + 3) == 4)
+        // Assertions
+        // The expression should be structured as: ((1 * 2 + 3) == 4)
+
+        // Validate the root expression is a comparison expression with equality as the operator
         try testing.expect(expr.* == .comparison_expr);
         try testing.expectEqual(lexer.TokenKind{ .operator = .Equality }, expr.comparison_expr.operator.kind);
 
         const right = expr.comparison_expr.right;
+
+        // Ensure the right operand is an integer literal with value 4
         try testing.expect(right.* == .int_literal);
         try testing.expectEqual(@as(i64, 4), right.int_literal.value);
 
         const left = expr.comparison_expr.left;
+
+        // Ensure the left operand is an arithmetic expression with addition as the operator
         try testing.expect(left.* == .arithmetic_expr);
         try testing.expectEqual(lexer.TokenKind{ .operator = .IntAdd }, left.arithmetic_expr.operator.kind);
 
         const add_right = left.arithmetic_expr.right;
+
+        // Ensure the right operand of the addition is an integer literal with value 3
         try testing.expect(add_right.* == .int_literal);
         try testing.expectEqual(@as(i64, 3), add_right.int_literal.value);
 
         const add_left = left.arithmetic_expr.left;
+
+        // Ensure the left operand of the addition is an arithmetic expression with multiplication as the operator
         try testing.expect(add_left.* == .arithmetic_expr);
         try testing.expectEqual(lexer.TokenKind{ .operator = .IntMul }, add_left.arithmetic_expr.operator.kind);
 
         const mul_left = add_left.arithmetic_expr.left;
+
+        // Ensure the left operand of the multiplication is an integer literal with value 1
         try testing.expect(mul_left.* == .int_literal);
         try testing.expectEqual(@as(i64, 1), mul_left.int_literal.value);
 
         const mul_right = add_left.arithmetic_expr.right;
+
+        // Ensure the right operand of the multiplication is an integer literal with value 2
         try testing.expect(mul_right.* == .int_literal);
         try testing.expectEqual(@as(i64, 2), mul_right.int_literal.value);
     }
 }
 
 test "[lambda_expr]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1707,19 +1858,29 @@ test "[lambda_expr]" {
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
 
+    // Action
     const expr = try parser.parseExpression();
     defer {
         expr.deinit(allocator);
         allocator.destroy(expr);
     }
 
+    // Assertions
+    // Ensure the expression is identified as a lambda expression
     try testing.expect(expr.* == .lambda_expr);
+
+    // Validate that the lambda expression has exactly one parameter
     try testing.expectEqual(@as(usize, 1), expr.lambda_expr.params.items.len);
+
+    // Ensure the parameter name matches the expected value ("x")
     try testing.expectEqualStrings("x", expr.lambda_expr.params.items[0]);
+
+    // Validate that the body of the lambda expression is an arithmetic expression
     try testing.expect(expr.lambda_expr.body.* == .arithmetic_expr);
 }
 
 test "[if_then_else_stmt]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1729,40 +1890,54 @@ test "[if_then_else_stmt]" {
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
 
+    // Action
     const node = try parser.parseIfThenElse();
     defer {
         node.deinit(allocator);
         allocator.destroy(node);
     }
 
+    // Assertions
+    // Ensure the node is identified as an if-then-else statement
     try testing.expect(node.* == .if_then_else_stmt);
+
     const stmt = node.if_then_else_stmt;
 
+    // Validate the condition of the if-then-else statement
     try testing.expect(stmt.condition.* == .comparison_expr);
+
     const condition = stmt.condition.comparison_expr;
+
+    // Ensure the condition's operator is a "greater than" comparison
     try testing.expectEqual(lexer.TokenKind{ .operator = .GreaterThan }, condition.operator.kind);
 
-    // Check left side of condition (x)
+    // Check the left-hand side of the condition (should be the identifier "x")
     try testing.expect(condition.left.* == .lower_identifier);
     try testing.expectEqualStrings("x", condition.left.lower_identifier.name);
 
-    // Check right side of condition (0)
+    // Check the right-hand side of the condition (should be the integer literal 0)
     try testing.expect(condition.right.* == .int_literal);
     try testing.expectEqual(@as(i64, 0), condition.right.int_literal.value);
 
-    // Verify then branch (1)
+    // Validate the "then" branch (should evaluate to integer literal 1)
     try testing.expect(stmt.then_branch.* == .int_literal);
     try testing.expectEqual(@as(i64, 1), stmt.then_branch.int_literal.value);
 
-    // Verify else branch (-1)
+    // Validate the "else" branch (should evaluate to the unary expression -1)
     try testing.expect(stmt.else_branch.* == .unary_expr);
+
     const else_expr = stmt.else_branch.unary_expr;
+
+    // Ensure the unary operator in the else branch is subtraction
     try testing.expectEqual(lexer.TokenKind{ .operator = .IntSub }, else_expr.operator.kind);
+
+    // Ensure the operand of the unary expression is an integer literal 1
     try testing.expect(else_expr.operand.* == .int_literal);
     try testing.expectEqual(@as(i64, 1), else_expr.operand.int_literal.value);
 }
 
 test "[function_decl] (simple)" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1773,42 +1948,56 @@ test "[function_decl] (simple)" {
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
 
+    // Action
     const node = try parser.parseFunctionDecl();
     defer {
         node.deinit(allocator);
         allocator.destroy(node);
     }
 
+    // Assertions
     // Verify the node is a function declaration
     try testing.expect(node.* == .function_decl);
+
     const decl = node.function_decl;
 
-    // Check function name
+    // Check that the function name matches
     try testing.expectEqualStrings("add", decl.name);
 
-    // Verify type annotation is null for simple declaration
+    // Verify that the type annotation is null for this simple function declaration
     try testing.expect(decl.type_annotation == null);
 
-    // Verify function value is a lambda expression
+    // Verify that the function's value is a lambda expression
     try testing.expect(decl.value.* == .lambda_expr);
+
     const lambda = decl.value.lambda_expr;
 
-    // Check lambda parameters
+    // Check that the lambda has exactly two parameters
     try testing.expectEqual(@as(usize, 2), lambda.params.items.len);
+
+    // Verify the parameter names are "x" and "y"
     try testing.expectEqualStrings("x", lambda.params.items[0]);
     try testing.expectEqualStrings("y", lambda.params.items[1]);
 
-    // Verify lambda body is an arithmetic expression
+    // Verify that the lambda body is an arithmetic expression
     try testing.expect(lambda.body.* == .arithmetic_expr);
+
     const body = lambda.body.arithmetic_expr;
+
+    // Ensure the operator in the arithmetic expression is addition
     try testing.expectEqual(lexer.TokenKind{ .operator = .IntAdd }, body.operator.kind);
+
+    // Verify the left operand of the addition is a lower identifier with the name "x"
     try testing.expect(body.left.* == .lower_identifier);
-    try testing.expect(body.right.* == .lower_identifier);
     try testing.expectEqualStrings("x", body.left.lower_identifier.name);
+
+    // Verify the right operand of the addition is a lower identifier with the name "y"
+    try testing.expect(body.right.* == .lower_identifier);
     try testing.expectEqualStrings("y", body.right.lower_identifier.name);
 }
 
 test "[function_decl] (w/ type annotation)" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1819,17 +2008,20 @@ test "[function_decl] (w/ type annotation)" {
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
 
+    // Action
     const node = try parser.parseFunctionDecl();
     defer {
         node.deinit(allocator);
         allocator.destroy(node);
     }
 
+    // Assertions
     // Verify the node is a function declaration
     try testing.expect(node.* == .function_decl);
+
     const decl = node.function_decl;
 
-    // Check function name
+    // Check that the function name matches
     try testing.expectEqualStrings("inc", decl.name);
 
     // Verify type annotation exists and is correct
@@ -1837,33 +2029,46 @@ test "[function_decl] (w/ type annotation)" {
     try testing.expect(decl.type_annotation.?.* == .function_type);
 
     const type_annotation = decl.type_annotation.?.function_type;
+
+    // Verify that the function type has exactly two parameter types
     try testing.expectEqual(@as(usize, 2), type_annotation.param_types.items.len);
 
-    // Check param types are both Int
+    // Check that both parameter types are upper identifiers with the name "Int"
     try testing.expect(type_annotation.param_types.items[0].* == .upper_identifier);
     try testing.expect(type_annotation.param_types.items[1].* == .upper_identifier);
     try testing.expectEqualStrings("Int", type_annotation.param_types.items[0].upper_identifier.name);
     try testing.expectEqualStrings("Int", type_annotation.param_types.items[1].upper_identifier.name);
 
-    // Verify function value is a lambda expression
+    // Verify that the function's value is a lambda expression
     try testing.expect(decl.value.* == .lambda_expr);
+
     const lambda = decl.value.lambda_expr;
 
-    // Check lambda parameters
+    // Check that the lambda has exactly one parameter
     try testing.expectEqual(@as(usize, 1), lambda.params.items.len);
+
+    // Verify the parameter name matches
     try testing.expectEqualStrings("x", lambda.params.items[0]);
 
-    // Verify lambda body is an arithmetic expression
+    // Verify that the body of the lambda is an arithmetic expression
     try testing.expect(lambda.body.* == .arithmetic_expr);
+
     const body = lambda.body.arithmetic_expr;
+
+    // Ensure the operator in the arithmetic expression is addition
     try testing.expectEqual(lexer.TokenKind{ .operator = .IntAdd }, body.operator.kind);
+
+    // Check that the left operand of the addition is a lower identifier with the name "x"
     try testing.expect(body.left.* == .lower_identifier);
-    try testing.expect(body.right.* == .int_literal);
     try testing.expectEqualStrings("x", body.left.lower_identifier.name);
+
+    // Check that the right operand of the addition is an integer literal with the value 1
+    try testing.expect(body.right.* == .int_literal);
     try testing.expectEqual(@as(i64, 1), body.right.int_literal.value);
 }
 
 test "[foreign_function_decl]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1875,24 +2080,34 @@ test "[foreign_function_decl]" {
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
 
+    // Action
     const node = try parser.parseForeignFunctionDecl();
     defer {
         node.deinit(allocator);
         allocator.destroy(node);
     }
 
+    // Assertions
+    // Verify the node is a foreign function declaration
     try testing.expect(node.* == .foreign_function_decl);
 
     const decl = node.foreign_function_decl;
 
+    // Verify the function name matches
     try testing.expectEqualStrings("sqrt", decl.name);
+
+    // Verify the external name matches
     try testing.expectEqualStrings("c_sqrt", decl.external_name);
 
+    // Ensure the type annotation exists and is a function type
     try testing.expect(decl.type_annotation.* == .function_type);
+
     const type_annotation = decl.type_annotation.function_type;
+
+    // Verify that the function type has exactly two parameter types
     try testing.expectEqual(@as(usize, 2), type_annotation.param_types.items.len);
 
-    // Check both param types are Float
+    // Check that both parameter types are upper identifiers with the name "Float"
     try testing.expect(type_annotation.param_types.items[0].* == .upper_identifier);
     try testing.expect(type_annotation.param_types.items[1].* == .upper_identifier);
     try testing.expectEqualStrings("Float", type_annotation.param_types.items[0].upper_identifier.name);
@@ -1900,6 +2115,7 @@ test "[foreign_function_decl]" {
 }
 
 test "[include]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1909,16 +2125,23 @@ test "[include]" {
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
 
+    // Action
     const node = try parser.parseInclude();
     defer {
         node.deinit(allocator);
         allocator.destroy(node);
     }
 
+    // Assertions
+    // Verify the node is an include statement
     try testing.expect(node.* == .include);
 
     const include = node.include;
+
+    // Check the include path has exactly two segments
     try testing.expectEqual(@as(usize, 2), include.path.segments.items.len);
+
+    // Verify the segments
     try testing.expectEqualStrings("Std", include.path.segments.items[0]);
     try testing.expectEqualStrings("List", include.path.segments.items[1]);
 }
