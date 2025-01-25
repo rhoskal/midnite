@@ -182,6 +182,10 @@ const TypeChecker = struct {
                     else => unreachable,
                 }
             },
+            .comparison_expr => error.Unimplemented, // 2
+            .composition_expr => error.Unimplemented,
+            .cons_expr => error.Unimplemented,
+            .lambda_expr => error.Unimplemented, // 5
             .list_concat_expr => |expr| {
                 const left_type = try self.checkNode(expr.left);
                 const right_type = try self.checkNode(expr.right);
@@ -221,6 +225,22 @@ const TypeChecker = struct {
 
                 return Type{ .List = result_type };
             },
+            .logical_expr => |expr| {
+                const left_type = try self.checkNode(expr.left);
+                const right_type = try self.checkNode(expr.right);
+
+                if (left_type != .Variant or right_type != .Variant) {
+                    return error.TypeMismatch;
+                }
+
+                if (!std.mem.eql(u8, left_type.Variant.name, right_type.Variant.name)) {
+                    return error.TypeMismatch;
+                }
+
+                return left_type;
+            },
+            .match_expr => error.Unimplemented,
+            .pipe_expr => error.Unimplemented,
             .str_concat_expr => |expr| {
                 const left_type = try self.checkNode(expr.left);
                 const right_type = try self.checkNode(expr.right);
@@ -247,12 +267,8 @@ const TypeChecker = struct {
                     else => unreachable,
                 }
             },
-            .logical_expr => |expr| {
-                const left_type = try self.checkNode(expr.left);
-                const right_type = try self.checkNode(expr.right);
-
-                if (left_type != .Variant or right_type != .Variant) {
-                    return error.TypeMismatch;
+            .if_then_else_stmt => error.Unimplemented, // 3
+            .function_type => error.Unimplemented, // 4
                 }
 
                 if (!std.mem.eql(u8, left_type.Variant.name, right_type.Variant.name)) {
@@ -270,6 +286,7 @@ const TypeChecker = struct {
                 return (self.environment.types.get(ident.name)) orelse
                     error.UndefinedConstructor;
             },
+            .program => error.Unimplemented,
             else => error.Unimplemented,
         };
     }

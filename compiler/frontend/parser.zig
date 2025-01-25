@@ -884,11 +884,9 @@ pub const Parser = struct {
     }
 
     /// Parses an include declaration which imports and re-exports all contents from a module.
-    /// The module path consists of one or more uppercase identifiers separated by dots.
     ///
     /// Syntax:
     /// include ModulePath
-    /// ModulePath = UpperIdent ("." UpperIdent)*
     ///
     /// Examples:
     /// - `include MyModule`
@@ -897,6 +895,38 @@ pub const Parser = struct {
     fn parseInclude(self: *Parser) ParserError!*ast.Node {
         const token = try self.expect(lexer.TokenKind{ .keyword = .Include });
 
+        const path_node = try self.parseModulePath();
+        errdefer {
+            path_node.deinit(self.allocator);
+            self.allocator.destroy(path_node);
+        }
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer self.allocator.destroy(node);
+
+        node.* = .{
+            .include = .{
+                .path = path_node.module_path,
+                .token = token,
+            },
+        };
+
+        self.allocator.destroy(path_node);
+
+        return node;
+    }
+
+    /// Parses a module path consisting of one or more uppercase identifiers separated by dots.
+    /// Used by module declarations, includes, and imports.
+    ///
+    /// Syntax:
+    /// ModulePath = UpperIdent ("." UpperIdent)*
+    ///
+    /// Examples:
+    /// - `MyModule`
+    /// - `Std.List`
+    /// - `Parser.Internal.Utils`
+    fn parseModulePath(self: *Parser) ParserError!*ast.Node {
         var segments = std.ArrayList([]const u8).init(self.allocator);
         errdefer {
             for (segments.items) |seg| {
@@ -920,12 +950,9 @@ pub const Parser = struct {
         errdefer self.allocator.destroy(node);
 
         node.* = .{
-            .include = .{
-                .path = .{
-                    .segments = segments,
-                    .token = token,
-                },
-                .token = token,
+            .module_path = .{
+                .segments = segments,
+                .token = first_segment.token,
             },
         };
 
@@ -2112,6 +2139,38 @@ test "[foreign_function_decl]" {
     try testing.expect(type_annotation.param_types.items[1].* == .upper_identifier);
     try testing.expectEqualStrings("Float", type_annotation.param_types.items[0].upper_identifier.name);
     try testing.expectEqualStrings("Float", type_annotation.param_types.items[1].upper_identifier.name);
+}
+
+test "[module_path]" {
+    // Setup
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    const source = "Std.List";
+    var l = lexer.Lexer.init(source, TEST_FILE);
+    var parser = try Parser.init(allocator, &l);
+    defer parser.deinit();
+
+    // Action
+    const node = try parser.parseModulePath();
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    // Assertions
+    // Verify the node is a path to a module
+    try testing.expect(node.* == .module_path);
+
+    const module_path = node.module_path;
+
+    // Check the module path has exactly two segments
+    try testing.expectEqual(@as(usize, 2), module_path.segments.items.len);
+
+    // Verify the segments
+    try testing.expectEqualStrings("Std", module_path.segments.items[0]);
+    try testing.expectEqualStrings("List", module_path.segments.items[1]);
 }
 
 test "[include]" {

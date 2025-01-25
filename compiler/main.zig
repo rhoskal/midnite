@@ -42,5 +42,10 @@ pub fn main() !void {
 
     const p = try parser.Parser.init(allocator, &l);
     const ast = try p.parseProgram();
+    defer ast.deinit(allocator);
     std.debug.print("\n{}\n", .{ast});
+
+    // try frontend.semantic_analyzer.analyze(ast);
+    // try backend.type_checker.check(ast);
+    // try backend.codegen.generate(ast);
 }
