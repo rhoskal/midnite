@@ -10,6 +10,7 @@ pub const Type = union(enum) {
     Int,
     String,
     List: *Type,
+    Variant: *VariantType,
     // Function: *FunctionType,
     // Variable: *TypeVariable,
 };
@@ -41,6 +42,10 @@ const VariantType = struct {
         };
     }
 
+    /// Frees all resources associated with the variant type.
+    pub fn deinit(self: *VariantType) void {
+        self.constructors.deinit();
+    }
 };
 
 /// Errors that can occur during type checking.
@@ -52,6 +57,7 @@ pub const TypeCheckError = error{
     OutOfMemory,
     StringOperandRequired,
     TypeMismatch,
+    UndefinedConstructor,
     UndefinedVariable,
     Unimplemented,
 };
@@ -75,6 +81,18 @@ const TypeEnvironment = struct {
 
     /// Frees all resources associated with the type environment.
     pub fn deinit(self: *TypeEnvironment) void {
+        var iter = self.types.iterator();
+
+        while (iter.next()) |entry| {
+            switch (entry.value_ptr.*) {
+                .Variant => |v| {
+                    v.deinit();
+                    self.allocator.destroy(v);
+                },
+                else => {}, // Other types don't need cleanup
+            }
+        }
+
         self.types.deinit();
     }
 };
@@ -243,36 +261,7 @@ const TypeChecker = struct {
 
                 return left_type;
             },
-            .variant_type => |vtype| {
-                const type_name = vtype.name;
-
-                // Create variant type in environment
-                var variant = try self.allocator.create(VariantType);
-                std.debug.print("Created VariantType at {*}\n", .{variant});
-                std.debug.print("Number of constructors: {d}\n", .{vtype.constructors.items.len});
-                variant.* = VariantType.init(self.allocator, type_name);
-
-                // Register each constructor
-                for (vtype.constructors.items) |constructor| {
-                    if (constructor.params.items.len > 0) {
-                        var param_types = try self.allocator.alloc(Type, constructor.params.items.len);
-
-                        for (constructor.params.items, 0..) |param, i| {
-                            param_types[i] = try self.checkNode(param);
-                        }
-
-                        try variant.addConstructorTypes(constructor.name, param_types);
-                    } else {
-                        const empty_params = try self.allocator.alloc(Type, 0);
-                        try variant.addConstructorTypes(constructor.name, empty_params);
-                    }
-                }
-
-                const variant_type = Type{ .Variant = variant };
-                try self.environment.types.put(type_name, variant_type);
-
-                return variant_type;
-            },
+            .variant_type => error.Unimplemented,
             .lower_identifier => |ident| {
                 return self.environment.types.get(ident.name) orelse
                     error.UndefinedVariable;
@@ -1194,6 +1183,80 @@ test "[unary_expr]" {
 
     try testing.expectEqual(.Int, result_type);
 }
+
+test "[variant_type] (Boolean)" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    const node = try allocator.create(ast.Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    var constructors = std.ArrayList(ast.VariantConstructorNode).init(allocator);
+    try constructors.append(.{
+        .name = "True",
+        .params = std.ArrayList(*ast.Node).init(allocator),
+        .token = .{
+            .kind = .UpperIdent,
+            .lexeme = "True",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 18, .end = 22 },
+                .src = .{ .line = 1, .col = 19 },
+            },
+        },
+    });
+    try constructors.append(.{
+        .name = "False",
+        .params = std.ArrayList(*ast.Node).init(allocator),
+        .token = .{
+            .kind = .UpperIdent,
+            .lexeme = "False",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 25, .end = 29 },
+                .src = .{ .line = 1, .col = 26 },
+            },
+        },
+    });
+
+    node.* = .{
+        .variant_type = .{
+            .name = "Boolean",
+            .type_params = std.ArrayList([]const u8).init(allocator),
+            .constructors = constructors,
+            .token = .{
+                .kind = .KwType,
+                .lexeme = "type",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    var checker = TypeChecker.init(allocator);
+    defer checker.deinit();
+
+    const result_type = try checker.checkNode(node);
+
+    try testing.expect(result_type == .Variant);
+    try testing.expectEqualStrings("Boolean", result_type.Variant.name);
+}
+
+test "[variant_type] (Tree)" {}
+
+test "[logical_expr]" {
+    // test both &&, ||
+}
+
+// test "[type_alias]" {}
+
 test "[lower_identifier]" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -1231,4 +1294,3 @@ test "[lower_identifier]" {
     const result_type = try checker.checkNode(node);
     try testing.expectEqual(.Int, result_type);
 }
-

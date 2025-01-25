@@ -1,7 +1,7 @@
 const std = @import("std");
 
-const lexer = @import("lexer.zig");
-const parser = @import("parser.zig");
+const lexer = @import("frontend/lexer.zig");
+const parser = @import("frontend/parser.zig");
 const diagnostics = @import("diagnostics.zig");
 
 pub fn main() !void {

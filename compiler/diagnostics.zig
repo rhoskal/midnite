@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const lexer = @import("lexer.zig");
+const lexer = @import("frontend/lexer.zig");
 const term = @import("terminal.zig");
 
 pub const Diagnostic = struct {
