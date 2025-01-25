@@ -1056,7 +1056,7 @@ test "[comment]" {
     }
 
     // Assertions
-    // Check that the node type is correctly identified as a comment
+    // Check the node type is correctly identified as a comment
     try testing.expect(node.* == .comment);
 
     // Validate the comment token and its properties
@@ -1086,7 +1086,7 @@ test "[doc_comment]" {
     }
 
     // Assertions
-    // Check that the node type is correctly identified as a doc comment
+    // Check the node type is correctly identified as a doc comment
     try testing.expect(node.* == .doc_comment);
 
     // Validate the comment token and its properties
@@ -1961,7 +1961,7 @@ test "[function_decl] (simple)" {
 
     const decl = node.function_decl;
 
-    // Check that the function name matches
+    // Check the function name matches
     try testing.expectEqualStrings("add", decl.name);
 
     // Verify that the type annotation is null for this simple function declaration
@@ -1972,7 +1972,7 @@ test "[function_decl] (simple)" {
 
     const lambda = decl.value.lambda_expr;
 
-    // Check that the lambda has exactly two parameters
+    // Check the lambda has exactly two parameters
     try testing.expectEqual(@as(usize, 2), lambda.params.items.len);
 
     // Verify the parameter names are "x" and "y"
@@ -2021,7 +2021,7 @@ test "[function_decl] (w/ type annotation)" {
 
     const decl = node.function_decl;
 
-    // Check that the function name matches
+    // Check the function name matches
     try testing.expectEqualStrings("inc", decl.name);
 
     // Verify type annotation exists and is correct
@@ -2033,7 +2033,7 @@ test "[function_decl] (w/ type annotation)" {
     // Verify that the function type has exactly two parameter types
     try testing.expectEqual(@as(usize, 2), type_annotation.param_types.items.len);
 
-    // Check that both parameter types are upper identifiers with the name "Int"
+    // Check both parameter types are upper identifiers with the name "Int"
     try testing.expect(type_annotation.param_types.items[0].* == .upper_identifier);
     try testing.expect(type_annotation.param_types.items[1].* == .upper_identifier);
     try testing.expectEqualStrings("Int", type_annotation.param_types.items[0].upper_identifier.name);
@@ -2044,7 +2044,7 @@ test "[function_decl] (w/ type annotation)" {
 
     const lambda = decl.value.lambda_expr;
 
-    // Check that the lambda has exactly one parameter
+    // Check the lambda has exactly one parameter
     try testing.expectEqual(@as(usize, 1), lambda.params.items.len);
 
     // Verify the parameter name matches
@@ -2058,11 +2058,11 @@ test "[function_decl] (w/ type annotation)" {
     // Ensure the operator in the arithmetic expression is addition
     try testing.expectEqual(lexer.TokenKind{ .operator = .IntAdd }, body.operator.kind);
 
-    // Check that the left operand of the addition is a lower identifier with the name "x"
+    // Check the left operand of the addition is a lower identifier with the name "x"
     try testing.expect(body.left.* == .lower_identifier);
     try testing.expectEqualStrings("x", body.left.lower_identifier.name);
 
-    // Check that the right operand of the addition is an integer literal with the value 1
+    // Check the right operand of the addition is an integer literal with the value 1
     try testing.expect(body.right.* == .int_literal);
     try testing.expectEqual(@as(i64, 1), body.right.int_literal.value);
 }
@@ -2107,7 +2107,7 @@ test "[foreign_function_decl]" {
     // Verify that the function type has exactly two parameter types
     try testing.expectEqual(@as(usize, 2), type_annotation.param_types.items.len);
 
-    // Check that both parameter types are upper identifiers with the name "Float"
+    // Check both parameter types are upper identifiers with the name "Float"
     try testing.expect(type_annotation.param_types.items[0].* == .upper_identifier);
     try testing.expect(type_annotation.param_types.items[1].* == .upper_identifier);
     try testing.expectEqualStrings("Float", type_annotation.param_types.items[0].upper_identifier.name);

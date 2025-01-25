@@ -1887,12 +1887,20 @@ test "[keyword]" {
     };
 
     for (cases) |case| {
+        // Setup
         var lexer = Lexer.init(case.source, TEST_FILE);
 
+        // Action
         const token = try lexer.nextToken();
+
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(case.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
+        // Ensure we reached the end of the string
         const eof = try lexer.nextToken();
         try testing.expectEqual(TokenKind{ .special = .Eof }, eof.kind);
     }
@@ -1948,12 +1956,20 @@ test "[delimiter]" {
     };
 
     for (cases) |case| {
+        // Setup
         var lexer = Lexer.init(case.source, TEST_FILE);
 
+        // Action
         const token = try lexer.nextToken();
+
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(case.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
+        // Ensure we reached the end of the string
         const eof = try lexer.nextToken();
         try testing.expectEqual(TokenKind{ .special = .Eof }, eof.kind);
     }
@@ -1984,12 +2000,20 @@ test "[symbol]" {
     };
 
     for (cases) |case| {
+        // Setup
         var lexer = Lexer.init(case.source, TEST_FILE);
 
+        // Action
         const token = try lexer.nextToken();
+
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(case.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
+        // Ensure we reached the end of the string
         const eof = try lexer.nextToken();
         try testing.expectEqual(TokenKind{ .special = .Eof }, eof.kind);
     }
@@ -2050,12 +2074,20 @@ test "[operator]" {
     };
 
     for (cases) |case| {
+        // Setup
         var lexer = Lexer.init(case.source, TEST_FILE);
 
+        // Action
         const token = try lexer.nextToken();
+
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(case.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
+        // Ensure we reached the end of the string
         const eof = try lexer.nextToken();
         try testing.expectEqual(TokenKind{ .special = .Eof }, eof.kind);
     }
@@ -2111,12 +2143,20 @@ test "[arithmetic operator]" {
     };
 
     for (cases) |case| {
+        // Setup
         var lexer = Lexer.init(case.source, TEST_FILE);
 
+        // Action
         const token = try lexer.nextToken();
+
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(case.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
+        // Ensure we reached the end of the string
         const eof = try lexer.nextToken();
         try testing.expectEqual(TokenKind{ .special = .Eof }, eof.kind);
     }
@@ -2157,12 +2197,20 @@ test "[comparison operator]" {
     };
 
     for (cases) |case| {
+        // Setup
         var lexer = Lexer.init(case.source, TEST_FILE);
 
+        // Action
         const token = try lexer.nextToken();
+
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(case.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
+        // Ensure we reached the end of the string
         const eof = try lexer.nextToken();
         try testing.expectEqual(TokenKind{ .special = .Eof }, eof.kind);
     }
@@ -2183,12 +2231,20 @@ test "[logical operator]" {
     };
 
     for (cases) |case| {
+        // Setup
         var lexer = Lexer.init(case.source, TEST_FILE);
 
+        // Action
         const token = try lexer.nextToken();
+
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(case.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
+        // Ensure we reached the end of the string
         const eof = try lexer.nextToken();
         try testing.expectEqual(TokenKind{ .special = .Eof }, eof.kind);
     }
@@ -2204,12 +2260,20 @@ test "[special]" {
     };
 
     for (cases) |case| {
+        // Setup
         var lexer = Lexer.init(case.source, TEST_FILE);
 
+        // Action
         const token = try lexer.nextToken();
+
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(case.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
+        // Ensure we reached the end of the string
         const eof = try lexer.nextToken();
         try testing.expectEqual(TokenKind{ .special = .Eof }, eof.kind);
     }
@@ -2245,12 +2309,20 @@ test "[comment]" {
     };
 
     for (cases) |case| {
+        // Setup
         var lexer = Lexer.init(case.source, TEST_FILE);
 
+        // Action
         const token = try lexer.nextToken();
+
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(case.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
+        // Ensure we reached the end of the string
         const eof = try lexer.nextToken();
         try testing.expectEqual(TokenKind{ .special = .Eof }, eof.kind);
     }
@@ -2272,12 +2344,20 @@ test "[multiline string literal]" {
     };
 
     for (cases) |case| {
+        // Setup
         var lexer = Lexer.init(case.source, TEST_FILE);
 
+        // Action
         const token = try lexer.nextToken();
+
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(case.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
+        // Ensure we reached the end of the string
         const eof = try lexer.nextToken();
         try testing.expectEqual(TokenKind{ .special = .Eof }, eof.kind);
     }
@@ -2292,9 +2372,14 @@ test "[multiline string literal] error.UnterminatedStrLiteral" {
     };
 
     for (invalid_cases) |source| {
+        // Setup
         var lexer = Lexer.init(source, TEST_FILE);
 
+        // Action
         const result = lexer.nextToken();
+
+        // Assertions
+        // Verify error
         try testing.expectError(error.UnterminatedStrLiteral, result);
     }
 }
@@ -2409,12 +2494,20 @@ test "[string literal]" {
     };
 
     for (cases) |case| {
+        // Setup
         var lexer = Lexer.init(case.source, TEST_FILE);
 
+        // Action
         const token = try lexer.nextToken();
+
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(case.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
+        // Ensure we reached the end of the string
         const eof = try lexer.nextToken();
         try testing.expectEqual(TokenKind{ .special = .Eof }, eof.kind);
     }
@@ -2428,9 +2521,14 @@ test "[string literal] error.CodePointOutOfRange" {
     };
 
     for (invalid_cases) |source| {
+        // Setup
         var lexer = Lexer.init(source, TEST_FILE);
 
+        // Action
         const result = lexer.nextToken();
+
+        // Assertions
+        // Verify error
         try testing.expectError(error.CodePointOutOfRange, result);
     }
 }
@@ -2442,9 +2540,14 @@ test "[string literal] error.UnrecognizedStrEscapeSequence" {
     };
 
     for (invalid_cases) |source| {
+        // Setup
         var lexer = Lexer.init(source, TEST_FILE);
 
+        // Action
         const result = lexer.nextToken();
+
+        // Assertions
+        // Verify error
         try testing.expectError(error.UnrecognizedStrEscapeSequence, result);
     }
 }
@@ -2456,9 +2559,14 @@ test "[string literal] error.InvalidUnicodeEscapeSequence" {
     };
 
     for (invalid_cases) |source| {
+        // Setup
         var lexer = Lexer.init(source, TEST_FILE);
 
+        // Action
         const result = lexer.nextToken();
+
+        // Assertions
+        // Verify error
         try testing.expectError(error.InvalidUnicodeEscapeSequence, result);
     }
 }
@@ -2471,9 +2579,14 @@ test "[string literal] error.UnterminatedStrLiteral" {
     };
 
     for (invalid_cases) |source| {
+        // Setup
         var lexer = Lexer.init(source, TEST_FILE);
 
+        // Action
         const result = lexer.nextToken();
+
+        // Assertions
+        // Verify error
         try testing.expectError(error.UnterminatedStrLiteral, result);
     }
 }
@@ -2573,12 +2686,20 @@ test "[char literal]" {
     };
 
     for (cases) |case| {
+        // Setup
         var lexer = Lexer.init(case.source, TEST_FILE);
 
+        // Action
         const token = try lexer.nextToken();
+
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(case.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
+        // Ensure we reached the end of the string
         const eof = try lexer.nextToken();
         try testing.expectEqual(TokenKind{ .special = .Eof }, eof.kind);
     }
@@ -2587,9 +2708,14 @@ test "[char literal]" {
 test "[char literal] error.EmptyCharLiteral" {
     const source = "''";
 
+    // Setup
     var lexer = Lexer.init(source, TEST_FILE);
 
+    // Action
     const result = lexer.nextToken();
+
+    // Assertions
+    // Verify error
     try testing.expectError(error.EmptyCharLiteral, result);
 }
 
@@ -2601,9 +2727,14 @@ test "[char literal] error.CodePointOutOfRange" {
     };
 
     for (invalid_cases) |source| {
+        // Setup
         var lexer = Lexer.init(source, TEST_FILE);
 
+        // Action
         const result = lexer.nextToken();
+
+        // Assertions
+        // Verify error
         try testing.expectError(error.CodePointOutOfRange, result);
     }
 }
@@ -2615,9 +2746,14 @@ test "[char literal] error.UnrecognizedCharEscapeSequence" {
     };
 
     for (invalid_cases) |source| {
+        // Setup
         var lexer = Lexer.init(source, TEST_FILE);
 
+        // Action
         const result = lexer.nextToken();
+
+        // Assertions
+        // Verify error
         try testing.expectError(error.UnrecognizedCharEscapeSequence, result);
     }
 }
@@ -2634,9 +2770,14 @@ test "[char literal] error.MultipleCharsInLiteral" {
     };
 
     for (invalid_cases) |source| {
+        // Setup
         var lexer = Lexer.init(source, TEST_FILE);
 
+        // Action
         const result = lexer.nextToken();
+
+        // Assertions
+        // Verify error
         try testing.expectError(error.MultipleCharsInLiteral, result);
     }
 }
@@ -2654,9 +2795,14 @@ test "[char literal] error.UnterminatedCharLiteral" {
     };
 
     for (invalid_cases) |source| {
+        // Setup
         var lexer = Lexer.init(source, TEST_FILE);
 
+        // Action
         const result = lexer.nextToken();
+
+        // Assertions
+        // Verify error
         try testing.expectError(error.UnterminatedCharLiteral, result);
     }
 }
@@ -2668,9 +2814,14 @@ test "[char literal] error.InvalidUnicodeEscapeSequence" {
     };
 
     for (invalid_cases) |source| {
+        // Setup
         var lexer = Lexer.init(source, TEST_FILE);
 
+        // Action
         const result = lexer.nextToken();
+
+        // Assertions
+        // Verify error
         try testing.expectError(error.InvalidUnicodeEscapeSequence, result);
     }
 }
@@ -2720,12 +2871,20 @@ test "[integer literal]" {
     };
 
     for (cases) |case| {
+        // Setup
         var lexer = Lexer.init(case.source, TEST_FILE);
 
+        // Action
         const token = try lexer.nextToken();
+
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(case.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
+        // Ensure we reached the end of the string
         const eof = try lexer.nextToken();
         try testing.expectEqual(TokenKind{ .special = .Eof }, eof.kind);
     }
@@ -2742,9 +2901,14 @@ test "[integer literal] error.InvalidIntLiteral" {
     };
 
     for (invalid_cases) |source| {
+        // Setup
         var lexer = Lexer.init(source, TEST_FILE);
 
+        // Action
         const result = lexer.nextToken();
+
+        // Assertions
+        // Verify error
         try testing.expectError(error.InvalidIntLiteral, result);
     }
 }
@@ -2784,12 +2948,20 @@ test "[float literal]" {
     };
 
     for (cases) |case| {
+        // Setup
         var lexer = Lexer.init(case.source, TEST_FILE);
 
+        // Action
         const token = try lexer.nextToken();
+
+        // Assertions
+        // Verify the token kind matches
         try std.testing.expectEqual(case.kind, token.kind);
+
+        // Verify the token lexeme matches
         try std.testing.expectEqualStrings(case.lexeme, token.lexeme);
 
+        // Ensure we reached the end of the string
         const eof = try lexer.nextToken();
         try testing.expectEqual(TokenKind{ .special = .Eof }, eof.kind);
     }
@@ -2802,9 +2974,14 @@ test "[float literal] error.InvalidFloat" {
     };
 
     for (invalid_cases) |source| {
+        // Setup
         var lexer = Lexer.init(source, TEST_FILE);
 
+        // Action
         const result = lexer.nextToken();
+
+        // Assertions
+        // Verify error
         try std.testing.expectError(error.InvalidFloatLiteral, result);
     }
 }
@@ -2904,12 +3081,20 @@ test "[identifier]" {
     };
 
     for (cases) |case| {
+        // Setup
         var lexer = Lexer.init(case.source, TEST_FILE);
 
+        // Action
         const token = try lexer.nextToken();
+
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(case.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(case.lexeme, token.lexeme);
 
+        // Ensure we reached the end of the string
         const eof = try lexer.nextToken();
         try testing.expectEqual(TokenKind{ .special = .Eof }, eof.kind);
     }
@@ -2924,9 +3109,15 @@ test "[identifier] error.InvalidIdentifier" {
     };
 
     for (invalid_cases) |source| {
+        // Setup
         var lexer = Lexer.init(source, TEST_FILE);
 
-        try testing.expectError(error.InvalidIdentifier, lexer.nextToken());
+        // Action
+        const result = lexer.nextToken();
+
+        // Assertions
+        // Verify error
+        try testing.expectError(error.InvalidIdentifier, result);
     }
 }
 
@@ -2976,13 +3167,21 @@ test "[type variant]" {
         }),
     };
 
+    // Setup
     var lexer = Lexer.init(source, TEST_FILE);
 
     for (expected_tokens) |expected| {
+        // Action
         const token = try lexer.nextToken();
 
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(expected.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
+
+        // Verify token locations
         try testing.expectEqual(expected.loc.span.start, token.loc.span.start);
         try testing.expectEqual(expected.loc.span.end, token.loc.span.end);
         try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
@@ -3026,13 +3225,21 @@ test "[type alias]" {
         }),
     };
 
+    // Setup
     var lexer = Lexer.init(source, TEST_FILE);
 
     for (expected_tokens) |expected| {
+        // Action
         const token = try lexer.nextToken();
 
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(expected.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
+
+        // Verify token locations
         try testing.expectEqual(expected.loc.span.start, token.loc.span.start);
         try testing.expectEqual(expected.loc.span.end, token.loc.span.end);
         try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
@@ -3111,13 +3318,21 @@ test "[record type]" {
         }),
     };
 
+    // Setup
     var lexer = Lexer.init(source, TEST_FILE);
 
     for (expected_tokens) |expected| {
+        // Action
         const token = try lexer.nextToken();
 
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(expected.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
+
+        // Verify token locations
         try testing.expectEqual(expected.loc.span.start, token.loc.span.start);
         try testing.expectEqual(expected.loc.span.end, token.loc.span.end);
         try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
@@ -3196,13 +3411,21 @@ test "[module definition]" {
         }),
     };
 
+    // Setup
     var lexer = Lexer.init(source, TEST_FILE);
 
     for (expected_tokens) |expected| {
+        // Action
         const token = try lexer.nextToken();
 
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(expected.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
+
+        // Verify token locations
         try testing.expectEqual(expected.loc.span.start, token.loc.span.start);
         try testing.expectEqual(expected.loc.span.end, token.loc.span.end);
         try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
@@ -3301,13 +3524,21 @@ test "[top level function definition]" {
         }),
     };
 
+    // Setup
     var lexer = Lexer.init(source, TEST_FILE);
 
     for (expected_tokens) |expected| {
+        // Action
         const token = try lexer.nextToken();
 
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(expected.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
+
+        // Verify token locations
         try testing.expectEqual(expected.loc.span.start, token.loc.span.start);
         try testing.expectEqual(expected.loc.span.end, token.loc.span.end);
         try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
@@ -3396,13 +3627,21 @@ test "[pattern matching]" {
         }),
     };
 
+    // Setup
     var lexer = Lexer.init(source, TEST_FILE);
 
     for (expected_tokens) |expected| {
+        // Action
         const token = try lexer.nextToken();
 
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(expected.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
+
+        // Verify token locations
         try testing.expectEqual(expected.loc.span.start, token.loc.span.start);
         try testing.expectEqual(expected.loc.span.end, token.loc.span.end);
         try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
@@ -3456,13 +3695,21 @@ test "[let_in block]" {
         }),
     };
 
+    // Setup
     var lexer = Lexer.init(source, TEST_FILE);
 
     for (expected_tokens) |expected| {
+        // Action
         const token = try lexer.nextToken();
 
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(expected.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
+
+        // Verify token locations
         try testing.expectEqual(expected.loc.span.start, token.loc.span.start);
         try testing.expectEqual(expected.loc.span.end, token.loc.span.end);
         try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
@@ -3521,13 +3768,21 @@ test "[if_then_else statment]" {
         }),
     };
 
+    // Setup
     var lexer = Lexer.init(source, TEST_FILE);
 
     for (expected_tokens) |expected| {
+        // Action
         const token = try lexer.nextToken();
 
+        // Assertions
+        // Verify the token kind matches
         try testing.expectEqual(expected.kind, token.kind);
+
+        // Verify the token lexeme matches
         try testing.expectEqualStrings(expected.lexeme, token.lexeme);
+
+        // Verify token locations
         try testing.expectEqual(expected.loc.span.start, token.loc.span.start);
         try testing.expectEqual(expected.loc.span.end, token.loc.span.end);
         try testing.expectEqual(expected.loc.src.line, token.loc.src.line);
