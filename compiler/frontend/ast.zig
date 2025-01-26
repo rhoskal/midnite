@@ -602,6 +602,37 @@ pub const TypeAliasNode = struct {
     token: lexer.Token,
 };
 
+/// Represents a field in a record type with a name and type.
+pub const RecordFieldNode = struct {
+    /// The name of the field.
+    name: []const u8,
+
+    /// The AST node representing the field's type.
+    type: *Node,
+
+    /// The token representing this field declaration.
+    token: lexer.Token,
+};
+
+/// Represents a record type declaration with named fields and types.
+///
+/// Examples:
+/// - `type Point = { x: Int, y: Int }`
+/// - `type User = { name: String, email: String }`
+pub const RecordTypeNode = struct {
+    /// The name of the record type.
+    name: []const u8,
+
+    /// Array of type parameter names.
+    type_params: std.ArrayList([]const u8),
+
+    /// Array of fields in the record.
+    fields: std.ArrayList(RecordFieldNode),
+
+    /// The token representing the start of this declaration.
+    token: lexer.Token,
+};
+
 /// The root AST node containing a sequence of top-level declarations like
 /// function definitions, type declarations, imports, and module definitions.
 pub const ProgramNode = struct {
@@ -656,6 +687,7 @@ pub const Node = union(enum) {
 
     // Types
     function_type: FunctionTypeNode,
+    record_type: RecordTypeNode,
     type_alias: TypeAliasNode,
     typed_hole: TypedHoleNode,
     variant_type: VariantTypeNode,
@@ -796,6 +828,21 @@ pub const Node = union(enum) {
                 }
 
                 ftype.param_types.deinit();
+            },
+            .record_type => |*rtype| {
+                for (rtype.type_params.items) |param| {
+                    allocator.free(param);
+                }
+
+                rtype.type_params.deinit();
+
+                for (rtype.fields.items) |field| {
+                    allocator.free(field.name);
+                    field.type.deinit(allocator);
+                    allocator.destroy(field.type);
+                }
+
+                rtype.fields.deinit();
             },
             .module_decl => |*decl| {
                 for (decl.path.segments.items) |segment| {
@@ -938,12 +985,14 @@ const testing = std.testing;
 const TEST_FILE = "test.mox";
 
 test "[BinaryExprNode]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
     // 42 + 24
 
+    // Action
     const left = try allocator.create(Node);
     left.* = .{
         .int_literal = .{
@@ -998,19 +1047,28 @@ test "[BinaryExprNode]" {
         },
     };
 
+    // Assertions
     const expr = binary.arithmetic_expr;
+
+    // Verify the operator in the expression is an integer addition operator (+)
     try testing.expectEqual(lexer.TokenKind{ .operator = .IntAdd }, expr.operator.kind);
+
+    // Check the left operand of the binary expression
     try testing.expect(expr.left.int_literal.value == 42);
+
+    // Check the right operand of the binary expression
     try testing.expect(expr.right.int_literal.value == 24);
 }
 
 test "[UnaryExprNode]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
     // -42
 
+    // Action
     const operand = try allocator.create(Node);
     operand.* = .{
         .int_literal = .{
@@ -1048,20 +1106,31 @@ test "[UnaryExprNode]" {
         },
     };
 
+    // Assertions
     const expr = unary.unary_expr;
+
+    // Verify the operator in the unary expression is an integer subtraction operator (-)
     try testing.expectEqual(lexer.TokenKind{ .operator = .IntSub }, expr.operator.kind);
+
+    // Ensure the lexeme for the operator is the string "-"
     try testing.expectEqualStrings("-", expr.operator.lexeme);
+
+    // Verify the operand is an integer literal with the correct token kind
     try testing.expectEqual(lexer.TokenKind{ .literal = .Int }, expr.operand.int_literal.token.kind);
+
+    // Check the value of the integer literal operand
     try testing.expect(expr.operand.int_literal.value == 42);
 }
 
 test "[LambdaExprNode]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
     // \x y => x + y
 
+    // Action
     var params = std.ArrayList([]const u8).init(allocator);
     try params.append("x");
     try params.append("y");
@@ -1137,30 +1206,51 @@ test "[LambdaExprNode]" {
         },
     };
 
+    // Assertions
     const expr = lambda.lambda_expr;
+
+    // Verify that the lambda expression has exactly two parameters
     try testing.expectEqual(@as(usize, 2), expr.params.items.len);
+
+    // Ensure the first parameter is named "x"
     try testing.expectEqualStrings("x", expr.params.items[0]);
+
+    // Ensure the second parameter is named "y"
     try testing.expectEqualStrings("y", expr.params.items[1]);
 
+    // Verify the token kind matches
     try testing.expectEqual(lexer.TokenKind{ .operator = .Lambda }, expr.token.kind);
+
+    // Verify the token lexeme matches
     try testing.expectEqualStrings("\\", expr.token.lexeme);
 
     const lambda_body = expr.body.arithmetic_expr;
+
+    // Verify the operator in the arithmetic expression is an integer addition operator (+)
     try testing.expectEqual(lexer.TokenKind{ .operator = .IntAdd }, lambda_body.operator.kind);
+
+    // Ensure the lexeme for the addition operator is "+"
     try testing.expectEqualStrings("+", lambda_body.operator.lexeme);
 
+    // Check the left operand is a lower-case identifier
     try testing.expect(lambda_body.left.* == .lower_identifier);
+
+    // Verify the name of the left identifier is "x"
     try testing.expectEqualStrings("x", lambda_body.left.lower_identifier.name);
+
+    // Ensure the token kind of the left identifier is a lower-case identifier
     try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, lambda_body.left.lower_identifier.token.kind);
 }
 
 test "[IfThenElseStmtNode]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
     // if x == y then True else False
 
+    // Action
     const left = try allocator.create(Node);
     left.* = .{
         .lower_identifier = .{
@@ -1256,40 +1346,64 @@ test "[IfThenElseStmtNode]" {
         },
     };
 
-    // Test condition (x == y)
+    // Assertions
     const cond = if_then_else.if_then_else_stmt.condition.comparison_expr;
+
+    // Verify the condition is a comparison expression
     try testing.expect(if_then_else.if_then_else_stmt.condition.* == .comparison_expr);
+
+    // Check the operator in the comparison expression is an equality operator (==)
     try testing.expectEqual(lexer.TokenKind{ .operator = .Equality }, cond.operator.kind);
+
+    // Ensure the lexeme for the equality operator is "=="
     try testing.expectEqualStrings("==", cond.operator.lexeme);
 
-    // Test left side of condition (x)
+    // Verify the left operand of the condition is a lower-case identifier (x)
     try testing.expect(cond.left.* == .lower_identifier);
+
+    // Check the name of the left identifier is "x"
     try testing.expectEqualStrings("x", cond.left.lower_identifier.name);
+
+    // Ensure the token kind of the left identifier is a lower-case identifier
     try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, cond.left.lower_identifier.token.kind);
 
-    // Test right side of condition (y)
+    // Verify the right operand of the condition is a lower-case identifier (y)
     try testing.expect(cond.right.* == .lower_identifier);
+
+    // Check the name of the right identifier is "y"
     try testing.expectEqualStrings("y", cond.right.lower_identifier.name);
+
+    // Ensure the token kind of the right identifier is a lower-case identifier
     try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, cond.right.lower_identifier.token.kind);
 
-    // Test then branch (True)
+    // Verify the "then" branch is an upper-case identifier (True)
     try testing.expect(if_then_else.if_then_else_stmt.then_branch.* == .upper_identifier);
+
+    // Check the name of the "then" branch is "True"
     try testing.expectEqualStrings("True", if_then_else.if_then_else_stmt.then_branch.upper_identifier.name);
+
+    // Ensure the token kind of the "then" branch is an upper-case identifier
     try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, if_then_else.if_then_else_stmt.then_branch.upper_identifier.token.kind);
 
-    // Test else branch (False)
+    // Verify the "else" branch is an upper-case identifier (False)
     try testing.expect(if_then_else.if_then_else_stmt.else_branch.* == .upper_identifier);
+
+    // Check the name of the "else" branch is "False"
     try testing.expectEqualStrings("False", if_then_else.if_then_else_stmt.else_branch.upper_identifier.name);
+
+    // Ensure the token kind of the "else" branch is an upper-case identifier
     try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, if_then_else.if_then_else_stmt.else_branch.upper_identifier.token.kind);
 }
 
 test "[ForeignFunctionDeclNode]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
     // foreign sqrt : Float -> Float = "c_sqrt"
 
+    // Action
     const type_node = try allocator.create(Node);
     const float_type1 = try allocator.create(Node);
     const float_type2 = try allocator.create(Node);
@@ -1361,19 +1475,28 @@ test "[ForeignFunctionDeclNode]" {
         },
     };
 
+    // Assertions
     const decl = foreign_func.foreign_function_decl;
+
+    // Verify the name of the declaration
     try testing.expectEqualStrings("sqrt", decl.name);
+
+    // Verify the external name of the declaration
     try testing.expectEqualStrings("c_sqrt", decl.external_name);
+
+    // Check the function type annotation specifies exactly two parameter types
     try testing.expectEqual(@as(usize, 2), decl.type_annotation.function_type.param_types.items.len);
 }
 
 test "[FunctionTypeNode]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
     // : Int -> Int -> Int
 
+    // Action
     var param_types = std.ArrayList(*Node).init(allocator);
 
     const int_type1 = try allocator.create(Node);
@@ -1449,16 +1572,27 @@ test "[FunctionTypeNode]" {
         },
     };
 
-    // Test the structure
+    // Assertions
+    // Check the delimiter in the function type is a colon (:)
     try testing.expectEqual(lexer.TokenKind{ .delimiter = .Colon }, func_type.function_type.token.kind);
+
+    // Verify the lexeme
     try testing.expectEqualStrings(":", func_type.function_type.token.lexeme);
+
+    // Check the function type has exactly three parameter types
     try testing.expectEqual(@as(usize, 3), func_type.function_type.param_types.items.len);
 
-    // Test each Int type
     for (func_type.function_type.param_types.items) |type_node| {
+        // Verify the parameter type is an upper-case identifier
         try testing.expect(type_node.* == .upper_identifier);
+
+        // Ensure the token kind of the parameter type is an upper-case identifier
         try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, type_node.upper_identifier.token.kind);
+
+        // Check the name of the parameter type
         try testing.expectEqualStrings("Int", type_node.upper_identifier.name);
+
+        // Check the lexeme for the parameter type
         try testing.expectEqualStrings("Int", type_node.upper_identifier.token.lexeme);
     }
 
@@ -1477,12 +1611,14 @@ test "[FunctionTypeNode]" {
 }
 
 test "[FunctionDeclNode]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
     // let add : Int -> Int -> Int = \x y => x + y
 
+    // Action
     var param_types = std.ArrayList(*Node).init(allocator);
 
     const int_type1 = try allocator.create(Node);
@@ -1647,54 +1783,86 @@ test "[FunctionDeclNode]" {
         },
     };
 
-    // Verify the structure
+    // Assertions
+    // Check the keyword for the function declaration is "let"
     try testing.expectEqual(lexer.TokenKind{ .keyword = .Let }, func_decl.function_decl.token.kind);
+
+    // Verify the lexeme for the "let" keyword matches "let"
     try testing.expectEqualStrings("let", func_decl.function_decl.token.lexeme);
+
+    // Verify the function name is "add"
     try testing.expectEqualStrings("add", func_decl.function_decl.name);
 
-    // Test type annotation
     const type_annot = func_decl.function_decl.type_annotation.?;
+
+    // Check the type annotation is a function type
     try testing.expect(type_annot.* == .function_type);
+
+    // Check the token for the type annotation is a colon (":")
     try testing.expectEqual(lexer.TokenKind{ .delimiter = .Colon }, type_annot.function_type.token.kind);
+
+    // Check the function type has exactly 3 parameter types (Int -> Int -> Int)
     try testing.expectEqual(@as(usize, 3), type_annot.function_type.param_types.items.len);
 
-    // Test each Int in type signature
     for (type_annot.function_type.param_types.items) |type_node| {
+        // Check the type node is an upper identifier
         try testing.expect(type_node.* == .upper_identifier);
+
+        // Check the token kind for the type node is an upper identifier
         try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, type_node.upper_identifier.token.kind);
+
+        // Check the name of the type node is "Int"
         try testing.expectEqualStrings("Int", type_node.upper_identifier.name);
     }
 
-    // Test lambda expression
     const lambda_value = func_decl.function_decl.value;
+
+    // Check the function body is a lambda expression
     try testing.expect(lambda_value.* == .lambda_expr);
+
+    // Check the token for the lambda expression is a lambda operator ("\")
     try testing.expectEqual(lexer.TokenKind{ .operator = .Lambda }, lambda_value.lambda_expr.token.kind);
+
+    // Check the lambda has exactly 2 parameters
     try testing.expectEqual(@as(usize, 2), lambda_value.lambda_expr.params.items.len);
+
+    // Verify the names of the lambda parameters are "x" and "y"
     try testing.expectEqualStrings("x", lambda_value.lambda_expr.params.items[0]);
     try testing.expectEqualStrings("y", lambda_value.lambda_expr.params.items[1]);
 
-    // Test lambda body
     const lambda_body = lambda_value.lambda_expr.body;
+
+    // Check the lambda body is an arithmetic expression
     try testing.expect(lambda_body.* == .arithmetic_expr);
+
+    // Check the operator in the arithmetic expression is integer addition ("+")
     try testing.expectEqual(lexer.TokenKind{ .operator = .IntAdd }, lambda_body.arithmetic_expr.operator.kind);
+
+    // Check the lexeme for the addition operator matches "+"
     try testing.expectEqualStrings("+", lambda_body.arithmetic_expr.operator.lexeme);
 
     const body_left = lambda_body.arithmetic_expr.left;
+
+    // Check the left operand is a lower identifier with the name "x"
     try testing.expect(body_left.* == .lower_identifier);
     try testing.expectEqualStrings("x", body_left.lower_identifier.name);
 
     const body_right = lambda_body.arithmetic_expr.right;
+
+    // Check the left operand is a lower identifier with the name "y"
     try testing.expect(body_right.* == .lower_identifier);
     try testing.expectEqualStrings("y", body_right.lower_identifier.name);
 }
 
 test "[ConsExprNode]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
     // 1 :: [2, 3]
 
+    // Action
     const head = try allocator.create(Node);
     head.* = .{
         .int_literal = .{
@@ -1786,34 +1954,46 @@ test "[ConsExprNode]" {
         },
     };
 
-    // Verify the structure
+    // Assertions
+    // Verify the expression is a cons expression (::)
     try testing.expect(cons.* == .cons_expr);
+
+    // Verify the operator in the cons expression is a cons operator (::)
     try testing.expectEqual(lexer.TokenKind{ .operator = .Cons }, cons.cons_expr.operator.kind);
+
+    // Verify the lexeme of the cons operator is "::"
     try testing.expectEqualStrings("::", cons.cons_expr.operator.lexeme);
 
-    // Test head (1)
+    // Verify the head of the cons expression is an integer literal with the value 1
     try testing.expect(cons.cons_expr.head.* == .int_literal);
     try testing.expectEqual(@as(i64, 1), cons.cons_expr.head.int_literal.value);
 
-    // Test tail ([2, 3])
+    // Verify the tail of the cons expression is a list
     try testing.expect(cons.cons_expr.tail.* == .list);
+
+    // Verify the list in the tail has exactly 2 elements
     try testing.expectEqual(@as(usize, 2), cons.cons_expr.tail.list.elements.items.len);
 
-    // Test list elements
     const list_elements = cons.cons_expr.tail.list.elements.items;
+
+    // Verify the first element in the list is an integer literal with the value 2
     try testing.expect(list_elements[0].* == .int_literal);
     try testing.expectEqual(@as(i64, 2), list_elements[0].int_literal.value);
+
+    // Verify the second element in the list is an integer literal with the value 3
     try testing.expect(list_elements[1].* == .int_literal);
     try testing.expectEqual(@as(i64, 3), list_elements[1].int_literal.value);
 }
 
 test "[StrConcatExprNode]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
     // "Hello" <> "World"
 
+    // Action
     const left = try allocator.create(Node);
     const left_str = try allocator.dupe(u8, "Hello");
     left.* = .{
@@ -1870,20 +2050,29 @@ test "[StrConcatExprNode]" {
         },
     };
 
-    // Verify the structure
+    // Assertions
+    // Verify the operator in the string concatenation expression is a string concatenation operator (<>)
     try testing.expectEqual(lexer.TokenKind{ .operator = .StrConcat }, concat.str_concat_expr.operator.kind);
+
+    // Verify the lexeme of the string concatenation operator is "<>"
     try testing.expectEqualStrings("<>", concat.str_concat_expr.operator.lexeme);
+
+    // Verify the left operand of the string concatenation is a string literal
     try testing.expectEqualStrings("Hello", concat.str_concat_expr.left.str_literal.value);
+
+    // Verify the right operand of the string concatenation is a string literal
     try testing.expectEqualStrings("World", concat.str_concat_expr.right.str_literal.value);
 }
 
 test "[ListConcatExprNode]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
     // [1, 2] ++ [3, 4]
 
+    // Action
     const left = try allocator.create(Node);
     var left_elements = std.ArrayList(*Node).init(allocator);
 
@@ -2012,34 +2201,51 @@ test "[ListConcatExprNode]" {
         },
     };
 
+    // Assertions
     const expr = concat.list_concat_expr;
 
-    // Verify the structure
+    // Verify the operator in the expression is a list concatenation operator (++)
     try testing.expectEqual(lexer.TokenKind{ .operator = .ListConcat }, expr.operator.kind);
+
+    // Verify the lexeme of the list concatenation operator is "++"
     try testing.expectEqualStrings("++", expr.operator.lexeme);
 
-    // Verify left list [1, 2]
+    // Verify the left operand of the list concatenation is a list
     try testing.expect(expr.left.* == .list);
+
+    // Verify the left list has exactly 2 elements
     try testing.expectEqual(@as(usize, 2), expr.left.list.elements.items.len);
+
+    // Verify the first element of the left list is an integer literal with the value 1
     try testing.expect(expr.left.list.elements.items[0].* == .int_literal);
     try testing.expectEqual(@as(i64, 1), expr.left.list.elements.items[0].int_literal.value);
+
+    // Verify the second element of the left list is an integer literal with the value 2
     try testing.expect(expr.left.list.elements.items[1].* == .int_literal);
     try testing.expectEqual(@as(i64, 2), expr.left.list.elements.items[1].int_literal.value);
 
-    // Verify right list [3, 4]
+    // Verify the right operand of the list concatenation is a list
     try testing.expect(expr.right.* == .list);
+
+    // Verify the right list has exactly 2 elements
     try testing.expectEqual(@as(usize, 2), expr.right.list.elements.items.len);
+
+    // Verify the first element of the right list is an integer literal with the value 3
     try testing.expect(expr.right.list.elements.items[0].* == .int_literal);
     try testing.expectEqual(@as(i64, 3), expr.right.list.elements.items[0].int_literal.value);
+
+    // Verify the second element of the right list is an integer literal with the value 4
     try testing.expect(expr.right.list.elements.items[1].* == .int_literal);
     try testing.expectEqual(@as(i64, 4), expr.right.list.elements.items[1].int_literal.value);
 }
 
 test "[CompositionExprNode]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
+    // Action
     const f = try allocator.create(Node);
     f.* = .{
         .lower_identifier = .{
@@ -2097,20 +2303,31 @@ test "[CompositionExprNode]" {
             },
         };
 
+        // Assertions
         const expr = compose.composition_expr;
 
-        // Verify the structure
+        // Verify the operator in the composition expression is a compose-right operator (>>)
         try testing.expectEqual(lexer.TokenKind{ .operator = .ComposeRight }, expr.operator.kind);
+
+        // Verify the lexeme of the compose-right operator
         try testing.expectEqualStrings(">>", expr.operator.lexeme);
 
-        // Verify first function (f)
+        // Verify the first function in the composition is a lower identifier
         try testing.expect(expr.first.* == .lower_identifier);
+
+        // Verify the token kind of the first function is a lower identifier
         try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.first.lower_identifier.token.kind);
+
+        // Verify the name of the first function is "f"
         try testing.expectEqualStrings("f", expr.first.lower_identifier.name);
 
-        // Verify second function (g)
+        // Verify the second function in the composition is a lower identifier
         try testing.expect(expr.second.* == .lower_identifier);
+
+        // Verify the token kind of the second function is a lower identifier
         try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.second.lower_identifier.token.kind);
+
+        // Verify the name of the second function is "g"
         try testing.expectEqualStrings("g", expr.second.lower_identifier.name);
     }
 
@@ -2133,29 +2350,42 @@ test "[CompositionExprNode]" {
             },
         };
 
+        // Assertions
         const expr = compose.composition_expr;
 
-        // Verify the structure
+        // Verify the operator in the composition expression is a compose-left operator (<<)
         try testing.expectEqual(lexer.TokenKind{ .operator = .ComposeLeft }, expr.operator.kind);
+
+        // Verify the lexeme of the compose-left operator
         try testing.expectEqualStrings("<<", expr.operator.lexeme);
 
-        // Verify first function (g)
+        // Verify the first function in the composition is a lower identifier
         try testing.expect(expr.first.* == .lower_identifier);
+
+        // Verify the token kind of the first function is a lower identifier
         try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.first.lower_identifier.token.kind);
+
+        // Verify the name of the first function is "g".
         try testing.expectEqualStrings("g", expr.first.lower_identifier.name);
 
-        // Verify second function (f)
+        // Verify the second function in the composition is a lower identifier
         try testing.expect(expr.second.* == .lower_identifier);
+
+        // Verify the token kind of the second function is a lower identifier
         try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.second.lower_identifier.token.kind);
+
+        // Verify the name of the second function is "f".
         try testing.expectEqualStrings("f", expr.second.lower_identifier.name);
     }
 }
 
 test "[PipeExprNode]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
+    // Action
     const value = try allocator.create(Node);
     value.* = .{
         .lower_identifier = .{
@@ -2213,20 +2443,31 @@ test "[PipeExprNode]" {
             },
         };
 
+        // Assertions
         const expr = pipe.pipe_expr;
 
-        // Verify the structure
+        // Verify the operator in the expression is a pipe-right operator (|>)
         try testing.expectEqual(lexer.TokenKind{ .operator = .PipeRight }, expr.operator.kind);
+
+        // Verify the lexeme of the pipe-right operator
         try testing.expectEqualStrings("|>", expr.operator.lexeme);
 
-        // Verify value being piped (x)
+        // Verify the value being piped is a lower identifier
         try testing.expect(expr.value.* == .lower_identifier);
+
+        // Verify the token kind of the value being piped is a lower identifier
         try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.value.lower_identifier.token.kind);
+
+        // Verify the name of the value being piped is "x"
         try testing.expectEqualStrings("x", expr.value.lower_identifier.name);
 
-        // Verify function (f)
+        // Verify the function being applied is a lower identifier
         try testing.expect(expr.func.* == .lower_identifier);
+
+        // Verify the token kind of the function being applied is a lower identifier
         try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.func.lower_identifier.token.kind);
+
+        // Verify the name of the function being applied is "f".
         try testing.expectEqualStrings("f", expr.func.lower_identifier.name);
     }
 
@@ -2249,20 +2490,31 @@ test "[PipeExprNode]" {
             },
         };
 
+        // Assertions
         const expr = pipe.pipe_expr;
 
-        // Verify the structure
+        // Verify the operator in the expression is a pipe-left operator (<|)
         try testing.expectEqual(lexer.TokenKind{ .operator = .PipeLeft }, expr.operator.kind);
+
+        // Verify the lexeme of the pipe-left operator
         try testing.expectEqualStrings("<|", expr.operator.lexeme);
 
-        // Verify value being piped (x)
+        // Verify the value being piped is a lower identifier
         try testing.expect(expr.value.* == .lower_identifier);
+
+        // Verify the token kind of the value being piped is a lower identifier
         try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.value.lower_identifier.token.kind);
+
+        // Verify the name of the value being piped is "x"
         try testing.expectEqualStrings("x", expr.value.lower_identifier.name);
 
-        // Verify function (f)
+        // Verify the function being applied is a lower identifier
         try testing.expect(expr.func.* == .lower_identifier);
+
+        // Verify the token kind of the function being applied is a lower identifier
         try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.func.lower_identifier.token.kind);
+
+        // Verify the name of the function being applied is "f".
         try testing.expectEqualStrings("f", expr.func.lower_identifier.name);
     }
 }
@@ -2312,27 +2564,44 @@ test "[TypeAliasNode]" {
         },
     };
 
-    // Verify the structure
+    // Assertions
+    // Verify the "type" keyword starts the type alias declaration
     try testing.expectEqual(lexer.TokenKind{ .keyword = .Type }, node.type_alias.token.kind);
+
+    // Verify the lexeme of the "type" keyword
     try testing.expectEqualStrings("type", node.type_alias.token.lexeme);
+
+    // Verify the name of the type alias
     try testing.expectEqualStrings("UserId", node.type_alias.name);
 
-    // Verify the value node (String type)
+    // Check the value node is an upper identifier
     try testing.expect(node.type_alias.value.* == .upper_identifier);
+
     const value_node = node.type_alias.value.upper_identifier;
+
+    // Verify the name of the upper identifier
     try testing.expectEqualStrings("String", value_node.name);
+
+    // Verify the token kind of the upper identifier
     try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, value_node.token.kind);
+
+    // Verify the lexeme of the upper identifier
     try testing.expectEqualStrings("String", value_node.token.lexeme);
 }
 
 test "[VariantTypeNode]" {
+    // Setup
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
+    // type Result e a = | Err e | Ok a
+
+    // Action
     // First constructor: Err e
     var err_params = std.ArrayList(*Node).init(allocator);
     const err_param = try allocator.create(Node);
+
     err_param.* = .{
         .lower_identifier = .{
             .name = "e",
@@ -2353,6 +2622,7 @@ test "[VariantTypeNode]" {
     // Second constructor: Ok a
     var ok_params = std.ArrayList(*Node).init(allocator);
     const ok_param = try allocator.create(Node);
+
     ok_param.* = .{
         .lower_identifier = .{
             .name = "a",
@@ -2428,29 +2698,201 @@ test "[VariantTypeNode]" {
         },
     };
 
+    // Assertions
+    // Verify the name of the variant type is "Result"
     try testing.expectEqualStrings("Result", node.variant_type.name);
+
+    // Verify the variant type has exactly two type parameters
     try testing.expectEqual(@as(usize, 2), node.variant_type.type_params.items.len);
+
+    // Verify the name of the first type parameter is "e"
     try testing.expectEqualStrings("e", node.variant_type.type_params.items[0]);
+
+    // Verify the name of the second type parameter is "a"
     try testing.expectEqualStrings("a", node.variant_type.type_params.items[1]);
 
+    // Verify the variant type has exactly two constructors
     try testing.expectEqual(@as(usize, 2), node.variant_type.constructors.items.len);
+
+    // Verify the name of the first constructor is "Err"
     try testing.expectEqualStrings("Err", node.variant_type.constructors.items[0].name);
+
+    // Verify the name of the second constructor is "Ok"
     try testing.expectEqualStrings("Ok", node.variant_type.constructors.items[1].name);
 
+    // "Err" constructor
     const err_constructor = node.variant_type.constructors.items[0];
+
+    // Verify the "Err" constructor has one parameter
     try testing.expectEqual(@as(usize, 1), err_constructor.params.items.len);
+
+    // Verify the name of the parameter for the "Err" constructor is "e"
     try testing.expectEqualStrings("e", err_constructor.params.items[0].lower_identifier.name);
 
+    // "Ok" constructor
     const ok_constructor = node.variant_type.constructors.items[1];
+
+    // Verify the "Ok" constructor has one parameter.
     try testing.expectEqual(@as(usize, 1), ok_constructor.params.items.len);
+
+    // Verify the name of the parameter for the "Ok" constructor is "a".
     try testing.expectEqualStrings("a", ok_constructor.params.items[0].lower_identifier.name);
 }
 
-test "[ModulePathNode]" {
+test "[RecordTypeNode]" {
+    // Setup
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
+    // type Point a = { x: a, y: a }
+
+    // Action
+    // Create type parameters
+    var type_params = std.ArrayList([]const u8).init(allocator);
+    try type_params.append(try allocator.dupe(u8, "a"));
+
+    // Create fields
+    var fields = std.ArrayList(RecordFieldNode).init(allocator);
+
+    // Create x field type (a)
+    const x_type = try allocator.create(Node);
+    x_type.* = .{
+        .lower_identifier = .{
+            .name = "a",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "a",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 15, .end = 16 },
+                    .src = .{ .line = 1, .col = 16 },
+                },
+            },
+        },
+    };
+
+    // Create y field type (a)
+    const y_type = try allocator.create(Node);
+    y_type.* = .{
+        .lower_identifier = .{
+            .name = "a",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "a",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 21, .end = 22 },
+                    .src = .{ .line = 1, .col = 22 },
+                },
+            },
+        },
+    };
+
+    try fields.append(.{
+        .name = try allocator.dupe(u8, "x"),
+        .type = x_type,
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "x",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 13, .end = 14 },
+                .src = .{ .line = 1, .col = 14 },
+            },
+        },
+    });
+
+    try fields.append(.{
+        .name = try allocator.dupe(u8, "y"),
+        .type = y_type,
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "y",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 19, .end = 20 },
+                .src = .{ .line = 1, .col = 20 },
+            },
+        },
+    });
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
+        .record_type = .{
+            .name = "Point",
+            .type_params = type_params,
+            .fields = fields,
+            .token = .{
+                .kind = .{ .keyword = .Type },
+                .lexeme = "type",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    // Assertions
+    const record = node.record_type;
+
+    // Verify the name of the record type is "Point"
+    try testing.expectEqualStrings("Point", record.name);
+
+    // Ensure the record type has exactly one type parameter
+    try testing.expectEqual(@as(usize, 1), record.type_params.items.len);
+
+    // Check the name of the type parameter is "a"
+    try testing.expectEqualStrings("a", record.type_params.items[0]);
+
+    // Verify the record type has exactly two fields
+    try testing.expectEqual(@as(usize, 2), record.fields.items.len);
+
+    // Test the first field (x)
+    const x_field = record.fields.items[0];
+
+    // Ensure the name of the first field is "x"
+    try testing.expectEqualStrings("x", x_field.name);
+
+    // Verify the type of the first field is a lower-case identifier
+    try testing.expect(x_field.type.* == .lower_identifier);
+
+    // Check the name of the type for the first field is "a"
+    try testing.expectEqualStrings("a", x_field.type.lower_identifier.name);
+
+    // Test the second field (y)
+    const y_field = record.fields.items[1];
+
+    // Ensure the name of the second field is "y"
+    try testing.expectEqualStrings("y", y_field.name);
+
+    // Verify the type of the second field is a lower-case identifier
+    try testing.expect(y_field.type.* == .lower_identifier);
+
+    // Check the name of the type for the second field is "a"
+    try testing.expectEqualStrings("a", y_field.type.lower_identifier.name);
+
+    // Verify the token kind for the record is "Type"
+    try testing.expectEqual(lexer.TokenKind{ .keyword = .Type }, record.token.kind);
+
+    // Ensure the lexeme for the record token is "type"
+    try testing.expectEqualStrings("type", record.token.lexeme);
+}
+
+test "[ModulePathNode]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
     var segments = std.ArrayList([]const u8).init(allocator);
     try segments.append(try allocator.dupe(u8, "Std"));
     try segments.append(try allocator.dupe(u8, "List"));
@@ -2476,19 +2918,28 @@ test "[ModulePathNode]" {
         },
     };
 
+    // Assertions
     const path = node.module_path;
+
+    // Verify the include path consists of exactly two segments
     try testing.expectEqual(@as(usize, 2), path.segments.items.len);
+
+    // Ensure the first segment of the include path is "Std"
     try testing.expectEqualStrings("Std", path.segments.items[0]);
+
+    // Ensure the second segment of the include path is "List"
     try testing.expectEqualStrings("List", path.segments.items[1]);
 }
 
 test "[IncludeNode]" {
+    // Setup
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     // include Std.List
 
+    // Action
     var segments = std.ArrayList([]const u8).init(allocator);
     try segments.append(try allocator.dupe(u8, "Std"));
     try segments.append(try allocator.dupe(u8, "List"));
@@ -2525,19 +2976,28 @@ test "[IncludeNode]" {
         },
     };
 
+    // Assertions
     const include = node.include;
+
+    // Verify the include path consists of exactly two segments
     try testing.expectEqual(@as(usize, 2), include.path.segments.items.len);
+
+    // Ensure the first segment of the include path is "Std"
     try testing.expectEqualStrings("Std", include.path.segments.items[0]);
+
+    // Ensure the second segment of the include path is "List"
     try testing.expectEqualStrings("List", include.path.segments.items[1]);
 }
 
 test "[MatchExprNode] (basic literal/constructor)" {
+    // Setup
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     // match opt on | Some x => x | None => 0
 
+    // Action
     const value = try allocator.create(Node);
     value.* = .{
         .upper_identifier = .{
@@ -2697,21 +3157,34 @@ test "[MatchExprNode] (basic literal/constructor)" {
         },
     };
 
+    // Assertions
     const match = node.match_expr;
+
+    // Verify the match expression has exactly two cases
     try testing.expectEqual(@as(usize, 2), match.cases.items.len);
+
+    // Ensure the constructor name for the first case is "Some"
     try testing.expectEqualStrings("Some", match.cases.items[0].pattern.constructor.name);
+
+    // Check the argument for the "Some" constructor is a variable named "x"
     try testing.expectEqualStrings("x", match.cases.items[0].pattern.constructor.args.items[0].variable.name);
+
+    // Ensure the constructor name for the second case is "None"
     try testing.expectEqualStrings("None", match.cases.items[1].pattern.constructor.name);
+
+    // Verify the "None" constructor in the second case has no arguments
     try testing.expectEqual(@as(usize, 0), match.cases.items[1].pattern.constructor.args.items.len);
 }
 
 test "[MatchExprNode] (list pattern with cons)" {
+    // Setup
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     // match list on | head :: tail => head | [] => 0
 
+    // Action
     // Value to match on (a list variable)
     const value = try allocator.create(Node);
     value.* = .{
@@ -2879,27 +3352,40 @@ test "[MatchExprNode] (list pattern with cons)" {
         },
     };
 
+    // Assertions
     const match = node.match_expr;
+
+    // Verify the match expression has exactly two cases
     try testing.expectEqual(@as(usize, 2), match.cases.items.len);
 
-    // Test cons pattern
+    // Test the first case (cons pattern)
     const cons_case = match.cases.items[0];
+
+    // Verify the pattern in the first case is a cons pattern (head :: tail)
     try testing.expect(cons_case.pattern.* == .cons);
+
+    // Ensure the name of the head variable in the cons pattern is "head"
     try testing.expectEqualStrings("head", cons_case.pattern.cons.head.variable.name);
+
+    // Ensure the name of the tail variable in the cons pattern is "tail"
     try testing.expectEqualStrings("tail", cons_case.pattern.cons.tail.variable.name);
 
-    // Test empty list pattern
+    // Test the second case (empty list pattern)
     const empty_case = match.cases.items[1];
+
+    // Verify the pattern in the second case is an empty list
     try testing.expect(empty_case.pattern.* == .empty_list);
 }
 
 test "[MatchExprNode] (with guards)" {
+    // Setup
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     // match x on | n when n > 0 => "positive" | n => "non-positive"
 
+    // Action
     const value = try allocator.create(Node);
     value.* = .{
         .lower_identifier = .{
@@ -3100,20 +3586,39 @@ test "[MatchExprNode] (with guards)" {
         },
     };
 
+    // Assertions
     const match = node.match_expr;
+
+    // Verify the match expression has exactly two cases
     try testing.expectEqual(@as(usize, 2), match.cases.items.len);
 
-    // Test guarded case
+    // Test the first case (guarded case)
     const guarded_case = match.cases.items[0];
+
+    // Verify the pattern in the guarded case is a variable
     try testing.expect(guarded_case.pattern.* == .variable);
+
+    // Verify the name of the variable
     try testing.expectEqualStrings("n", guarded_case.pattern.variable.name);
+
+    // Ensure the guarded case has a guard condition
     try testing.expect(guarded_case.guard != null);
+
+    // Verify the expression in the guarded case is the string literal "positive"
     try testing.expectEqualStrings("positive", guarded_case.expression.str_literal.value);
 
-    // Test catch-all case
+    // Test the second case (catch-all case)
     const catchall_case = match.cases.items[1];
+
+    // Verify the pattern in the catch-all case is a variable
     try testing.expect(catchall_case.pattern.* == .variable);
+
+    // Ensure the name of the variable in the pattern is "n"
     try testing.expectEqualStrings("n", catchall_case.pattern.variable.name);
+
+    // Ensure the catch-all case does not have a guard condition
     try testing.expect(catchall_case.guard == null);
+
+    // Verify the expression in the catch-all case is the string literal "non-positive"
     try testing.expectEqualStrings("non-positive", catchall_case.expression.str_literal.value);
 }

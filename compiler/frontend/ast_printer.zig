@@ -214,6 +214,7 @@ test "example" {
 
     const two = try allocator.create(ast.Node);
     defer allocator.destroy(two);
+
     two.* = .{
         .int_literal = .{
             .value = 2,
@@ -231,6 +232,7 @@ test "example" {
 
     const three = try allocator.create(ast.Node);
     defer allocator.destroy(three);
+
     three.* = .{
         .int_literal = .{
             .value = 3,
@@ -248,6 +250,7 @@ test "example" {
 
     const mul = try allocator.create(ast.Node);
     defer allocator.destroy(mul);
+
     mul.* = .{
         .arithmetic_expr = .{
             .left = two,
@@ -266,6 +269,7 @@ test "example" {
 
     const one = try allocator.create(ast.Node);
     defer allocator.destroy(one);
+
     one.* = .{
         .int_literal = .{
             .value = 1,
@@ -283,6 +287,7 @@ test "example" {
 
     const add = try allocator.create(ast.Node);
     defer allocator.destroy(add);
+
     add.* = .{
         .arithmetic_expr = .{
             .left = one,

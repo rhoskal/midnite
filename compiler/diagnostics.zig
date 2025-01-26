@@ -24,7 +24,7 @@ pub const Diagnostic = struct {
             line_end += 1;
         }
 
-        return Diagnostic{
+        return .{
             .problem = problem,
             .hint = hint,
             .snippet = source[line_start..line_end],
