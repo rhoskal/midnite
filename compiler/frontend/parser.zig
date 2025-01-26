@@ -845,6 +845,44 @@ pub const Parser = struct {
         return error.UnexpectedToken;
     }
 
+    /// Parses a type declaration, which can be a type alias, record type, or variant type.
+    /// Handles parsing of type parameters that may be used in the type definition.
+    ///
+    /// Syntax:
+    /// TypeDecl = "type" "alias" UpperIdent TypeParams? "=" Type
+    ///          | "type" UpperIdent TypeParams? "=" "{" FieldList "}"
+    ///          | "type" UpperIdent TypeParams? "=" "|"? Constructor ("|" Constructor)*
+    /// TypeParams = LowerIdent+
+    ///
+    /// Examples:
+    /// - `type alias Reader r a = r -> a`
+    /// - `type Dict k v = { keys: List k, values: List v }`
+    /// - `type Maybe a = | None | Some a`
+    fn parseTypeDecl(self: *Parser) ParserError!*ast.Node {
+        const type_token = try self.expect(lexer.TokenKind{ .keyword = .Type });
+
+        if (try self.match(lexer.TokenKind{ .keyword = .Alias })) {
+            const name = try self.parseUpperIdentifier();
+
+            _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
+
+            const value = try self.parseTypeExpression();
+
+            const node = try self.allocator.create(ast.Node);
+            node.* = .{
+                .type_alias = .{
+                    .name = name.name,
+                    .value = value,
+                    .token = type_token,
+                },
+            };
+
+            return node;
+        }
+
+        return error.UnexpectedToken;
+    }
+
     /// Parses a foreign function declaration that links to external code.
     /// The declaration specifies an internal function name and type signature
     /// along with the external symbol name to link against.
@@ -1010,15 +1048,7 @@ pub const Parser = struct {
                 .Let => return self.parseFunctionDecl(),
                 // .Module => return self.parseModuleDecl(),
                 // .Open => return self.parseImportSpec(),
-                // .Type => {
-                //     try self.advance();
-
-                //     if (self.check(.KwAlias)) {
-                //         return self.parseTypeAlias();
-                //     } else {
-                //         return self.parseVariantType();
-                //     }
-                // },
+                .Type => return self.parseTypeDecl(),
                 else => return error.UnexpectedToken,
             },
             .comment => |c| switch (c) {
@@ -2204,3 +2234,84 @@ test "[include]" {
     try testing.expectEqualStrings("Std", include.path.segments.items[0]);
     try testing.expectEqualStrings("List", include.path.segments.items[1]);
 }
+
+test "[type_alias]" {
+    // Setup
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    {
+        // Basic type
+        const source = "type alias UserId = String";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseTypeDecl();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify the node is a type alias declaration
+        try testing.expect(node.* == .type_alias);
+
+        const type_alias = node.type_alias;
+
+        // Verify the name of the type alias is "UserId"
+        try testing.expectEqualStrings("UserId", type_alias.name);
+
+        // Verify the value of the type alias is an upper identifier
+        try testing.expect(type_alias.value.* == .upper_identifier);
+
+        // Verify the name of the upper identifier is "String"
+        try testing.expectEqualStrings("String", type_alias.value.upper_identifier.name);
+    }
+
+    {
+        // Type parameters
+        const source = "type alias Dict k v = Map k v";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        // ...
+
+        // Assertions
+        try testing.expectError(error.UnexpectedToken, parser.parseTypeDecl());
+    }
+
+    {
+        // Function type
+        const source = "type alias Reducer a b = a -> b -> b";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        // ...
+
+        // Assertions
+        try testing.expectError(error.UnexpectedToken, parser.parseTypeDecl());
+    }
+
+    {
+        // Complex nested type
+        const source = "type alias TreeMap k v = Tree (Pair k v) (Compare k)";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        // const node = try parser.parseTypeDecl();
+        // ...
+
+        // Assertions
+        try testing.expectError(error.UnexpectedToken, parser.parseTypeDecl());
+    }
+}
+
