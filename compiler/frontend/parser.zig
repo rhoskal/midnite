@@ -796,17 +796,65 @@ pub const Parser = struct {
     /// - `Maybe a`
     /// - `List String`
     fn parseTypeExpression(self: *Parser) ParserError!*ast.Node {
-        // For now just handle simple types
         if (self.check(lexer.TokenKind{ .identifier = .Upper })) {
-            const type_name = try self.expect(lexer.TokenKind{ .identifier = .Upper });
+            const type_token = self.current_token;
+            const base_type = try self.parseUpperIdentifier();
+
+            const base_node = try self.allocator.create(ast.Node);
+            errdefer self.allocator.destroy(base_node);
+
+            base_node.* = .{
+                .upper_identifier = base_type,
+            };
+
+            // Check for type arguments
+            var type_args = std.ArrayList(*ast.Node).init(self.allocator);
+            errdefer {
+                for (type_args.items) |arg| {
+                    arg.deinit(self.allocator);
+                    self.allocator.destroy(arg);
+                }
+
+                type_args.deinit();
+            }
+
+            var has_args = false;
+
+            while (self.check(lexer.TokenKind{ .identifier = .Lower })) {
+                has_args = true;
+
+                const arg_node = try self.allocator.create(ast.Node);
+                errdefer self.allocator.destroy(arg_node);
+
+                const arg = try self.parseLowerIdentifier();
+                arg_node.* = .{
+                    .lower_identifier = arg,
+                };
+
+                try type_args.append(arg_node);
+            }
+
+            if (!has_args) return base_node;
 
             const node = try self.allocator.create(ast.Node);
-            errdefer self.allocator.destroy(node);
+            errdefer {
+                base_node.deinit(self.allocator);
+                self.allocator.destroy(base_node);
+
+                for (type_args.items) |arg| {
+                    arg.deinit(self.allocator);
+                    self.allocator.destroy(arg);
+                }
+
+                type_args.deinit();
+                self.allocator.destroy(node);
+            }
 
             node.* = .{
-                .upper_identifier = .{
-                    .name = type_name.lexeme,
-                    .token = type_name,
+                .type_application = .{
+                    .base = base_node,
+                    .args = type_args,
+                    .token = type_token,
                 },
             };
 
@@ -837,6 +885,7 @@ pub const Parser = struct {
                 inner_type.deinit(self.allocator);
                 self.allocator.destroy(inner_type);
             }
+
             _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
 
             return inner_type;
@@ -861,26 +910,57 @@ pub const Parser = struct {
     fn parseTypeDecl(self: *Parser) ParserError!*ast.Node {
         const type_token = try self.expect(lexer.TokenKind{ .keyword = .Type });
 
-        if (try self.match(lexer.TokenKind{ .keyword = .Alias })) {
-            const name = try self.parseUpperIdentifier();
+        _ = try self.expect(lexer.TokenKind{ .keyword = .Alias });
 
-            _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
+        const type_ident = try self.parseUpperIdentifier();
 
-            const value = try self.parseTypeExpression();
+        var type_params = std.ArrayList([]const u8).init(self.allocator);
+        errdefer {
+            for (type_params.items) |param| {
+                self.allocator.free(param);
+            }
 
-            const node = try self.allocator.create(ast.Node);
-            node.* = .{
-                .type_alias = .{
-                    .name = name.name,
-                    .value = value,
-                    .token = type_token,
-                },
-            };
-
-            return node;
+            type_params.deinit();
         }
 
-        return error.UnexpectedToken;
+        while (self.check(lexer.TokenKind{ .identifier = .Lower })) {
+            const param = try self.parseLowerIdentifier();
+
+            const duped = try self.allocator.dupe(u8, param.name);
+            errdefer self.allocator.free(duped);
+
+            try type_params.append(duped);
+        }
+
+        _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
+        const value = try self.parseTypeExpression();
+        errdefer {
+            value.deinit(self.allocator);
+            self.allocator.destroy(value);
+        }
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer {
+            for (type_params.items) |param| {
+                self.allocator.free(param);
+            }
+
+            type_params.deinit();
+            value.deinit(self.allocator);
+            self.allocator.destroy(value);
+            self.allocator.destroy(node);
+        }
+
+        node.* = .{
+            .type_alias = .{
+                .name = type_ident.name,
+                .type_params = type_params,
+                .value = value,
+                .token = type_token,
+            },
+        };
+
+        return node;
     }
 
     /// Parses a foreign function declaration that links to external code.
@@ -2279,10 +2359,47 @@ test "[type_alias]" {
         defer parser.deinit();
 
         // Action
-        // ...
+        const node = try parser.parseTypeDecl();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
 
         // Assertions
-        try testing.expectError(error.UnexpectedToken, parser.parseTypeDecl());
+        // Verify the node is a type alias declaration
+        try testing.expect(node.* == .type_alias);
+
+        const type_alias = node.type_alias;
+
+        // Verify the name of the type alias is "Dict"
+        try testing.expectEqualStrings("Dict", type_alias.name);
+
+        // Verify the type alias has exactly two type parameters
+        try testing.expectEqual(@as(usize, 2), type_alias.type_params.items.len);
+
+        // Verify the type alias type parameters are: "k" and "v"
+        try testing.expectEqualStrings("k", type_alias.type_params.items[0]);
+        try testing.expectEqualStrings("v", type_alias.type_params.items[1]);
+
+        // Check type application
+        try testing.expect(type_alias.value.* == .type_application);
+
+        const app = type_alias.value.type_application;
+
+        // Verify the base type of the type application is "Map"
+        try testing.expect(app.base.* == .upper_identifier);
+        try testing.expectEqualStrings("Map", app.base.upper_identifier.name);
+
+        // Verify the type application has exactly two arguments
+        try testing.expectEqual(@as(usize, 2), app.args.items.len);
+
+        // Verify the first argument is a lower identifier with the name "k"
+        try testing.expect(app.args.items[0].* == .lower_identifier);
+        try testing.expectEqualStrings("k", app.args.items[0].lower_identifier.name);
+
+        // Verify the second argument is a lower identifier with the name "v"
+        try testing.expect(app.args.items[1].* == .lower_identifier);
+        try testing.expectEqualStrings("v", app.args.items[1].lower_identifier.name);
     }
 
     {
@@ -2293,10 +2410,15 @@ test "[type_alias]" {
         defer parser.deinit();
 
         // Action
-        // ...
+        const node = try parser.parseTypeDecl();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
 
         // Assertions
-        try testing.expectError(error.UnexpectedToken, parser.parseTypeDecl());
+        // Verify the node is a type alias declaration
+        try testing.expect(node.* == .type_alias);
     }
 
     {
@@ -2307,11 +2429,15 @@ test "[type_alias]" {
         defer parser.deinit();
 
         // Action
-        // const node = try parser.parseTypeDecl();
-        // ...
+        const node = try parser.parseTypeDecl();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
 
         // Assertions
-        try testing.expectError(error.UnexpectedToken, parser.parseTypeDecl());
+        // Verify the node is a type alias declaration
+        try testing.expect(node.* == .type_alias);
     }
 }
 

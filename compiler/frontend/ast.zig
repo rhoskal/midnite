@@ -589,16 +589,39 @@ pub const VariantTypeNode = struct {
 ///
 /// Examples:
 /// - `type alias UserId = String`
-/// - `type alias Reader r a = r -> a`
-/// - `type alias Parser = String -> Maybe Expr`
+/// - `type alias Dict k v = Map k v`
+/// - `type alias Reducer a b = a -> b -> b`
+/// - `type alias TreeMap k v = Tree (Pair k v) (Compare k)`
 pub const TypeAliasNode = struct {
     /// The name of the type alias.
     name: []const u8,
+
+    /// Array of type parameter names.
+    type_params: std.ArrayList([]const u8),
 
     /// The AST node representing the aliased type.
     value: *Node,
 
     /// The token representing the start of this declaration.
+    token: lexer.Token,
+};
+
+/// Represents an application of type arguments to a type constructor.
+/// For example: in `Map k v`, Map is the base type being applied to args k and v.
+///
+/// Examples:
+/// - `List a` applies type variable a to List constructor
+/// - `Map k v` applies type variables k and v to Map constructor
+/// - `Result e a` applies type variables e and a to Result constructor
+/// - `Tree (Maybe a)` applies complex type (Maybe a) to Tree constructor
+pub const TypeApplicationNode = struct {
+    /// The type constructor being applied (e.g., Map, List, Maybe).
+    base: *Node,
+
+    /// The type arguments being applied.
+    args: std.ArrayList(*Node),
+
+    /// The token representing the type application.
     token: lexer.Token,
 };
 
@@ -689,6 +712,7 @@ pub const Node = union(enum) {
     function_type: FunctionTypeNode,
     record_type: RecordTypeNode,
     type_alias: TypeAliasNode,
+    type_application: TypeApplicationNode,
     typed_hole: TypedHoleNode,
     variant_type: VariantTypeNode,
 
@@ -909,8 +933,25 @@ pub const Node = union(enum) {
                 path.segments.deinit();
             },
             .type_alias => |*alias| {
+                for (alias.type_params.items) |param| {
+                    allocator.free(param);
+                }
+
+                alias.type_params.deinit();
+
                 alias.value.deinit(allocator);
                 allocator.destroy(alias.value);
+            },
+            .type_application => |*app| {
+                app.base.deinit(allocator);
+                allocator.destroy(app.base);
+
+                for (app.args.items) |arg| {
+                    arg.deinit(allocator);
+                    allocator.destroy(arg);
+                }
+
+                app.args.deinit();
             },
             .variant_type => |*vtype| {
                 for (vtype.type_params.items) |param| {
@@ -2548,9 +2589,13 @@ test "[TypeAliasNode]" {
         allocator.destroy(node);
     }
 
+    const type_params = std.ArrayList([]const u8).init(allocator);
+    defer type_params.deinit();
+
     node.* = .{
         .type_alias = .{
             .name = "UserId",
+            .type_params = type_params,
             .value = value,
             .token = .{
                 .kind = .{ .keyword = .Type },
@@ -2587,6 +2632,108 @@ test "[TypeAliasNode]" {
 
     // Verify the lexeme of the upper identifier
     try testing.expectEqualStrings("String", value_node.token.lexeme);
+}
+
+test "[TypeApplicationNode]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Map k v
+
+    const base = try allocator.create(Node);
+    base.* = .{
+        .upper_identifier = .{
+            .name = "Map",
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "Map",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 3 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    var args = std.ArrayList(*Node).init(allocator);
+
+    const k = try allocator.create(Node);
+    k.* = .{
+        .lower_identifier = .{
+            .name = "k",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "k",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 4, .end = 5 },
+                    .src = .{ .line = 1, .col = 5 },
+                },
+            },
+        },
+    };
+
+    const v = try allocator.create(Node);
+    v.* = .{
+        .lower_identifier = .{
+            .name = "v",
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "v",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 6, .end = 7 },
+                    .src = .{ .line = 1, .col = 7 },
+                },
+            },
+        },
+    };
+
+    try args.append(k);
+    try args.append(v);
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
+        .type_application = .{
+            .base = base,
+            .args = args,
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "Map",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 3 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    // Assertions
+    const app = node.type_application;
+
+    // Verify the base type of the type application is an upper identifier named "Map"
+    try testing.expect(app.base.* == .upper_identifier);
+    try testing.expectEqualStrings("Map", app.base.upper_identifier.name);
+
+    // Verify that the type application has exactly two arguments
+    try testing.expectEqual(@as(usize, 2), app.args.items.len);
+
+    // Verify the first argument is a lower identifier with the name "k"
+    try testing.expect(app.args.items[0].* == .lower_identifier);
+    try testing.expectEqualStrings("k", app.args.items[0].lower_identifier.name);
+
+    // Verify the second argument is a lower identifier with the name "v"
+    try testing.expect(app.args.items[1].* == .lower_identifier);
+    try testing.expectEqualStrings("v", app.args.items[1].lower_identifier.name);
 }
 
 test "[VariantTypeNode]" {
