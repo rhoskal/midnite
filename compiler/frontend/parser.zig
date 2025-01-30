@@ -650,7 +650,7 @@ pub const Parser = struct {
         if (self.check(lexer.TokenKind{ .delimiter = .Colon })) {
             try self.advance();
 
-            type_annotation = try self.parseFunctionType();
+            type_annotation = try self.parseTypeExpr();
             errdefer {
                 type_annotation.deinit(self.allocator);
                 self.allocator.destroy(type_annotation);
@@ -737,15 +737,30 @@ pub const Parser = struct {
         return node;
     }
 
-    /// Parses a function type signature consisting of types separated by arrows.
-    /// The final type is considered the return type.
+    /// Parses a type expression, which can be a simple type name or a more complex
+    /// parameterized type.
     ///
     /// Examples:
-    /// - `Int -> Int`
-    /// - `String -> Int -> Bool`
-    /// - `(List a) -> Maybe b -> Result Error c`
-    fn parseFunctionType(self: *Parser) ParserError!*ast.Node {
-        const token = self.current_token;
+    /// - `Int`
+    /// - `Maybe a`
+    /// - `List String`
+    fn parseTypeExpr(self: *Parser) ParserError!*ast.Node {
+        const start_token = self.current_token;
+        var first_type = try self.parseSimpleType();
+        errdefer {
+            first_type.deinit(self.allocator);
+            self.allocator.destroy(first_type);
+        }
+
+        if (!try self.match(lexer.TokenKind{ .symbol = .ArrowRight })) {
+            return first_type;
+        }
+
+        const second_type = try self.parseTypeExpr();
+        errdefer {
+            second_type.deinit(self.allocator);
+            self.allocator.destroy(second_type);
+        }
 
         var param_types = std.ArrayList(*ast.Node).init(self.allocator);
         errdefer {
@@ -757,22 +772,17 @@ pub const Parser = struct {
             param_types.deinit();
         }
 
-        const first_type = try self.parseTypeExpression();
-        errdefer {
-            first_type.deinit(self.allocator);
-            self.allocator.destroy(first_type);
-        }
-
         try param_types.append(first_type);
 
-        while (try self.match(lexer.TokenKind{ .symbol = .ArrowRight })) {
-            const param_type = try self.parseTypeExpression();
-            errdefer {
-                param_type.deinit(self.allocator);
-                self.allocator.destroy(param_type);
+        if (second_type.* == .function_type) {
+            for (second_type.function_type.param_types.items) |param| {
+                try param_types.append(param);
             }
 
-            try param_types.append(param_type);
+            second_type.function_type.param_types.deinit();
+            self.allocator.destroy(second_type);
+        } else {
+            try param_types.append(second_type);
         }
 
         const node = try self.allocator.create(ast.Node);
@@ -781,21 +791,15 @@ pub const Parser = struct {
         node.* = .{
             .function_type = .{
                 .param_types = param_types,
-                .token = token,
+                .token = start_token,
             },
         };
 
         return node;
     }
 
-    /// Parses a type expression, which can be a simple type name or a more complex
-    /// parameterized type.
-    ///
-    /// Examples:
-    /// - `Int`
-    /// - `Maybe a`
-    /// - `List String`
-    fn parseTypeExpression(self: *Parser) ParserError!*ast.Node {
+    /// Helper function to parse non-function types
+    fn parseSimpleType(self: *Parser) ParserError!*ast.Node {
         if (self.check(lexer.TokenKind{ .identifier = .Upper })) {
             const type_token = self.current_token;
             const base_type = try self.parseUpperIdentifier();
@@ -820,18 +824,34 @@ pub const Parser = struct {
 
             var has_args = false;
 
-            while (self.check(lexer.TokenKind{ .identifier = .Lower })) {
-                has_args = true;
+            // Parse either a lower identifier or a parenthesized type expression
+            while (true) {
+                if (self.check(lexer.TokenKind{ .identifier = .Lower })) {
+                    has_args = true;
 
-                const arg_node = try self.allocator.create(ast.Node);
-                errdefer self.allocator.destroy(arg_node);
+                    const arg_node = try self.allocator.create(ast.Node);
+                    errdefer self.allocator.destroy(arg_node);
 
-                const arg = try self.parseLowerIdentifier();
-                arg_node.* = .{
-                    .lower_identifier = arg,
-                };
+                    const arg = try self.parseLowerIdentifier();
+                    arg_node.* = .{
+                        .lower_identifier = arg,
+                    };
 
-                try type_args.append(arg_node);
+                    try type_args.append(arg_node);
+                } else if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
+                    has_args = true;
+
+                    const inner_type = try self.parseTypeExpr();
+                    errdefer {
+                        inner_type.deinit(self.allocator);
+                        self.allocator.destroy(inner_type);
+                    }
+
+                    _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+                    try type_args.append(inner_type);
+                } else {
+                    break;
+                }
             }
 
             if (!has_args) return base_node;
@@ -880,7 +900,7 @@ pub const Parser = struct {
 
         // Handle parenthesized type expressions
         if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
-            const inner_type = try self.parseTypeExpression();
+            const inner_type = try self.parseTypeExpr();
             errdefer {
                 inner_type.deinit(self.allocator);
                 self.allocator.destroy(inner_type);
@@ -933,7 +953,7 @@ pub const Parser = struct {
         }
 
         _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
-        const value = try self.parseTypeExpression();
+        const value = try self.parseTypeExpr();
         errdefer {
             value.deinit(self.allocator);
             self.allocator.destroy(value);
@@ -980,7 +1000,7 @@ pub const Parser = struct {
         const name = try self.parseLowerIdentifier();
 
         _ = try self.expect(lexer.TokenKind{ .delimiter = .Colon });
-        const type_annotation = try self.parseFunctionType();
+        const type_annotation = try self.parseTypeExpr();
         errdefer type_annotation.deinit(self.allocator);
 
         _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
@@ -1276,7 +1296,7 @@ test "[int_literal]" {
         // Ensure the lexeme matches the source string
         try testing.expectEqualStrings(case.source, lit.token.lexeme);
 
-        // Verify that the parsed integer value matches the expected value
+        // Verify the parsed integer value matches the expected value
         try testing.expectEqual(case.expected, lit.value);
     }
 }
@@ -1315,7 +1335,7 @@ test "[float_literal]" {
         // Ensure the lexeme matches the source string
         try testing.expectEqualStrings(case.source, lit.token.lexeme);
 
-        // Verify that the parsed float value matches the expected value
+        // Verify the parsed float value matches the expected value
         try testing.expectEqual(case.expected, lit.value);
     }
 }
@@ -1393,7 +1413,7 @@ test "[str_literal]" {
         // Ensure the lexeme matches the source string
         try testing.expectEqualStrings(case.source, lit.token.lexeme);
 
-        // Verify that the parsed string value matches the expected value
+        // Verify the parsed string value matches the expected value
         try testing.expectEqualStrings(case.expected, lit.value);
     }
 }
@@ -1444,7 +1464,7 @@ test "[char_literal]" {
         // Ensure the lexeme matches the source string
         try testing.expectEqualStrings(case.source, lit.token.lexeme);
 
-        // Verify that the parsed char value matches the expected value
+        // Verify the parsed char value matches the expected value
         try testing.expectEqual(case.expected, lit.value);
     }
 }
@@ -1476,7 +1496,7 @@ test "[lower_identifier]" {
         const ident = try parser.parseLowerIdentifier();
 
         // Assertions
-        // Verify that the token is recognized as a lower identifier
+        // Verify the token is recognized as a lower identifier
         try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, ident.token.kind);
 
         // Ensure the lexeme matches the source string
@@ -1515,7 +1535,7 @@ test "[upper_identifier]" {
         const ident = try parser.parseUpperIdentifier();
 
         // Assertions
-        // Verify that the token is recognized as an upper identifier
+        // Verify the token is recognized as an upper identifier
         try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, ident.token.kind);
 
         // Ensure the lexeme matches the source string
@@ -2101,10 +2121,10 @@ test "[function_decl] (simple)" {
     // Check the function name matches
     try testing.expectEqualStrings("add", decl.name);
 
-    // Verify that the type annotation is null for this simple function declaration
+    // Verify the type annotation is null for this simple function declaration
     try testing.expect(decl.type_annotation == null);
 
-    // Verify that the function's value is a lambda expression
+    // Verify the function's value is a lambda expression
     try testing.expect(decl.value.* == .lambda_expr);
 
     const lambda = decl.value.lambda_expr;
@@ -2116,7 +2136,7 @@ test "[function_decl] (simple)" {
     try testing.expectEqualStrings("x", lambda.params.items[0]);
     try testing.expectEqualStrings("y", lambda.params.items[1]);
 
-    // Verify that the lambda body is an arithmetic expression
+    // Verify the lambda body is an arithmetic expression
     try testing.expect(lambda.body.* == .arithmetic_expr);
 
     const body = lambda.body.arithmetic_expr;
@@ -2167,16 +2187,16 @@ test "[function_decl] (w/ type annotation)" {
 
     const type_annotation = decl.type_annotation.?.function_type;
 
-    // Verify that the function type has exactly two parameter types
+    // Verify the function type has exactly two parameter types
     try testing.expectEqual(@as(usize, 2), type_annotation.param_types.items.len);
 
     // Check both parameter types are upper identifiers with the name "Int"
     try testing.expect(type_annotation.param_types.items[0].* == .upper_identifier);
-    try testing.expect(type_annotation.param_types.items[1].* == .upper_identifier);
     try testing.expectEqualStrings("Int", type_annotation.param_types.items[0].upper_identifier.name);
+    try testing.expect(type_annotation.param_types.items[1].* == .upper_identifier);
     try testing.expectEqualStrings("Int", type_annotation.param_types.items[1].upper_identifier.name);
 
-    // Verify that the function's value is a lambda expression
+    // Verify the function's value is a lambda expression
     try testing.expect(decl.value.* == .lambda_expr);
 
     const lambda = decl.value.lambda_expr;
@@ -2187,7 +2207,7 @@ test "[function_decl] (w/ type annotation)" {
     // Verify the parameter name matches
     try testing.expectEqualStrings("x", lambda.params.items[0]);
 
-    // Verify that the body of the lambda is an arithmetic expression
+    // Verify the body of the lambda is an arithmetic expression
     try testing.expect(lambda.body.* == .arithmetic_expr);
 
     const body = lambda.body.arithmetic_expr;
@@ -2241,7 +2261,7 @@ test "[foreign_function_decl]" {
 
     const type_annotation = decl.type_annotation.function_type;
 
-    // Verify that the function type has exactly two parameter types
+    // Verify the function type has exactly two parameter types
     try testing.expectEqual(@as(usize, 2), type_annotation.param_types.items.len);
 
     // Check both parameter types are upper identifiers with the name "Float"
@@ -2417,8 +2437,36 @@ test "[type_alias]" {
         }
 
         // Assertions
-        // Verify the node is a type alias declaration
+        // Verify that the parsed node represents a type alias declaration
         try testing.expect(node.* == .type_alias);
+
+        const type_alias = node.type_alias;
+
+        // Check the name and type parameters of the alias
+        try testing.expectEqualStrings("Reducer", type_alias.name);
+        try testing.expectEqual(@as(usize, 2), type_alias.type_params.items.len);
+        try testing.expectEqualStrings("a", type_alias.type_params.items[0]);
+        try testing.expectEqualStrings("b", type_alias.type_params.items[1]);
+
+        // Ensure the type alias represents a function type
+        try testing.expect(type_alias.value.* == .function_type);
+
+        const func_type = type_alias.value.function_type;
+
+        // The function type should have three type entries: 'a -> b -> b'
+        try testing.expectEqual(@as(usize, 3), func_type.param_types.items.len);
+
+        // Ensure the first parameter type is 'a'
+        try testing.expect(func_type.param_types.items[0].* == .lower_identifier);
+        try testing.expectEqualStrings("a", func_type.param_types.items[0].lower_identifier.name);
+
+        // Ensure the second parameter type is 'b'
+        try testing.expect(func_type.param_types.items[1].* == .lower_identifier);
+        try testing.expectEqualStrings("b", func_type.param_types.items[1].lower_identifier.name);
+
+        // Ensure the return type is also 'b'
+        try testing.expect(func_type.param_types.items[2].* == .lower_identifier);
+        try testing.expectEqualStrings("b", func_type.param_types.items[2].lower_identifier.name);
     }
 
     {
@@ -2436,8 +2484,74 @@ test "[type_alias]" {
         }
 
         // Assertions
-        // Verify the node is a type alias declaration
+        // Verify that the parsed node represents a type alias declaration
         try testing.expect(node.* == .type_alias);
+
+        const type_alias = node.type_alias;
+
+        // Verify the name and type parameters of the alias
+        try testing.expectEqualStrings("TreeMap", type_alias.name);
+        try testing.expectEqual(@as(usize, 2), type_alias.type_params.items.len);
+        try testing.expectEqualStrings("k", type_alias.type_params.items[0]);
+        try testing.expectEqualStrings("v", type_alias.type_params.items[1]);
+
+        // Ensure the alias represents a type application (Tree with arguments)
+        try testing.expect(type_alias.value.* == .type_application);
+
+        const tree_app = type_alias.value.type_application;
+
+        // Validate that the base type is 'Tree'
+        try testing.expect(tree_app.base.* == .upper_identifier);
+        try testing.expectEqualStrings("Tree", tree_app.base.upper_identifier.name);
+
+        // Ensure 'Tree' has exactly two type arguments: (Pair k v) and (Compare k)
+        try testing.expectEqual(@as(usize, 2), tree_app.args.items.len);
+
+        // Check first argument (Pair k v)
+        {
+            const pair_arg = tree_app.args.items[0];
+
+            // Ensure it's a type application (Pair applied to k and v)
+            try testing.expect(pair_arg.* == .type_application);
+
+            const pair_app = pair_arg.type_application;
+
+            // Verify 'Pair' as the base type
+            try testing.expect(pair_app.base.* == .upper_identifier);
+            try testing.expectEqualStrings("Pair", pair_app.base.upper_identifier.name);
+
+            // Ensure 'Pair' takes two arguments: 'k' and 'v'
+            try testing.expectEqual(@as(usize, 2), pair_app.args.items.len);
+
+            // Validate first argument of Pair: 'k'
+            try testing.expect(pair_app.args.items[0].* == .lower_identifier);
+            try testing.expectEqualStrings("k", pair_app.args.items[0].lower_identifier.name);
+
+            // Validate second argument of Pair: 'v'
+            try testing.expect(pair_app.args.items[1].* == .lower_identifier);
+            try testing.expectEqualStrings("v", pair_app.args.items[1].lower_identifier.name);
+        }
+
+        // Check second argument (Compare k)
+        {
+            const compare_arg = tree_app.args.items[1];
+
+            // Ensure it's a type application (Compare applied to k)
+            try testing.expect(compare_arg.* == .type_application);
+
+            const compare_app = compare_arg.type_application;
+
+            // Verify 'Compare' as the base type
+            try testing.expect(compare_app.base.* == .upper_identifier);
+            try testing.expectEqualStrings("Compare", compare_app.base.upper_identifier.name);
+
+            // Ensure 'Compare' takes exactly one argument: 'k'
+            try testing.expectEqual(@as(usize, 1), compare_app.args.items.len);
+
+            // Validate argument of Compare: 'k'
+            try testing.expect(compare_app.args.items[0].* == .lower_identifier);
+            try testing.expectEqualStrings("k", compare_app.args.items[0].lower_identifier.name);
+        }
     }
 }
 
