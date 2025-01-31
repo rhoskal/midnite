@@ -1,5 +1,7 @@
 const std = @import("std");
+
 const ascii = std.ascii;
+const assert = std.debug.assert;
 
 pub const KeywordKind = enum {
     Alias,
@@ -163,6 +165,15 @@ pub const Token = struct {
     loc: TokenLoc,
 
     pub fn init(kind: TokenKind, lexeme: []const u8, loc: TokenLoc) Token {
+        // Assert location spans are valid
+        assert(loc.span.start <= loc.span.end);
+        // Assert line numbers are 1-based
+        assert(loc.src.line > 0);
+        // Assert column numbers are 1-based
+        assert(loc.src.col > 0);
+        // Assert lexeme length matches span
+        assert(lexeme.len == loc.span.end - loc.span.start);
+
         return .{
             .kind = kind,
             .lexeme = lexeme,
@@ -196,6 +207,9 @@ pub const Lexer = struct {
     loc: TokenLoc,
 
     pub fn init(source: []const u8, filename: []const u8) Lexer {
+        // Filename must not be empty
+        assert(filename.len > 0);
+
         return .{
             .source = source,
             .loc = .{
@@ -208,6 +222,10 @@ pub const Lexer = struct {
 
     /// Peeks at the next character in the source code without advancing the position.
     fn peek(self: *Lexer) ?u8 {
+        // Assert our internal state is valid
+        assert(self.loc.span.end >= self.loc.span.start);
+        assert(self.loc.span.start <= self.source.len);
+
         if (self.loc.span.end >= self.source.len) return null;
 
         return self.source[self.loc.span.end];
@@ -216,7 +234,11 @@ pub const Lexer = struct {
     /// Advances the lexer by one position in the source code.
     /// Updates the current line and column numbers accordingly.
     fn advance(self: *Lexer) void {
-        if (self.loc.span.end >= self.source.len) return;
+        // Assert we haven't reached the end of input
+        assert(self.loc.span.end < self.source.len);
+        // Assert our position tracking is valid
+        assert(self.loc.src.line > 0);
+        assert(self.loc.src.col > 0);
 
         if (self.source[self.loc.span.end] == '\n') {
             self.loc.src.line += 1;
@@ -226,9 +248,14 @@ pub const Lexer = struct {
         }
 
         self.loc.span.end += 1;
+
+        assert(self.loc.span.end <= self.source.len);
+        assert(self.loc.span.end > self.loc.span.start);
     }
 
     fn skipWhitespace(self: *Lexer) void {
+        const initial_pos = self.loc.span.end;
+
         while (self.peek()) |c| {
             if (!ascii.isWhitespace(c)) break;
 
@@ -236,6 +263,11 @@ pub const Lexer = struct {
         }
 
         self.loc.span.start = self.loc.span.end;
+
+        // Assert we've either moved forward or stayed in place
+        assert(self.loc.span.end >= initial_pos);
+        // Assert our start/end positions are synchronized after skipping
+        assert(self.loc.span.start == self.loc.span.end);
     }
 
     /// Checks if there is an exact match for a keyword starting at a given position.
@@ -249,6 +281,10 @@ pub const Lexer = struct {
         keyword: []const u8,
         kind: TokenKind,
     ) ?Token {
+        // Assert the start position is valid
+        assert(start <= self.loc.span.end);
+        assert(start < self.source.len);
+
         const len = keyword.len;
         const lexeme = self.source[start..self.loc.span.end];
 
@@ -269,6 +305,9 @@ pub const Lexer = struct {
             },
         };
 
+        // Assert our column calculation is valid
+        assert(self.loc.src.col >= len);
+
         return Token.init(kind, lexeme, end_loc);
     }
 
@@ -281,6 +320,8 @@ pub const Lexer = struct {
     }
 
     fn hexDigitToValue(digit: u8) u4 {
+        assert(ascii.isHex(digit));
+
         return switch (digit) {
             '0'...'9' => @intCast(digit - '0'),
             'a'...'f' => @intCast(digit - 'a' + 10),
@@ -291,11 +332,18 @@ pub const Lexer = struct {
 
     fn handleNumber(self: *Lexer, base: enum { Decimal, Hex, Octal, Binary }) LexerError!Token {
         const offset = if (base == .Decimal) @as(usize, 0) else 2;
-        const mark = if (base == .Decimal)
+        const position_start = if (base == .Decimal)
             self.loc.span.start
         else
             self.loc.span.end - offset;
+
+        // Assert our starting position is valid
+        assert(position_start <= self.loc.span.end);
+        assert(position_start < self.source.len);
+
         const col_offset = self.loc.src.col - offset;
+        // Assert column calculation is valid
+        assert(col_offset > 0);
 
         if (base != .Decimal) {
             if (self.peek()) |next| {
@@ -410,11 +458,11 @@ pub const Lexer = struct {
                 }
             }
 
-            const lexeme = self.source[mark..self.loc.span.end];
+            const lexeme = self.source[position_start..self.loc.span.end];
             const end_loc = TokenLoc{
                 .filename = self.loc.filename,
                 .span = .{
-                    .start = mark,
+                    .start = position_start,
                     .end = self.loc.span.end,
                 },
                 .src = .{
@@ -426,11 +474,11 @@ pub const Lexer = struct {
             return Token.init(.{ .literal = .Float }, lexeme, end_loc);
         }
 
-        const lexeme = self.source[mark..self.loc.span.end];
+        const lexeme = self.source[position_start..self.loc.span.end];
         const end_loc = TokenLoc{
             .filename = self.loc.filename,
             .span = .{
-                .start = mark,
+                .start = position_start,
                 .end = self.loc.span.end,
             },
             .src = .{
@@ -451,6 +499,11 @@ pub const Lexer = struct {
     }
 
     fn handleUnicodeEscape(self: *Lexer) LexerError!void {
+        const initial_pos = self.loc.span.end;
+
+        // Assert we have input to process
+        assert(self.loc.span.end < self.source.len);
+
         self.advance();
 
         if (self.peek()) |next| {
@@ -506,6 +559,9 @@ pub const Lexer = struct {
 
             return error.CodePointOutOfRange;
         }
+
+        // Assert we've moved forward in the input
+        assert(self.loc.span.end > initial_pos);
     }
 
     /// Retrieves and returns the next token from the source code, advancing the lexer position.
@@ -555,7 +611,7 @@ pub const Lexer = struct {
                 return error.InvalidIdentifier;
             },
             '#' => {
-                const mark = span_start;
+                const position_start = span_start;
                 self.advance();
 
                 var is_doc = false;
@@ -584,7 +640,7 @@ pub const Lexer = struct {
                 }
 
                 const kind = if (is_doc) TokenKind{ .comment = .Doc } else TokenKind{ .comment = .Regular };
-                const lexeme = self.source[mark..self.loc.span.end];
+                const lexeme = self.source[position_start..self.loc.span.end];
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
                     .span = .{
@@ -600,7 +656,7 @@ pub const Lexer = struct {
                 return Token.init(kind, lexeme, end_loc);
             },
             '"' => {
-                const mark = span_start;
+                const position_start = span_start;
                 self.advance();
 
                 if (self.peek()) |next1| {
@@ -659,11 +715,11 @@ pub const Lexer = struct {
 
                                 if (!found_end) return error.UnterminatedStrLiteral;
 
-                                const lexeme = self.source[mark..self.loc.span.end];
+                                const lexeme = self.source[position_start..self.loc.span.end];
                                 const end_loc = TokenLoc{
                                     .filename = self.loc.filename,
                                     .span = .{
-                                        .start = mark,
+                                        .start = position_start,
                                         .end = self.loc.span.end,
                                     },
                                     .src = .{
@@ -676,11 +732,11 @@ pub const Lexer = struct {
                             }
                         }
 
-                        const lexeme = self.source[mark..self.loc.span.end];
+                        const lexeme = self.source[position_start..self.loc.span.end];
                         const end_loc = TokenLoc{
                             .filename = self.loc.filename,
                             .span = .{
-                                .start = mark,
+                                .start = position_start,
                                 .end = self.loc.span.end,
                             },
                             .src = .{
@@ -729,11 +785,11 @@ pub const Lexer = struct {
 
                 if (!found_closing_quote) return error.UnterminatedStrLiteral;
 
-                const lexeme = self.source[mark..self.loc.span.end];
+                const lexeme = self.source[position_start..self.loc.span.end];
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
                     .span = .{
-                        .start = mark,
+                        .start = position_start,
                         .end = self.loc.span.end,
                     },
                     .src = .{
@@ -745,7 +801,7 @@ pub const Lexer = struct {
                 return Token.init(.{ .literal = .String }, lexeme, end_loc);
             },
             '\'' => {
-                const mark = span_start;
+                const position_start = span_start;
                 self.advance();
 
                 if (self.peek() == '\'') return error.EmptyCharLiteral;
@@ -792,11 +848,11 @@ pub const Lexer = struct {
 
                 if (char_count > 1) return error.MultipleCharsInLiteral;
 
-                const lexeme = self.source[mark..self.loc.span.end];
+                const lexeme = self.source[position_start..self.loc.span.end];
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
                     .span = .{
-                        .start = mark,
+                        .start = position_start,
                         .end = self.loc.span.end,
                     },
                     .src = .{
