@@ -824,9 +824,13 @@ pub const Parser = struct {
 
             var has_args = false;
 
-            // Parse either a lower identifier or a parenthesized type expression
+            // Parse sequence of type arguments which can be:
+            // 1. Lower identifiers (type variables like 'a')
+            // 2. Upper identifiers (concrete types like 'String')
+            // 3. Parenthesized type expressions (like '(Maybe a)')
             while (true) {
                 if (self.check(lexer.TokenKind{ .identifier = .Lower })) {
+                    // Handle type variables (e.g., 'a' in 'List a')
                     has_args = true;
 
                     const arg_node = try self.allocator.create(ast.Node);
@@ -838,7 +842,21 @@ pub const Parser = struct {
                     };
 
                     try type_args.append(arg_node);
+                } else if (self.check(lexer.TokenKind{ .identifier = .Upper })) {
+                    // Handle concrete types (e.g., 'String' in 'List String')
+                    has_args = true;
+
+                    const arg_node = try self.allocator.create(ast.Node);
+                    errdefer self.allocator.destroy(arg_node);
+
+                    const arg = try self.parseUpperIdentifier();
+                    arg_node.* = .{
+                        .upper_identifier = arg,
+                    };
+
+                    try type_args.append(arg_node);
                 } else if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
+                    // Handle complex type expressions (e.g., '(Maybe a)' in 'List (Maybe a)')
                     has_args = true;
 
                     const inner_type = try self.parseTypeExpr();
@@ -848,6 +866,7 @@ pub const Parser = struct {
                     }
 
                     _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+
                     try type_args.append(inner_type);
                 } else {
                     break;
@@ -930,8 +949,51 @@ pub const Parser = struct {
     fn parseTypeDecl(self: *Parser) ParserError!*ast.Node {
         const type_token = try self.expect(lexer.TokenKind{ .keyword = .Type });
 
-        _ = try self.expect(lexer.TokenKind{ .keyword = .Alias });
+        if (try self.match(lexer.TokenKind{ .keyword = .Alias })) {
+            const type_ident = try self.parseUpperIdentifier();
 
+            var type_params = std.ArrayList([]const u8).init(self.allocator);
+            errdefer {
+                for (type_params.items) |param| {
+                    self.allocator.free(param);
+                }
+
+                type_params.deinit();
+            }
+
+            while (self.check(lexer.TokenKind{ .identifier = .Lower })) {
+                const param = try self.parseLowerIdentifier();
+
+                const duped = try self.allocator.dupe(u8, param.name);
+                errdefer self.allocator.free(duped);
+
+                try type_params.append(duped);
+            }
+
+            _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
+
+            const value = try self.parseTypeExpr();
+            errdefer {
+                value.deinit(self.allocator);
+                self.allocator.destroy(value);
+            }
+
+            const node = try self.allocator.create(ast.Node);
+            errdefer self.allocator.destroy(node);
+
+            node.* = .{
+                .type_alias = .{
+                    .name = try self.allocator.dupe(u8, type_ident.name),
+                    .type_params = type_params,
+                    .value = value,
+                    .token = type_token,
+                },
+            };
+
+            return node;
+        }
+
+        // Handle record and variant types - parse common prefix first
         const type_ident = try self.parseUpperIdentifier();
 
         var type_params = std.ArrayList([]const u8).init(self.allocator);
@@ -953,34 +1015,63 @@ pub const Parser = struct {
         }
 
         _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
-        const value = try self.parseTypeExpr();
-        errdefer {
-            value.deinit(self.allocator);
-            self.allocator.destroy(value);
-        }
 
-        const node = try self.allocator.create(ast.Node);
-        errdefer {
-            for (type_params.items) |param| {
-                self.allocator.free(param);
+        // Branch based on what follows the equals sign
+        if (try self.match(lexer.TokenKind{ .delimiter = .LeftBrace })) {
+            // Parse record type fields
+            var fields = std.ArrayList(ast.RecordFieldNode).init(self.allocator);
+            errdefer {
+                for (fields.items) |field| {
+                    field.type.deinit(self.allocator);
+                    self.allocator.destroy(field.type);
+                }
+
+                fields.deinit();
             }
 
-            type_params.deinit();
-            value.deinit(self.allocator);
-            self.allocator.destroy(value);
-            self.allocator.destroy(node);
+            // Parse fields until we hit closing brace
+            while (!self.check(lexer.TokenKind{ .delimiter = .RightBrace })) {
+                const field_name = try self.parseLowerIdentifier();
+                _ = try self.expect(lexer.TokenKind{ .delimiter = .Colon });
+
+                const field_type = try self.parseTypeExpr();
+                errdefer {
+                    field_type.deinit(self.allocator);
+                    self.allocator.destroy(field_type);
+                }
+
+                try fields.append(.{
+                    .name = try self.allocator.dupe(u8, field_name.name),
+                    .type = field_type,
+                    .token = field_name.token,
+                });
+
+                // Handle comma between fields
+                if (!self.check(lexer.TokenKind{ .delimiter = .RightBrace })) {
+                    _ = try self.expect(lexer.TokenKind{ .delimiter = .Comma });
+                }
+            }
+
+            _ = try self.expect(lexer.TokenKind{ .delimiter = .RightBrace });
+
+            const node = try self.allocator.create(ast.Node);
+            errdefer self.allocator.destroy(node);
+
+            node.* = .{
+                .record_type = .{
+                    .name = try self.allocator.dupe(u8, type_ident.name),
+                    .type_params = type_params,
+                    .fields = fields,
+                    .token = type_token,
+                },
+            };
+
+            return node;
         }
 
-        node.* = .{
-            .type_alias = .{
-                .name = type_ident.name,
-                .type_params = type_params,
-                .value = value,
-                .token = type_token,
-            },
-        };
+        // TODO: Handle variant types here once we implement them
 
-        return node;
+        return error.UnexpectedToken;
     }
 
     /// Parses a foreign function declaration that links to external code.
@@ -2555,3 +2646,299 @@ test "[type_alias]" {
     }
 }
 
+test "[record_type]" {
+    // Setup
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    {
+        const source = "type User = { name: String, age: Int }";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseTypeDecl();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Ensure the parsed node represents a record type
+        try testing.expect(node.* == .record_type);
+
+        const record = node.record_type;
+
+        // Validate the name of the record type
+        try testing.expectEqualStrings("User", record.name);
+
+        // Ensure the record has no type parameters
+        try testing.expectEqual(@as(usize, 0), record.type_params.items.len);
+
+        // Verify the record has exactly two fields
+        try testing.expectEqual(@as(usize, 2), record.fields.items.len);
+
+        // Check first field (name)
+        {
+            const name_field = record.fields.items[0];
+
+            // Ensure the field name is 'name'
+            try testing.expectEqualStrings("name", name_field.name);
+
+            // Ensure the field type is 'String'
+            try testing.expect(name_field.type.* == .upper_identifier);
+            try testing.expectEqualStrings("String", name_field.type.upper_identifier.name);
+        }
+
+        // Check second field (age)
+        {
+            const age_field = record.fields.items[1];
+
+            // Ensure the field name is 'age'
+            try testing.expectEqualStrings("age", age_field.name);
+
+            // Ensure the field type is 'Int'
+            try testing.expect(age_field.type.* == .upper_identifier);
+            try testing.expectEqualStrings("Int", age_field.type.upper_identifier.name);
+        }
+    }
+
+    {
+        const source = "type Point a = { x: a, y: a }";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseTypeDecl();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Ensure the parsed node represents a record type
+        try testing.expect(node.* == .record_type);
+
+        const record = node.record_type;
+
+        // Validate the name of the record type
+        try testing.expectEqualStrings("Point", record.name);
+
+        // Ensure the record has exactly one type parameter
+        try testing.expectEqual(@as(usize, 1), record.type_params.items.len);
+        try testing.expectEqualStrings("a", record.type_params.items[0]);
+
+        // Verify the record has exactly two fields
+        try testing.expectEqual(@as(usize, 2), record.fields.items.len);
+
+        // Check first field (x)
+        {
+            const x_field = record.fields.items[0];
+
+            // Ensure the field name is 'x'
+            try testing.expectEqualStrings("x", x_field.name);
+
+            // Ensure the field type is the generic type parameter 'a'
+            try testing.expect(x_field.type.* == .lower_identifier);
+            try testing.expectEqualStrings("a", x_field.type.lower_identifier.name);
+        }
+
+        // Check second field (y)
+        {
+            const y_field = record.fields.items[1];
+
+            // Ensure the field name is 'y'
+            try testing.expectEqualStrings("y", y_field.name);
+
+            // Ensure the field type is the generic type parameter 'a'
+            try testing.expect(y_field.type.* == .lower_identifier);
+            try testing.expectEqualStrings("a", y_field.type.lower_identifier.name);
+        }
+    }
+
+    {
+        const source = "type Dict k v = { keys: List k, values: List v }";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseTypeDecl();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Ensure the parsed node represents a record type
+        try testing.expect(node.* == .record_type);
+
+        const record = node.record_type;
+
+        // Validate the name of the record type
+        try testing.expectEqualStrings("Dict", record.name);
+
+        // Ensure the record has exactly two type parameters
+        try testing.expectEqual(@as(usize, 2), record.type_params.items.len);
+        try testing.expectEqualStrings("k", record.type_params.items[0]);
+        try testing.expectEqualStrings("v", record.type_params.items[1]);
+
+        // Verify the record has exactly two fields
+        try testing.expectEqual(@as(usize, 2), record.fields.items.len);
+
+        // Check first field (keys)
+        {
+            const keys_field = record.fields.items[0];
+
+            // Ensure the field name is 'keys'
+            try testing.expectEqualStrings("keys", keys_field.name);
+
+            // Ensure the field type is a type application (List k)
+            try testing.expect(keys_field.type.* == .type_application);
+
+            const app = keys_field.type.type_application;
+
+            // Ensure the base type is 'List'
+            try testing.expect(app.base.* == .upper_identifier);
+            try testing.expectEqualStrings("List", app.base.upper_identifier.name);
+
+            // Ensure 'List' has exactly one type argument: 'k'
+            try testing.expectEqual(@as(usize, 1), app.args.items.len);
+            try testing.expect(app.args.items[0].* == .lower_identifier);
+            try testing.expectEqualStrings("k", app.args.items[0].lower_identifier.name);
+        }
+
+        // Check second field (values)
+        {
+            const values_field = record.fields.items[1];
+
+            // Ensure the field name is 'values'
+            try testing.expectEqualStrings("values", values_field.name);
+
+            // Ensure the field type is a type application (List v)
+            try testing.expect(values_field.type.* == .type_application);
+
+            const app = values_field.type.type_application;
+
+            // Ensure the base type is 'List'
+            try testing.expect(app.base.* == .upper_identifier);
+            try testing.expectEqualStrings("List", app.base.upper_identifier.name);
+
+            // Ensure 'List' has exactly one type argument: 'v'
+            try testing.expectEqual(@as(usize, 1), app.args.items.len);
+            try testing.expect(app.args.items[0].* == .lower_identifier);
+            try testing.expectEqualStrings("v", app.args.items[0].lower_identifier.name);
+        }
+    }
+
+    {
+        const source = "type Storage a = { items: List (Maybe a), count: Maybe Int, names: List String }";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseTypeDecl();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Ensure the parsed node is a record type
+        try testing.expect(node.* == .record_type);
+
+        const record = node.record_type;
+
+        // Validate the name of the record type
+        try testing.expectEqualStrings("Storage", record.name);
+
+        // Ensure 'Storage' has one type parameter: 'a'
+        try testing.expectEqual(@as(usize, 1), record.type_params.items.len);
+        try testing.expectEqualStrings("a", record.type_params.items[0]);
+
+        // Ensure the record has exactly three fields
+        try testing.expectEqual(@as(usize, 3), record.fields.items.len);
+
+        // Check first field (items: List (Maybe a))
+        {
+            const items_field = record.fields.items[0];
+
+            // Ensure the field name is 'items'
+            try testing.expectEqualStrings("items", items_field.name);
+
+            // Ensure the field type is a type application (List (Maybe a))
+            try testing.expect(items_field.type.* == .type_application);
+
+            const list_app = items_field.type.type_application;
+
+            // Ensure the base type is 'List'
+            try testing.expect(list_app.base.* == .upper_identifier);
+            try testing.expectEqualStrings("List", list_app.base.upper_identifier.name);
+
+            // Ensure List has exactly one type argument
+            try testing.expectEqual(@as(usize, 1), list_app.args.items.len);
+
+            // Ensure the argument is another type application (Maybe a)
+            try testing.expect(list_app.args.items[0].* == .type_application);
+
+            const maybe_app = list_app.args.items[0].type_application;
+
+            // Ensure the base type is 'Maybe'
+            try testing.expect(maybe_app.base.* == .upper_identifier);
+            try testing.expectEqualStrings("Maybe", maybe_app.base.upper_identifier.name);
+
+            // Ensure Maybe has one type argument: 'a'
+            try testing.expectEqual(@as(usize, 1), maybe_app.args.items.len);
+            try testing.expect(maybe_app.args.items[0].* == .lower_identifier);
+            try testing.expectEqualStrings("a", maybe_app.args.items[0].lower_identifier.name);
+        }
+
+        // Check second field (count: Maybe Int)
+        {
+            const count_field = record.fields.items[1];
+
+            // Ensure the field name is 'count'
+            try testing.expectEqualStrings("count", count_field.name);
+
+            // Ensure the field type is a type application (Maybe Int)
+            try testing.expect(count_field.type.* == .type_application);
+
+            const maybe_app = count_field.type.type_application;
+
+            // Ensure the base type is 'Maybe'
+            try testing.expect(maybe_app.base.* == .upper_identifier);
+            try testing.expectEqualStrings("Maybe", maybe_app.base.upper_identifier.name);
+
+            // Ensure Maybe has exactly one type argument: 'Int'
+            try testing.expectEqual(@as(usize, 1), maybe_app.args.items.len);
+            try testing.expect(maybe_app.args.items[0].* == .upper_identifier);
+            try testing.expectEqualStrings("Int", maybe_app.args.items[0].upper_identifier.name);
+        }
+
+        // Check third field (names: List String)
+        {
+            const names_field = record.fields.items[2];
+
+            // Ensure the field name is 'names'
+            try testing.expectEqualStrings("names", names_field.name);
+
+            // Ensure the field type is a type application (List String)
+            try testing.expect(names_field.type.* == .type_application);
+
+            const list_app = names_field.type.type_application;
+
+            // Ensure the base type is 'List'
+            try testing.expect(list_app.base.* == .upper_identifier);
+            try testing.expectEqualStrings("List", list_app.base.upper_identifier.name);
+
+            // Ensure List has exactly one type argument: 'String'
+            try testing.expectEqual(@as(usize, 1), list_app.args.items.len);
+            try testing.expect(list_app.args.items[0].* == .upper_identifier);
+            try testing.expectEqualStrings("String", list_app.args.items[0].upper_identifier.name);
+        }
+    }
+}
