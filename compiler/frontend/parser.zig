@@ -1069,7 +1069,87 @@ pub const Parser = struct {
             return node;
         }
 
-        // TODO: Handle variant types here once we implement them
+        if (try self.match(lexer.TokenKind{ .symbol = .Pipe })) {
+            // Parse variant type constructors
+            var constructors = std.ArrayList(ast.VariantConstructorNode).init(self.allocator);
+            errdefer {
+                for (constructors.items) |*constructor| {
+                    constructor.params.deinit();
+                }
+
+                constructors.deinit();
+            }
+
+            // Parse first constructor
+            const constructor = try self.parseUpperIdentifier();
+
+            var params = std.ArrayList(*ast.Node).init(self.allocator);
+            errdefer {
+                for (params.items) |param| {
+                    param.deinit(self.allocator);
+                    self.allocator.destroy(param);
+                }
+
+                params.deinit();
+            }
+
+            // Parse any parameters that follow this constructor
+            while (!self.check(lexer.TokenKind{ .symbol = .Pipe }) and
+                !self.check(lexer.TokenKind{ .special = .Eof }))
+            {
+                const param = try self.parseTypeExpr();
+                try params.append(param);
+            }
+
+            try constructors.append(.{
+                .name = constructor.name,
+                .params = params,
+                .token = constructor.token,
+            });
+
+            // Parse remaining constructors
+            while (try self.match(lexer.TokenKind{ .symbol = .Pipe })) {
+                const next_constructor = try self.parseUpperIdentifier();
+
+                var next_params = std.ArrayList(*ast.Node).init(self.allocator);
+                errdefer {
+                    for (next_params.items) |param| {
+                        param.deinit(self.allocator);
+                        self.allocator.destroy(param);
+                    }
+
+                    next_params.deinit();
+                }
+
+                // Parse any parameters that follow this constructor
+                while (!self.check(lexer.TokenKind{ .symbol = .Pipe }) and
+                    !self.check(lexer.TokenKind{ .special = .Eof }))
+                {
+                    const param = try self.parseTypeExpr();
+                    try next_params.append(param);
+                }
+
+                try constructors.append(.{
+                    .name = next_constructor.name,
+                    .params = next_params,
+                    .token = next_constructor.token,
+                });
+            }
+
+            const node = try self.allocator.create(ast.Node);
+            errdefer self.allocator.destroy(node);
+
+            node.* = .{
+                .variant_type = .{
+                    .name = try self.allocator.dupe(u8, type_ident.name),
+                    .type_params = type_params,
+                    .constructors = constructors,
+                    .token = type_token,
+                },
+            };
+
+            return node;
+        }
 
         return error.UnexpectedToken;
     }
@@ -2939,6 +3019,221 @@ test "[record_type]" {
             try testing.expectEqual(@as(usize, 1), list_app.args.items.len);
             try testing.expect(list_app.args.items[0].* == .upper_identifier);
             try testing.expectEqualStrings("String", list_app.args.items[0].upper_identifier.name);
+        }
+    }
+}
+
+test "[type_variant]" {
+    // Setup
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    {
+        const source = "type Boolean = | True | False";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseTypeDecl();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Ensure the parsed node is a variant type
+        try testing.expect(node.* == .variant_type);
+
+        const variant = node.variant_type;
+
+        // Validate the name of the variant type
+        try testing.expectEqualStrings("Boolean", variant.name);
+
+        // Ensure 'Boolean' has no type parameters
+        try testing.expectEqual(@as(usize, 0), variant.type_params.items.len);
+
+        // Ensure the variant type has exactly two constructors (True, False)
+        try testing.expectEqual(@as(usize, 2), variant.constructors.items.len);
+
+        // Check first constructor (True)
+        {
+            const true_constructor = variant.constructors.items[0];
+
+            // Ensure the constructor is named 'True'
+            try testing.expectEqualStrings("True", true_constructor.name);
+
+            // Ensure 'True' has no associated parameters
+            try testing.expectEqual(@as(usize, 0), true_constructor.params.items.len);
+        }
+
+        // Check second constructor (False)
+        {
+            const false_constructor = variant.constructors.items[1];
+
+            // Ensure the constructor is named 'False'
+            try testing.expectEqualStrings("False", false_constructor.name);
+
+            // Ensure 'False' has no associated parameters
+            try testing.expectEqual(@as(usize, 0), false_constructor.params.items.len);
+        }
+    }
+
+    {
+        const source = "type Maybe a = | None | Some a";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseTypeDecl();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Ensure the parsed node is a variant type
+        try testing.expect(node.* == .variant_type);
+
+        const variant = node.variant_type;
+
+        // Validate the name of the variant type
+        try testing.expectEqualStrings("Maybe", variant.name);
+
+        // Ensure 'Maybe' has a single type parameter 'a'
+        try testing.expectEqual(@as(usize, 1), variant.type_params.items.len);
+        try testing.expectEqualStrings("a", variant.type_params.items[0]);
+
+        // Ensure the variant type has exactly two constructors (None, Some)
+        try testing.expectEqual(@as(usize, 2), variant.constructors.items.len);
+
+        // Check first constructor (None)
+        {
+            const none_constructor = variant.constructors.items[0];
+
+            // Ensure the constructor is named 'None'
+            try testing.expectEqualStrings("None", none_constructor.name);
+
+            // Ensure 'None' has no associated parameters
+            try testing.expectEqual(@as(usize, 0), none_constructor.params.items.len);
+        }
+
+        // Check second constructor (Some a)
+        {
+            const some_constructor = variant.constructors.items[1];
+
+            // Ensure the constructor is named 'Some'
+            try testing.expectEqualStrings("Some", some_constructor.name);
+
+            // Ensure 'Some' has exactly one associated parameter
+            try testing.expectEqual(@as(usize, 1), some_constructor.params.items.len);
+
+            const param = some_constructor.params.items[0];
+
+            // Validate that the parameter is the type variable 'a'
+            try testing.expect(param.* == .lower_identifier);
+            try testing.expectEqualStrings("a", param.lower_identifier.name);
+        }
+    }
+
+    {
+        const source = "type Tree a = | Leaf | Branch (Tree a) a (Tree a)";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseTypeDecl();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Ensure the parsed node is a variant type
+        try testing.expect(node.* == .variant_type);
+
+        const variant = node.variant_type;
+
+        // Validate the name of the variant type
+        try testing.expectEqualStrings("Tree", variant.name);
+
+        // Ensure 'Tree' has a single type parameter 'a'
+        try testing.expectEqual(@as(usize, 1), variant.type_params.items.len);
+        try testing.expectEqualStrings("a", variant.type_params.items[0]);
+
+        // Ensure the variant type has exactly two constructors (Leaf, Branch)
+        try testing.expectEqual(@as(usize, 2), variant.constructors.items.len);
+
+        // Check first constructor (Leaf)
+        {
+            const leaf_constructor = variant.constructors.items[0];
+
+            // Ensure the constructor is named 'Leaf'
+            try testing.expectEqualStrings("Leaf", leaf_constructor.name);
+
+            // Ensure 'Leaf' has no associated parameters
+            try testing.expectEqual(@as(usize, 0), leaf_constructor.params.items.len);
+        }
+
+        // Check second constructor (Branch (Tree a) a (Tree a))
+        {
+            const branch_constructor = variant.constructors.items[1];
+
+            // Ensure the constructor is named 'Branch'
+            try testing.expectEqualStrings("Branch", branch_constructor.name);
+
+            // Ensure 'Branch' has exactly three parameters
+            try testing.expectEqual(@as(usize, 3), branch_constructor.params.items.len);
+
+            // First parameter (Tree a)
+            {
+                const param1 = branch_constructor.params.items[0];
+
+                // Ensure 'param1' is a type application
+                try testing.expect(param1.* == .type_application);
+
+                const app = param1.type_application;
+
+                // Ensure the base type is 'Tree'
+                try testing.expect(app.base.* == .upper_identifier);
+                try testing.expectEqualStrings("Tree", app.base.upper_identifier.name);
+
+                // Ensure 'Tree' is applied to one argument ('a')
+                try testing.expectEqual(@as(usize, 1), app.args.items.len);
+                try testing.expect(app.args.items[0].* == .lower_identifier);
+                try testing.expectEqualStrings("a", app.args.items[0].lower_identifier.name);
+            }
+
+            // Second parameter (a)
+            {
+                const param2 = branch_constructor.params.items[1];
+
+                // Ensure 'param2' is the type variable 'a'
+                try testing.expect(param2.* == .lower_identifier);
+                try testing.expectEqualStrings("a", param2.lower_identifier.name);
+            }
+
+            // Third parameter (Tree a)
+            {
+                const param3 = branch_constructor.params.items[2];
+
+                // Ensure 'param3' is a type application
+                try testing.expect(param3.* == .type_application);
+
+                const app = param3.type_application;
+
+                // Ensure the base type is 'Tree'
+                try testing.expect(app.base.* == .upper_identifier);
+                try testing.expectEqualStrings("Tree", app.base.upper_identifier.name);
+
+                // Ensure 'Tree' is applied to one argument ('a')
+                try testing.expectEqual(@as(usize, 1), app.args.items.len);
+                try testing.expect(app.args.items[0].* == .lower_identifier);
+                try testing.expectEqualStrings("a", app.args.items[0].lower_identifier.name);
+            }
         }
     }
 }
