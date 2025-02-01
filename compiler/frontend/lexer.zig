@@ -220,545 +220,6 @@ pub const Lexer = struct {
         };
     }
 
-    /// Peeks at the next character in the source code without advancing the position.
-    fn peek(self: *Lexer) ?u8 {
-        // Assert our internal state is valid
-        assert(self.loc.span.end >= self.loc.span.start);
-        assert(self.loc.span.start <= self.source.len);
-
-        if (self.loc.span.end < self.source.len) {
-            return self.source[self.loc.span.end];
-        } else {
-            return null;
-        }
-    }
-
-    /// Advances the lexer by one position in the source code.
-    /// Updates the current line and column numbers accordingly.
-    fn advance(self: *Lexer) void {
-        // Assert we haven't reached the end of input
-        assert(self.loc.span.end < self.source.len);
-        // Assert our position tracking is valid
-        assert(self.loc.src.line > 0);
-        assert(self.loc.src.col > 0);
-        // Spans remain ordered
-        assert(self.loc.span.start <= self.loc.span.end);
-
-        if (self.source[self.loc.span.end] == '\n') {
-            self.loc.src.line += 1;
-            self.loc.src.col = 1;
-        } else {
-            self.loc.src.col += 1;
-        }
-
-        self.loc.span.end += 1;
-
-        assert(self.loc.span.end <= self.source.len);
-        assert(self.loc.span.end > self.loc.span.start);
-    }
-
-    fn skipWhitespace(self: *Lexer) void {
-        const initial_pos = self.loc.span.end;
-
-        while (self.peek()) |c| {
-            if (ascii.isWhitespace(c)) {
-                self.advance();
-            } else {
-                break;
-            }
-        }
-
-        self.loc.span.start = self.loc.span.end;
-
-        // Assert we've either moved forward or stayed in place
-        assert(self.loc.span.end >= initial_pos);
-        // Assert our start/end positions are synchronized after skipping
-        assert(self.loc.span.start == self.loc.span.end);
-    }
-
-    /// Checks if there is an exact match for a keyword starting at a given position.
-    ///
-    /// - `start`: The starting position of the match in the source code.
-    /// - `keyword`: The keyword to check for.
-    /// - `kind`: The token kind that corresponds to the keyword.
-    fn checkExactMatch(
-        self: *Lexer,
-        start: usize,
-        keyword: []const u8,
-        kind: TokenKind,
-    ) ?Token {
-        // Assert the start position is valid
-        assert(start <= self.loc.span.end);
-        assert(start < self.source.len);
-
-        const len = keyword.len;
-        const lexeme = self.source[start..self.loc.span.end];
-
-        const is_exact_match = self.loc.span.end - start == len and
-            std.mem.eql(u8, lexeme, keyword);
-
-        if (is_exact_match) {
-            // Assert our column calculation is valid
-            assert(self.loc.src.col >= len);
-
-            return Token.init(kind, lexeme, TokenLoc{
-                .filename = self.loc.filename,
-                .span = .{
-                    .start = start,
-                    .end = self.loc.span.end,
-                },
-                .src = .{
-                    .line = self.loc.src.line,
-                    .col = self.loc.src.col - len,
-                },
-            });
-        } else {
-            return null;
-        }
-    }
-
-    fn isBinDigit(c: u8) bool {
-        return c == '0' or c == '1';
-    }
-
-    fn isOctDigit(c: u8) bool {
-        return c >= '0' and c <= '7';
-    }
-
-    fn hexDigitToValue(digit: u8) u4 {
-        assert(ascii.isHex(digit));
-
-        return switch (digit) {
-            '0'...'9' => @intCast(digit - '0'),
-            'a'...'f' => @intCast(digit - 'a' + 10),
-            'A'...'F' => @intCast(digit - 'A' + 10),
-            else => unreachable,
-        };
-    }
-
-    fn handleNumber(self: *Lexer, base: enum { Decimal, Hex, Octal, Binary }) LexerError!Token {
-        const offset = if (base == .Decimal) @as(usize, 0) else 2;
-        const position_start = if (base == .Decimal)
-            self.loc.span.start
-        else
-            self.loc.span.end - offset;
-
-        // Assert our starting position is valid
-        assert(position_start <= self.loc.span.end);
-        assert(position_start < self.source.len);
-
-        const col_offset = self.loc.src.col - offset;
-        // Assert column calculation is valid
-        assert(col_offset > 0);
-
-        if (base != .Decimal) {
-            if (self.peek()) |next| {
-                if (next == '_') return error.InvalidIntLiteral;
-            }
-        }
-
-        var found_valid_digit = true;
-        var last_was_underscore = false;
-        var is_float = false;
-
-        // Handle initial digit sequence
-        while (self.peek()) |c| {
-            if (base == .Decimal and c == '.') {
-                is_float = true;
-
-                self.advance();
-                break;
-            }
-
-            const is_valid_digit = switch (base) {
-                .Decimal => ascii.isDigit(c),
-                .Hex => ascii.isHex(c),
-                .Binary => isBinDigit(c),
-                .Octal => isOctDigit(c),
-            };
-
-            if (is_valid_digit) {
-                found_valid_digit = true;
-                last_was_underscore = false;
-
-                self.advance();
-            } else if (c == '_') {
-                if (!found_valid_digit or last_was_underscore) {
-                    return error.InvalidIntLiteral;
-                }
-
-                last_was_underscore = true;
-
-                self.advance();
-            } else {
-                break;
-            }
-        }
-
-        if (last_was_underscore) return error.InvalidIntLiteral;
-
-        if (is_float) {
-            // Must have at least one digit after decimal
-            var found_fraction_digit = false;
-            last_was_underscore = false;
-
-            while (self.peek()) |c| {
-                if (ascii.isDigit(c)) {
-                    found_fraction_digit = true;
-                    last_was_underscore = false;
-
-                    self.advance();
-                } else if (c == '_') {
-                    if (!found_fraction_digit or last_was_underscore) {
-                        return error.InvalidFloatLiteral;
-                    }
-
-                    last_was_underscore = true;
-
-                    self.advance();
-                } else {
-                    break;
-                }
-            }
-
-            if (!found_fraction_digit or last_was_underscore) {
-                return error.InvalidFloatLiteral;
-            }
-
-            if (self.peek()) |c| {
-                if (c == 'e') {
-                    self.advance();
-
-                    if (self.peek()) |next| {
-                        if (next == '+' or next == '-') {
-                            self.advance();
-                        }
-                    }
-
-                    // Must have at least one digit in exponent
-                    var found_exponent_digit = false;
-                    last_was_underscore = false;
-
-                    while (self.peek()) |digit| {
-                        if (ascii.isDigit(digit)) {
-                            found_exponent_digit = true;
-                            last_was_underscore = false;
-
-                            self.advance();
-                        } else if (digit == '_') {
-                            if (!found_exponent_digit or last_was_underscore) {
-                                return error.InvalidFloatLiteral;
-                            }
-
-                            last_was_underscore = true;
-
-                            self.advance();
-                        } else {
-                            break;
-                        }
-                    }
-
-                    if (!found_exponent_digit or last_was_underscore) {
-                        return error.InvalidFloatLiteral;
-                    }
-                }
-            }
-
-            const lexeme = self.source[position_start..self.loc.span.end];
-
-            return Token.init(
-                .{ .literal = .Float },
-                lexeme,
-                TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = position_start,
-                        .end = self.loc.span.end,
-                    },
-                    .src = .{
-                        .line = self.loc.src.line,
-                        .col = col_offset,
-                    },
-                },
-            );
-        }
-
-        const lexeme = self.source[position_start..self.loc.span.end];
-
-        return Token.init(
-            .{ .literal = .Int },
-            lexeme,
-            TokenLoc{
-                .filename = self.loc.filename,
-                .span = .{
-                    .start = position_start,
-                    .end = self.loc.span.end,
-                },
-                .src = .{
-                    .line = self.loc.src.line,
-                    .col = col_offset,
-                },
-            },
-        );
-    }
-
-    fn isValidUnicodeCodepoint(value: u21) bool {
-        // Value must be <= 0x10FFFF and not in the surrogate range (0xD800..0xDFFF)
-        if (value > 0x10FFFF) return false;
-        if (value >= 0xD800 and value <= 0xDFFF) return false;
-
-        return true;
-    }
-
-    fn handleUnicodeEscape(self: *Lexer) LexerError!void {
-        const initial_pos = self.loc.span.end;
-
-        // Assert we have input to process
-        assert(self.loc.span.end < self.source.len);
-
-        self.advance();
-
-        if (self.peek()) |next| {
-            if (next != '{') return error.InvalidUnicodeEscapeSequence;
-
-            self.advance();
-        } else {
-            return error.InvalidUnicodeEscapeSequence;
-        }
-
-        // Save the starting position of the hex digits
-        const escape_start = self.loc.span.end;
-        const escape_col = self.loc.src.col;
-
-        var unicode_value: u21 = 0;
-        var digit_count: usize = 0;
-        while (digit_count < 6) : (digit_count += 1) {
-            if (self.peek()) |hex| {
-                if (ascii.isHex(hex)) {
-                    const digit_value = hexDigitToValue(hex);
-                    unicode_value = (unicode_value << 4) | digit_value;
-
-                    self.advance();
-                } else {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-
-        if (self.peek()) |next| {
-            if (next != '}') {
-                self.loc.span.start = escape_start;
-                self.loc.src.col = escape_col;
-
-                return error.InvalidUnicodeEscapeSequence;
-            }
-
-            self.advance();
-        } else {
-            self.loc.span.start = escape_start;
-            self.loc.src.col = escape_col;
-
-            return error.InvalidUnicodeEscapeSequence;
-        }
-
-        if (digit_count == 0) {
-            self.loc.span.start = escape_start;
-            self.loc.src.col = escape_col;
-
-            return error.InvalidUnicodeEscapeSequence;
-        }
-
-        if (!isValidUnicodeCodepoint(unicode_value)) {
-            self.loc.span.start = escape_start - 2;
-            self.loc.src.col = escape_col - 2;
-
-            return error.CodePointOutOfRange;
-        }
-
-        // Assert we've moved forward in the input
-        assert(self.loc.span.end > initial_pos);
-        // Assert we're still in bounds
-        assert(self.loc.span.end <= self.source.len);
-    }
-
-    fn handleStringLiteral(self: *Lexer, span_start: usize) LexerError!Token {
-        const start_line = self.loc.src.line;
-        const start_col = self.loc.src.col;
-
-        assert(self.source[self.loc.span.end - 1] == '"');
-
-        // Check for multiline string
-        if (self.peek()) |next1| {
-            if (next1 == '"') {
-                self.advance();
-
-                if (self.peek()) |next2| {
-                    if (next2 == '"') {
-                        self.advance();
-
-                        return try self.handleMultilineString(span_start, start_line, start_col);
-                    }
-                }
-
-                // Just two quotes - empty string
-                const lexeme = self.source[span_start..self.loc.span.end];
-
-                return Token.init(
-                    .{ .literal = .String },
-                    lexeme,
-                    TokenLoc{
-                        .filename = self.loc.filename,
-                        .span = .{
-                            .start = span_start,
-                            .end = self.loc.span.end,
-                        },
-                        .src = .{
-                            .line = start_line,
-                            .col = start_col,
-                        },
-                    },
-                );
-            }
-        }
-
-        var found_closing_quote = false;
-
-        while (self.peek()) |next| {
-            if (next == '"') {
-                self.advance();
-
-                found_closing_quote = true;
-                break;
-            }
-
-            if (next == '\\') {
-                self.advance();
-
-                if (self.peek()) |escaped_char| {
-                    switch (escaped_char) {
-                        '\\', '"', 'n', 't', 'r' => self.advance(),
-                        'u' => try self.handleUnicodeEscape(),
-                        else => return error.UnrecognizedStrEscapeSequence,
-                    }
-                } else {
-                    return error.UnterminatedStrLiteral;
-                }
-            } else {
-                const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
-                    // fail silently with invalid sequence
-                    self.advance();
-
-                    continue;
-                };
-
-                var i: usize = 0;
-                while (i < utf8_len) : (i += 1) {
-                    self.advance();
-                }
-            }
-        }
-
-        if (found_closing_quote) {
-            const lexeme = self.source[span_start..self.loc.span.end];
-
-            return Token.init(
-                .{ .literal = .String },
-                lexeme,
-                TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                },
-            );
-        } else {
-            return error.UnterminatedStrLiteral;
-        }
-    }
-
-    fn handleMultilineString(self: *Lexer, span_start: usize, start_line: usize, start_col: usize) LexerError!Token {
-        // We must have processed at least the opening triple quotes
-        assert(self.loc.span.end >= 3);
-        // Verify we entered this function after seeing exactly three quote characters
-        assert(std.mem.eql(u8, self.source[self.loc.span.end - 3 .. self.loc.span.end], "\"\"\""));
-
-        var found_end = false;
-
-        while (self.peek()) |next| {
-            if (next == '"') {
-                self.advance();
-
-                if (self.peek()) |quote2| {
-                    if (quote2 == '"') {
-                        self.advance();
-
-                        if (self.peek()) |quote3| {
-                            if (quote3 == '"') {
-                                self.advance();
-
-                                found_end = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if (!found_end) {
-                    const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
-                        // fail silently with invalid sequence
-                        continue;
-                    };
-
-                    var i: usize = 1;
-                    while (i < utf8_len) : (i += 1) {
-                        self.advance();
-                    }
-                }
-            } else {
-                const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
-                    // fail silently with invalid sequence
-                    self.advance();
-
-                    continue;
-                };
-
-                var i: usize = 0;
-                while (i < utf8_len) : (i += 1) {
-                    self.advance();
-                }
-            }
-        }
-
-        if (found_end) {
-            const lexeme = self.source[span_start..self.loc.span.end];
-
-            return Token.init(
-                .{ .literal = .MultilineString },
-                lexeme,
-                TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                },
-            );
-        } else {
-            return error.UnterminatedStrLiteral;
-        }
-    }
-
     /// Retrieves and returns the next token from the source code, advancing the lexer position.
     pub fn nextToken(self: *Lexer) LexerError!Token {
         // Assert our position tracking is valid
@@ -1978,6 +1439,545 @@ pub const Lexer = struct {
                 );
             },
         }
+    }
+
+    /// Peeks at the next character in the source code without advancing the position.
+    fn peek(self: *Lexer) ?u8 {
+        // Assert our internal state is valid
+        assert(self.loc.span.end >= self.loc.span.start);
+        assert(self.loc.span.start <= self.source.len);
+
+        if (self.loc.span.end < self.source.len) {
+            return self.source[self.loc.span.end];
+        } else {
+            return null;
+        }
+    }
+
+    /// Advances the lexer by one position in the source code.
+    /// Updates the current line and column numbers accordingly.
+    fn advance(self: *Lexer) void {
+        // Assert we haven't reached the end of input
+        assert(self.loc.span.end < self.source.len);
+        // Assert our position tracking is valid
+        assert(self.loc.src.line > 0);
+        assert(self.loc.src.col > 0);
+        // Spans remain ordered
+        assert(self.loc.span.start <= self.loc.span.end);
+
+        if (self.source[self.loc.span.end] == '\n') {
+            self.loc.src.line += 1;
+            self.loc.src.col = 1;
+        } else {
+            self.loc.src.col += 1;
+        }
+
+        self.loc.span.end += 1;
+
+        assert(self.loc.span.end <= self.source.len);
+        assert(self.loc.span.end > self.loc.span.start);
+    }
+
+    fn skipWhitespace(self: *Lexer) void {
+        const initial_pos = self.loc.span.end;
+
+        while (self.peek()) |c| {
+            if (ascii.isWhitespace(c)) {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+
+        self.loc.span.start = self.loc.span.end;
+
+        // Assert we've either moved forward or stayed in place
+        assert(self.loc.span.end >= initial_pos);
+        // Assert our start/end positions are synchronized after skipping
+        assert(self.loc.span.start == self.loc.span.end);
+    }
+
+    /// Checks if there is an exact match for a keyword starting at a given position.
+    ///
+    /// - `start`: The starting position of the match in the source code.
+    /// - `keyword`: The keyword to check for.
+    /// - `kind`: The token kind that corresponds to the keyword.
+    fn checkExactMatch(
+        self: *Lexer,
+        start: usize,
+        keyword: []const u8,
+        kind: TokenKind,
+    ) ?Token {
+        // Assert the start position is valid
+        assert(start <= self.loc.span.end);
+        assert(start < self.source.len);
+
+        const len = keyword.len;
+        const lexeme = self.source[start..self.loc.span.end];
+
+        const is_exact_match = self.loc.span.end - start == len and
+            std.mem.eql(u8, lexeme, keyword);
+
+        if (is_exact_match) {
+            // Assert our column calculation is valid
+            assert(self.loc.src.col >= len);
+
+            return Token.init(kind, lexeme, TokenLoc{
+                .filename = self.loc.filename,
+                .span = .{
+                    .start = start,
+                    .end = self.loc.span.end,
+                },
+                .src = .{
+                    .line = self.loc.src.line,
+                    .col = self.loc.src.col - len,
+                },
+            });
+        } else {
+            return null;
+        }
+    }
+
+    fn handleMultilineString(self: *Lexer, span_start: usize, start_line: usize, start_col: usize) LexerError!Token {
+        // We must have processed at least the opening triple quotes
+        assert(self.loc.span.end >= 3);
+        // Verify we entered this function after seeing exactly three quote characters
+        assert(std.mem.eql(u8, self.source[self.loc.span.end - 3 .. self.loc.span.end], "\"\"\""));
+
+        var found_end = false;
+
+        while (self.peek()) |next| {
+            if (next == '"') {
+                self.advance();
+
+                if (self.peek()) |quote2| {
+                    if (quote2 == '"') {
+                        self.advance();
+
+                        if (self.peek()) |quote3| {
+                            if (quote3 == '"') {
+                                self.advance();
+
+                                found_end = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (!found_end) {
+                    const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
+                        // fail silently with invalid sequence
+                        continue;
+                    };
+
+                    var i: usize = 1;
+                    while (i < utf8_len) : (i += 1) {
+                        self.advance();
+                    }
+                }
+            } else {
+                const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
+                    // fail silently with invalid sequence
+                    self.advance();
+
+                    continue;
+                };
+
+                var i: usize = 0;
+                while (i < utf8_len) : (i += 1) {
+                    self.advance();
+                }
+            }
+        }
+
+        if (found_end) {
+            const lexeme = self.source[span_start..self.loc.span.end];
+
+            return Token.init(
+                .{ .literal = .MultilineString },
+                lexeme,
+                TokenLoc{
+                    .filename = self.loc.filename,
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
+                    },
+                    .src = .{
+                        .line = start_line,
+                        .col = start_col,
+                    },
+                },
+            );
+        } else {
+            return error.UnterminatedStrLiteral;
+        }
+    }
+
+    fn handleNumber(self: *Lexer, base: enum { Decimal, Hex, Octal, Binary }) LexerError!Token {
+        const offset = if (base == .Decimal) @as(usize, 0) else 2;
+        const position_start = if (base == .Decimal)
+            self.loc.span.start
+        else
+            self.loc.span.end - offset;
+
+        // Assert our starting position is valid
+        assert(position_start <= self.loc.span.end);
+        assert(position_start < self.source.len);
+
+        const col_offset = self.loc.src.col - offset;
+        // Assert column calculation is valid
+        assert(col_offset > 0);
+
+        if (base != .Decimal) {
+            if (self.peek()) |next| {
+                if (next == '_') return error.InvalidIntLiteral;
+            }
+        }
+
+        var found_valid_digit = true;
+        var last_was_underscore = false;
+        var is_float = false;
+
+        // Handle initial digit sequence
+        while (self.peek()) |c| {
+            if (base == .Decimal and c == '.') {
+                is_float = true;
+
+                self.advance();
+                break;
+            }
+
+            const is_valid_digit = switch (base) {
+                .Decimal => ascii.isDigit(c),
+                .Hex => ascii.isHex(c),
+                .Binary => isBinDigit(c),
+                .Octal => isOctDigit(c),
+            };
+
+            if (is_valid_digit) {
+                found_valid_digit = true;
+                last_was_underscore = false;
+
+                self.advance();
+            } else if (c == '_') {
+                if (!found_valid_digit or last_was_underscore) {
+                    return error.InvalidIntLiteral;
+                }
+
+                last_was_underscore = true;
+
+                self.advance();
+            } else {
+                break;
+            }
+        }
+
+        if (last_was_underscore) return error.InvalidIntLiteral;
+
+        if (is_float) {
+            // Must have at least one digit after decimal
+            var found_fraction_digit = false;
+            last_was_underscore = false;
+
+            while (self.peek()) |c| {
+                if (ascii.isDigit(c)) {
+                    found_fraction_digit = true;
+                    last_was_underscore = false;
+
+                    self.advance();
+                } else if (c == '_') {
+                    if (!found_fraction_digit or last_was_underscore) {
+                        return error.InvalidFloatLiteral;
+                    }
+
+                    last_was_underscore = true;
+
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+
+            if (!found_fraction_digit or last_was_underscore) {
+                return error.InvalidFloatLiteral;
+            }
+
+            if (self.peek()) |c| {
+                if (c == 'e') {
+                    self.advance();
+
+                    if (self.peek()) |next| {
+                        if (next == '+' or next == '-') {
+                            self.advance();
+                        }
+                    }
+
+                    // Must have at least one digit in exponent
+                    var found_exponent_digit = false;
+                    last_was_underscore = false;
+
+                    while (self.peek()) |digit| {
+                        if (ascii.isDigit(digit)) {
+                            found_exponent_digit = true;
+                            last_was_underscore = false;
+
+                            self.advance();
+                        } else if (digit == '_') {
+                            if (!found_exponent_digit or last_was_underscore) {
+                                return error.InvalidFloatLiteral;
+                            }
+
+                            last_was_underscore = true;
+
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if (!found_exponent_digit or last_was_underscore) {
+                        return error.InvalidFloatLiteral;
+                    }
+                }
+            }
+
+            const lexeme = self.source[position_start..self.loc.span.end];
+
+            return Token.init(
+                .{ .literal = .Float },
+                lexeme,
+                TokenLoc{
+                    .filename = self.loc.filename,
+                    .span = .{
+                        .start = position_start,
+                        .end = self.loc.span.end,
+                    },
+                    .src = .{
+                        .line = self.loc.src.line,
+                        .col = col_offset,
+                    },
+                },
+            );
+        }
+
+        const lexeme = self.source[position_start..self.loc.span.end];
+
+        return Token.init(
+            .{ .literal = .Int },
+            lexeme,
+            TokenLoc{
+                .filename = self.loc.filename,
+                .span = .{
+                    .start = position_start,
+                    .end = self.loc.span.end,
+                },
+                .src = .{
+                    .line = self.loc.src.line,
+                    .col = col_offset,
+                },
+            },
+        );
+    }
+
+    fn handleStringLiteral(self: *Lexer, span_start: usize) LexerError!Token {
+        const start_line = self.loc.src.line;
+        const start_col = self.loc.src.col;
+
+        assert(self.source[self.loc.span.end - 1] == '"');
+
+        // Check for multiline string
+        if (self.peek()) |next1| {
+            if (next1 == '"') {
+                self.advance();
+
+                if (self.peek()) |next2| {
+                    if (next2 == '"') {
+                        self.advance();
+
+                        return try self.handleMultilineString(span_start, start_line, start_col);
+                    }
+                }
+
+                // Just two quotes - empty string
+                const lexeme = self.source[span_start..self.loc.span.end];
+
+                return Token.init(
+                    .{ .literal = .String },
+                    lexeme,
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
+                    },
+                );
+            }
+        }
+
+        var found_closing_quote = false;
+
+        while (self.peek()) |next| {
+            if (next == '"') {
+                self.advance();
+
+                found_closing_quote = true;
+                break;
+            }
+
+            if (next == '\\') {
+                self.advance();
+
+                if (self.peek()) |escaped_char| {
+                    switch (escaped_char) {
+                        '\\', '"', 'n', 't', 'r' => self.advance(),
+                        'u' => try self.handleUnicodeEscape(),
+                        else => return error.UnrecognizedStrEscapeSequence,
+                    }
+                } else {
+                    return error.UnterminatedStrLiteral;
+                }
+            } else {
+                const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
+                    // fail silently with invalid sequence
+                    self.advance();
+
+                    continue;
+                };
+
+                var i: usize = 0;
+                while (i < utf8_len) : (i += 1) {
+                    self.advance();
+                }
+            }
+        }
+
+        if (found_closing_quote) {
+            const lexeme = self.source[span_start..self.loc.span.end];
+
+            return Token.init(
+                .{ .literal = .String },
+                lexeme,
+                TokenLoc{
+                    .filename = self.loc.filename,
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
+                    },
+                    .src = .{
+                        .line = start_line,
+                        .col = start_col,
+                    },
+                },
+            );
+        } else {
+            return error.UnterminatedStrLiteral;
+        }
+    }
+
+    fn handleUnicodeEscape(self: *Lexer) LexerError!void {
+        const initial_pos = self.loc.span.end;
+
+        // Assert we have input to process
+        assert(self.loc.span.end < self.source.len);
+
+        self.advance();
+
+        if (self.peek()) |next| {
+            if (next != '{') return error.InvalidUnicodeEscapeSequence;
+
+            self.advance();
+        } else {
+            return error.InvalidUnicodeEscapeSequence;
+        }
+
+        // Save the starting position of the hex digits
+        const escape_start = self.loc.span.end;
+        const escape_col = self.loc.src.col;
+
+        var unicode_value: u21 = 0;
+        var digit_count: usize = 0;
+        while (digit_count < 6) : (digit_count += 1) {
+            if (self.peek()) |hex| {
+                if (ascii.isHex(hex)) {
+                    const digit_value = hexDigitToValue(hex);
+                    unicode_value = (unicode_value << 4) | digit_value;
+
+                    self.advance();
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        if (self.peek()) |next| {
+            if (next != '}') {
+                self.loc.span.start = escape_start;
+                self.loc.src.col = escape_col;
+
+                return error.InvalidUnicodeEscapeSequence;
+            }
+
+            self.advance();
+        } else {
+            self.loc.span.start = escape_start;
+            self.loc.src.col = escape_col;
+
+            return error.InvalidUnicodeEscapeSequence;
+        }
+
+        if (digit_count == 0) {
+            self.loc.span.start = escape_start;
+            self.loc.src.col = escape_col;
+
+            return error.InvalidUnicodeEscapeSequence;
+        }
+
+        if (!isValidUnicodeCodepoint(unicode_value)) {
+            self.loc.span.start = escape_start - 2;
+            self.loc.src.col = escape_col - 2;
+
+            return error.CodePointOutOfRange;
+        }
+
+        // Assert we've moved forward in the input
+        assert(self.loc.span.end > initial_pos);
+        // Assert we're still in bounds
+        assert(self.loc.span.end <= self.source.len);
+    }
+
+    fn hexDigitToValue(digit: u8) u4 {
+        assert(ascii.isHex(digit));
+
+        return switch (digit) {
+            '0'...'9' => @intCast(digit - '0'),
+            'a'...'f' => @intCast(digit - 'a' + 10),
+            'A'...'F' => @intCast(digit - 'A' + 10),
+            else => unreachable,
+        };
+    }
+
+    fn isBinDigit(c: u8) bool {
+        return c == '0' or c == '1';
+    }
+
+    fn isOctDigit(c: u8) bool {
+        return c >= '0' and c <= '7';
+    }
+
+    fn isValidUnicodeCodepoint(value: u21) bool {
+        // Value must be <= 0x10FFFF and not in the surrogate range (0xD800..0xDFFF)
+        if (value > 0x10FFFF) return false;
+        if (value >= 0xD800 and value <= 0xDFFF) return false;
+
+        return true;
     }
 };
 
