@@ -4,9 +4,16 @@ const lexer = @import("frontend/lexer.zig");
 const term = @import("terminal.zig");
 
 pub const Diagnostic = struct {
+    /// The user-facing error message describing the problem that was encountered.
     problem: []const u8,
+
+    /// Additional contextual information to help the user fix the problem.
     hint: []const u8,
+
+    /// The relevant line of source code where the error occurred.
     snippet: []const u8,
+
+    /// Location information for the error, including filename, position and span.
     loc: lexer.TokenLoc,
 
     /// Creates a new ErrorReport from a LexerError and location information.
@@ -127,6 +134,12 @@ pub const Diagnostic = struct {
     const CORNER = "└─";
     const ERROR_MARKER = "^";
 
+    /// Formats the diagnostic message for display, including:
+    /// - A syntax error header
+    /// - The problem description
+    /// - The relevant code snippet with error markers
+    /// - File location information
+    /// - Optional hint text for fixing the error
     pub fn format(self: Diagnostic, raw_writer: anytype) !void {
         const writer = term.ColorWriter.init(raw_writer);
 
