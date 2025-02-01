@@ -1892,10 +1892,12 @@ pub const Lexer = struct {
     }
 
     fn handleUnicodeEscape(self: *Lexer) LexerError!void {
-        const initial_pos = self.loc.span.end;
-
         // Assert we have input to process
         assert(self.loc.span.end < self.source.len);
+        // Spans must remain ordered
+        assert(self.loc.span.end >= self.loc.span.start);
+        assert(self.loc.src.line > 0);
+        assert(self.loc.src.col > 0);
 
         self.advance();
 
@@ -1928,40 +1930,32 @@ pub const Lexer = struct {
             }
         }
 
-        if (self.peek()) |next| {
-            if (next != '}') {
+        if (digit_count > 0) {
+            if (isValidUnicodeCodepoint(unicode_value)) {
+                if (self.peek()) |next| {
+                    if (next == '}') {
+                        self.advance();
+
+                        return;
+                    }
+                }
+
                 self.loc.span.start = escape_start;
                 self.loc.src.col = escape_col;
 
                 return error.InvalidUnicodeEscapeSequence;
-            }
+            } else {
+                self.loc.span.start = escape_start - 2;
+                self.loc.src.col = escape_col - 2;
 
-            self.advance();
+                return error.CodePointOutOfRange;
+            }
         } else {
             self.loc.span.start = escape_start;
             self.loc.src.col = escape_col;
 
             return error.InvalidUnicodeEscapeSequence;
         }
-
-        if (digit_count == 0) {
-            self.loc.span.start = escape_start;
-            self.loc.src.col = escape_col;
-
-            return error.InvalidUnicodeEscapeSequence;
-        }
-
-        if (!isValidUnicodeCodepoint(unicode_value)) {
-            self.loc.span.start = escape_start - 2;
-            self.loc.src.col = escape_col - 2;
-
-            return error.CodePointOutOfRange;
-        }
-
-        // Assert we've moved forward in the input
-        assert(self.loc.span.end > initial_pos);
-        // Assert we're still in bounds
-        assert(self.loc.span.end <= self.source.len);
     }
 
     fn hexDigitToValue(digit: u8) u4 {
