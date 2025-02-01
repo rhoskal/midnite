@@ -241,6 +241,8 @@ pub const Lexer = struct {
         // Assert our position tracking is valid
         assert(self.loc.src.line > 0);
         assert(self.loc.src.col > 0);
+        // Spans remain ordered
+        assert(self.loc.span.start <= self.loc.span.end);
 
         if (self.source[self.loc.span.end] == '\n') {
             self.loc.src.line += 1;
@@ -577,11 +579,196 @@ pub const Lexer = struct {
 
         // Assert we've moved forward in the input
         assert(self.loc.span.end > initial_pos);
+        // Assert we're still in bounds
+        assert(self.loc.span.end <= self.source.len);
+    }
+
+    fn handleStringLiteral(self: *Lexer, span_start: usize) LexerError!Token {
+        const start_line = self.loc.src.line;
+        const start_col = self.loc.src.col;
+
+        assert(self.source[self.loc.span.end - 1] == '"');
+
+        // Check for multiline string
+        if (self.peek()) |next1| {
+            if (next1 == '"') {
+                self.advance();
+
+                if (self.peek()) |next2| {
+                    if (next2 == '"') {
+                        self.advance();
+
+                        return try self.handleMultilineString(span_start, start_line, start_col);
+                    }
+                }
+
+                // Just two quotes - empty string
+                const lexeme = self.source[span_start..self.loc.span.end];
+
+                return Token.init(
+                    .{ .literal = .String },
+                    lexeme,
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
+                    },
+                );
+            }
+        }
+
+        var found_closing_quote = false;
+
+        while (self.peek()) |next| {
+            if (next == '"') {
+                self.advance();
+
+                found_closing_quote = true;
+                break;
+            }
+
+            if (next == '\\') {
+                self.advance();
+
+                if (self.peek()) |escaped_char| {
+                    switch (escaped_char) {
+                        '\\', '"', 'n', 't', 'r' => self.advance(),
+                        'u' => try self.handleUnicodeEscape(),
+                        else => return error.UnrecognizedStrEscapeSequence,
+                    }
+                } else {
+                    return error.UnterminatedStrLiteral;
+                }
+            } else {
+                const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
+                    // fail silently with invalid sequence
+                    self.advance();
+
+                    continue;
+                };
+
+                var i: usize = 0;
+                while (i < utf8_len) : (i += 1) {
+                    self.advance();
+                }
+            }
+        }
+
+        if (found_closing_quote) {
+            const lexeme = self.source[span_start..self.loc.span.end];
+
+            return Token.init(
+                .{ .literal = .String },
+                lexeme,
+                TokenLoc{
+                    .filename = self.loc.filename,
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
+                    },
+                    .src = .{
+                        .line = start_line,
+                        .col = start_col,
+                    },
+                },
+            );
+        } else {
+            return error.UnterminatedStrLiteral;
+        }
+    }
+
+    fn handleMultilineString(self: *Lexer, span_start: usize, start_line: usize, start_col: usize) LexerError!Token {
+        // We must have processed at least the opening triple quotes
+        assert(self.loc.span.end >= 3);
+        // Verify we entered this function after seeing exactly three quote characters
+        assert(std.mem.eql(u8, self.source[self.loc.span.end - 3 .. self.loc.span.end], "\"\"\""));
+
+        var found_end = false;
+
+        while (self.peek()) |next| {
+            if (next == '"') {
+                self.advance();
+
+                if (self.peek()) |quote2| {
+                    if (quote2 == '"') {
+                        self.advance();
+
+                        if (self.peek()) |quote3| {
+                            if (quote3 == '"') {
+                                self.advance();
+
+                                found_end = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (!found_end) {
+                    const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
+                        // fail silently with invalid sequence
+                        continue;
+                    };
+
+                    var i: usize = 1;
+                    while (i < utf8_len) : (i += 1) {
+                        self.advance();
+                    }
+                }
+            } else {
+                const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
+                    // fail silently with invalid sequence
+                    self.advance();
+
+                    continue;
+                };
+
+                var i: usize = 0;
+                while (i < utf8_len) : (i += 1) {
+                    self.advance();
+                }
+            }
+        }
+
+        if (found_end) {
+            const lexeme = self.source[span_start..self.loc.span.end];
+
+            return Token.init(
+                .{ .literal = .MultilineString },
+                lexeme,
+                TokenLoc{
+                    .filename = self.loc.filename,
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
+                    },
+                    .src = .{
+                        .line = start_line,
+                        .col = start_col,
+                    },
+                },
+            );
+        } else {
+            return error.UnterminatedStrLiteral;
+        }
     }
 
     /// Retrieves and returns the next token from the source code, advancing the lexer position.
     pub fn nextToken(self: *Lexer) LexerError!Token {
+        // Assert our position tracking is valid
+        assert(self.loc.span.end >= self.loc.span.start);
+        assert(self.loc.span.start <= self.source.len);
+
         self.skipWhitespace();
+
+        // Verify skipWhitespace properly synchronized positions
+        assert(self.loc.span.start == self.loc.span.end);
 
         const span_start = self.loc.span.start;
         const start_line = self.loc.src.line;
@@ -678,165 +865,9 @@ pub const Lexer = struct {
                 );
             },
             '"' => {
-                const position_start = span_start;
                 self.advance();
 
-                if (self.peek()) |next1| {
-                    if (next1 == '"') {
-                        self.advance();
-
-                        if (self.peek()) |next2| {
-                            if (next2 == '"') {
-                                self.advance();
-
-                                var found_end = false;
-                                while (self.peek()) |next| {
-                                    if (next == '"') {
-                                        self.advance();
-
-                                        if (self.peek()) |quote2| {
-                                            if (quote2 == '"') {
-                                                self.advance();
-
-                                                if (self.peek()) |quote3| {
-                                                    if (quote3 == '"') {
-                                                        self.advance();
-
-                                                        found_end = true;
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        if (!found_end) {
-                                            const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
-                                                // fail silently with invalid sequence
-                                                continue;
-                                            };
-
-                                            var i: usize = 1;
-                                            while (i < utf8_len) : (i += 1) {
-                                                self.advance();
-                                            }
-                                        }
-                                    } else {
-                                        const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
-                                            // fail silently with invalid sequence
-                                            self.advance();
-
-                                            continue;
-                                        };
-
-                                        var i: usize = 0;
-                                        while (i < utf8_len) : (i += 1) {
-                                            self.advance();
-                                        }
-                                    }
-                                }
-
-                                if (found_end) {
-                                    const lexeme = self.source[position_start..self.loc.span.end];
-
-                                    return Token.init(
-                                        .{ .literal = .MultilineString },
-                                        lexeme,
-                                        TokenLoc{
-                                            .filename = self.loc.filename,
-                                            .span = .{
-                                                .start = position_start,
-                                                .end = self.loc.span.end,
-                                            },
-                                            .src = .{
-                                                .line = start_line,
-                                                .col = start_col,
-                                            },
-                                        },
-                                    );
-                                } else {
-                                    return error.UnterminatedStrLiteral;
-                                }
-                            }
-                        }
-
-                        const lexeme = self.source[position_start..self.loc.span.end];
-
-                        return Token.init(
-                            .{ .literal = .String },
-                            lexeme,
-                            TokenLoc{
-                                .filename = self.loc.filename,
-                                .span = .{
-                                    .start = position_start,
-                                    .end = self.loc.span.end,
-                                },
-                                .src = .{
-                                    .line = start_line,
-                                    .col = start_col,
-                                },
-                            },
-                        );
-                    }
-                }
-
-                var found_closing_quote = false;
-
-                while (self.peek()) |next| {
-                    if (next == '"') {
-                        self.advance();
-
-                        found_closing_quote = true;
-                        break;
-                    }
-
-                    if (next == '\\') {
-                        self.advance();
-
-                        if (self.peek()) |escaped_char| {
-                            switch (escaped_char) {
-                                '\\', '"', 'n', 't', 'r' => self.advance(),
-                                'u' => try self.handleUnicodeEscape(),
-                                else => return error.UnrecognizedStrEscapeSequence,
-                            }
-                        } else {
-                            return error.UnterminatedStrLiteral;
-                        }
-                    } else {
-                        const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
-                            // fail silently with invalid sequence
-                            self.advance();
-
-                            continue;
-                        };
-
-                        var i: usize = 0;
-                        while (i < utf8_len) : (i += 1) {
-                            self.advance();
-                        }
-                    }
-                }
-
-                if (found_closing_quote) {
-                    const lexeme = self.source[position_start..self.loc.span.end];
-
-                    return Token.init(
-                        .{ .literal = .String },
-                        lexeme,
-                        TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = position_start,
-                                .end = self.loc.span.end,
-                            },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        },
-                    );
-                } else {
-                    return error.UnterminatedStrLiteral;
-                }
+                return self.handleStringLiteral(span_start);
             },
             '\'' => {
                 const position_start = span_start;
