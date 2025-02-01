@@ -215,6 +215,26 @@ pub const Parser = struct {
     // They return specific node structs rather than allocated Nodes.
     //==========================================================================
 
+    /// Parses a lower-case identifier into a structured node.
+    fn parseLowerIdentifier(self: *Parser) ParserError!ast.LowerIdentifierNode {
+        const token = try self.expect(lexer.TokenKind{ .identifier = .Lower });
+
+        return ast.LowerIdentifierNode{
+            .name = token.lexeme,
+            .token = token,
+        };
+    }
+
+    /// Parses a upper-case identifier into a structured node.
+    fn parseUpperIdentifier(self: *Parser) ParserError!ast.UpperIdentifierNode {
+        const token = try self.expect(lexer.TokenKind{ .identifier = .Upper });
+
+        return ast.UpperIdentifierNode{
+            .name = token.lexeme,
+            .token = token,
+        };
+    }
+
     /// Parses an integer literal value into a structured node.
     /// The literal can be in decimal, hexadecimal (0x), binary (0b), or octal (0o) format.
     /// Underscores in numbers are allowed and ignored (e.g., 1_000_000).
@@ -279,6 +299,32 @@ pub const Parser = struct {
         };
     }
 
+    /// Parses a character literal into its Unicode codepoint value.
+    /// Handles standard characters ('a'), escape sequences ('\n', '\t', etc.),
+    /// and Unicode escape sequences ('\u{0061}').
+    fn parseCharLiteral(self: *Parser) ParserError!ast.CharLiteralNode {
+        const token = try self.expect(lexer.TokenKind{ .literal = .Char });
+
+        // Lexeme includes the quotes, so it's at least 3 chars: 'x'
+        std.debug.assert(token.lexeme.len >= 3);
+
+        const unquoted = token.lexeme[1 .. token.lexeme.len - 1];
+
+        var value: u21 = undefined;
+        if (unquoted[0] == '\\') {
+            value = try parseCharEscapeSequence(unquoted);
+        } else {
+            value = std.unicode.utf8Decode(unquoted) catch {
+                return error.InvalidCharLiteral;
+            };
+        }
+
+        return ast.CharLiteralNode{
+            .value = value,
+            .token = token,
+        };
+    }
+
     const EscapeSequence = struct {
         value: []const u8,
         len: usize,
@@ -316,32 +362,6 @@ pub const Parser = struct {
         };
     }
 
-    /// Parses a character literal into its Unicode codepoint value.
-    /// Handles standard characters ('a'), escape sequences ('\n', '\t', etc.),
-    /// and Unicode escape sequences ('\u{0061}').
-    fn parseCharLiteral(self: *Parser) ParserError!ast.CharLiteralNode {
-        const token = try self.expect(lexer.TokenKind{ .literal = .Char });
-
-        // Lexeme includes the quotes, so it's at least 3 chars: 'x'
-        std.debug.assert(token.lexeme.len >= 3);
-
-        const unquoted = token.lexeme[1 .. token.lexeme.len - 1];
-
-        var value: u21 = undefined;
-        if (unquoted[0] == '\\') {
-            value = try parseCharEscapeSequence(unquoted);
-        } else {
-            value = std.unicode.utf8Decode(unquoted) catch {
-                return error.InvalidCharLiteral;
-            };
-        }
-
-        return ast.CharLiteralNode{
-            .value = value,
-            .token = token,
-        };
-    }
-
     fn parseCharEscapeSequence(unquoted: []const u8) ParserError!u21 {
         return switch (unquoted[1]) {
             'n' => '\n',
@@ -362,26 +382,6 @@ pub const Parser = struct {
         };
     }
 
-    /// Parses a lower-case identifier into a structured node.
-    fn parseLowerIdentifier(self: *Parser) ParserError!ast.LowerIdentifierNode {
-        const token = try self.expect(lexer.TokenKind{ .identifier = .Lower });
-
-        return ast.LowerIdentifierNode{
-            .name = token.lexeme,
-            .token = token,
-        };
-    }
-
-    /// Parses a upper-case identifier into a structured node.
-    fn parseUpperIdentifier(self: *Parser) ParserError!ast.UpperIdentifierNode {
-        const token = try self.expect(lexer.TokenKind{ .identifier = .Upper });
-
-        return ast.UpperIdentifierNode{
-            .name = token.lexeme,
-            .token = token,
-        };
-    }
-
     //==========================================================================
     // Language Construct Parsers
     //==========================================================================
@@ -389,548 +389,54 @@ pub const Parser = struct {
     // They handle allocation and return *ast.Node.
     //==========================================================================
 
-    /// Parses a regular comment node from the input.
-    fn parseComment(self: *Parser) ParserError!*ast.Node {
-        const token = try self.expect(lexer.TokenKind{ .comment = .Regular });
+    /// Parses a complete program, which consists of a sequence of top-level declarations.
+    pub fn parseProgram(self: *Parser) ParserError!*ast.Node {
+        var statements = std.ArrayList(*ast.Node).init(self.allocator);
+        errdefer {
+            for (statements.items) |stmt| {
+                stmt.deinit(self.allocator);
+                self.allocator.destroy(stmt);
+            }
+
+            statements.deinit();
+        }
+
+        while (!self.check(lexer.TokenKind{ .special = .Eof })) {
+            const stmt = try self.parseTopLevel();
+            try statements.append(stmt);
+        }
 
         const node = try self.allocator.create(ast.Node);
         errdefer self.allocator.destroy(node);
 
         node.* = .{
-            .comment = .{
-                .content = token.lexeme,
-                .token = token,
+            .program = .{
+                .statements = statements,
+                .token = self.current_token,
             },
         };
 
         return node;
     }
 
-    /// Parses a documentation comment node from the input.
-    fn parseDocComment(self: *Parser) ParserError!*ast.Node {
-        const token = try self.expect(lexer.TokenKind{ .comment = .Doc });
-
-        const node = try self.allocator.create(ast.Node);
-        errdefer self.allocator.destroy(node);
-
-        node.* = .{
-            .doc_comment = .{
-                .content = token.lexeme,
-                .token = token,
-            },
-        };
-
-        return node;
-    }
-
-    /// Parses a primary expression, such as literals, identifiers, or parenthesized expressions.
-    /// Handles cases for basic literals (int, float, string, char), identifiers (lower and upper),
-    /// and parenthesized expressions.
-    fn parsePrimaryExpr(self: *Parser) ParserError!*ast.Node {
-        const node = try self.allocator.create(ast.Node);
-        errdefer self.allocator.destroy(node);
-
+    /// Parses a single top-level declaration based on the current token.
+    fn parseTopLevel(self: *Parser) ParserError!*ast.Node {
         switch (self.current_token.kind) {
-            .literal => |lit| switch (lit) {
-                .Char => {
-                    const char_literal = try self.parseCharLiteral();
-                    node.* = .{ .char_literal = char_literal };
-                },
-                .Float => {
-                    const float_literal = try self.parseFloatLiteral();
-                    node.* = .{ .float_literal = float_literal };
-                },
-                .Int => {
-                    const int_literal = try self.parseIntLiteral();
-                    node.* = .{ .int_literal = int_literal };
-                },
-                .String => {
-                    const str_literal = try self.parseStrLiteral();
-                    node.* = .{ .str_literal = str_literal };
-                },
-                .MultilineString => {
-                    self.allocator.destroy(node);
-
-                    return error.UnexpectedToken;
-                },
+            .keyword => |kw| switch (kw) {
+                .Foreign => return self.parseForeignFunctionDecl(),
+                .Include => return self.parseInclude(),
+                .Let => return self.parseFunctionDecl(),
+                // .Module => return self.parseModuleDecl(),
+                // .Open => return self.parseImportSpec(),
+                .Type => return self.parseTypeDecl(),
+                else => return error.UnexpectedToken,
             },
-            .identifier => |ident| switch (ident) {
-                .Lower => {
-                    const identifier = try self.parseLowerIdentifier();
-                    node.* = .{ .lower_identifier = identifier };
-                },
-                .Upper => {
-                    const identifier = try self.parseUpperIdentifier();
-                    node.* = .{ .upper_identifier = identifier };
-                },
+            .comment => |c| switch (c) {
+                .Doc => return self.parseDocComment(),
+                .Regular => return self.parseComment(),
             },
-            .operator => |op| switch (op) {
-                .Lambda => return try self.parseLambdaExpr(),
-                else => {
-                    self.allocator.destroy(node);
-
-                    return error.UnexpectedToken;
-                },
-            },
-            .delimiter => |delim| switch (delim) {
-                .LeftParen => {
-                    try self.advance();
-
-                    const expr = try self.parseExpression();
-
-                    _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
-
-                    return expr;
-                },
-                else => {
-                    self.allocator.destroy(node);
-
-                    return error.UnexpectedToken;
-                },
-            },
-            else => {
-                self.allocator.destroy(node);
-
-                return error.UnexpectedToken;
-            },
+            else => return error.UnexpectedToken,
         }
-
-        return node;
-    }
-
-    /// Parses a complete expression by starting the precedence climbing algorithm
-    /// at the lowest precedence level (0). This is the main entry point for
-    /// parsing any expression.
-    fn parseExpression(self: *Parser) ParserError!*ast.Node {
-        // Start at highest precedence level
-        const expr = try self.parseBinaryExpr(0);
-        errdefer {
-            expr.deinit(self.allocator);
-            self.allocator.destroy(expr);
-        }
-
-        return expr;
-    }
-
-    /// Implements precedence climbing to parse binary operator expressions.
-    /// Uses operator precedence and associativity from getOperatorInfo() to build
-    /// correctly structured expression trees.
-    fn parseBinaryExpr(self: *Parser, min_precedence: u8) ParserError!*ast.Node {
-        var left = try self.parseSimpleExpr();
-        errdefer {
-            left.deinit(self.allocator);
-            self.allocator.destroy(left);
-        }
-
-        while (true) {
-            const op_info = if (Parser.getOperatorInfo(self.current_token.kind)) |info| info else break;
-
-            if (op_info.precedence < min_precedence) break;
-
-            const operator = self.current_token;
-            try self.advance();
-
-            // Determine minimum precedence for right side
-            const next_min = switch (op_info.associativity) {
-                .Left => op_info.precedence + 1,
-                .Right => op_info.precedence,
-                .None => op_info.precedence + 1,
-            };
-
-            const right = try self.parseBinaryExpr(next_min);
-            errdefer {
-                right.deinit(self.allocator);
-                self.allocator.destroy(right);
-            }
-
-            const node = try self.allocator.create(ast.Node);
-            errdefer {
-                right.deinit(self.allocator);
-                self.allocator.destroy(right);
-                self.allocator.destroy(node);
-            }
-
-            node.* = switch (operator.kind) {
-                .operator => |op| switch (op) {
-                    .Exp,
-                    .FloatAdd,
-                    .FloatDiv,
-                    .FloatMul,
-                    .FloatSub,
-                    .IntAdd,
-                    .IntDiv,
-                    .IntMul,
-                    .IntSub,
-                    => .{
-                        .arithmetic_expr = .{
-                            .left = left,
-                            .operator = operator,
-                            .right = right,
-                        },
-                    },
-                    .LogicalAnd,
-                    .LogicalOr,
-                    => .{
-                        .logical_expr = .{
-                            .left = left,
-                            .operator = operator,
-                            .right = right,
-                        },
-                    },
-                    .Equality,
-                    .GreaterThan,
-                    .GreaterThanEqual,
-                    .LessThan,
-                    .LessThanEqual,
-                    .NotEqual,
-                    => .{
-                        .comparison_expr = .{
-                            .left = left,
-                            .operator = operator,
-                            .right = right,
-                        },
-                    },
-                    else => unreachable,
-                },
-                else => unreachable,
-            };
-
-            left = node;
-        }
-
-        return left;
-    }
-
-    /// Identify if the current token _could_ be used as a unary operator.
-    fn isUnaryOp(self: *Parser) bool {
-        return self.check(lexer.TokenKind{ .operator = .IntSub });
-    }
-
-    /// Parses a simple expression, such as a unary operation or a primary expression.
-    /// If the current token represents a unary operator, it parses the operator and its operand.
-    /// Otherwise, delegates to `parsePrimaryExpr` for parsing primary expressions.
-    fn parseSimpleExpr(self: *Parser) ParserError!*ast.Node {
-        if (self.isUnaryOp()) {
-            const node = try self.allocator.create(ast.Node);
-            errdefer self.allocator.destroy(node);
-
-            const operator = self.current_token;
-            try self.advance();
-
-            const operand = try self.parseSimpleExpr();
-            errdefer {
-                operand.deinit(self.allocator);
-                self.allocator.destroy(operand);
-            }
-
-            node.* = .{
-                .unary_expr = .{
-                    .operator = operator,
-                    .operand = operand,
-                },
-            };
-
-            return node;
-        }
-
-        return self.parsePrimaryExpr();
-    }
-
-    /// Parses a function declaration with an optional type annotation.
-    ///
-    /// Examples:
-    /// - `let add = \x y => x + y`
-    /// - `let factorial : Int -> Int = \n => if n == 0 then 1 else n * factorial (n - 1)`
-    /// - `let const : a -> b -> a = \x y => x`
-    fn parseFunctionDecl(self: *Parser) ParserError!*ast.Node {
-        const token = try self.expect(lexer.TokenKind{ .keyword = .Let });
-        const name = try self.expect(lexer.TokenKind{ .identifier = .Lower });
-
-        var type_annotation: ?*ast.Node = null;
-        if (self.check(lexer.TokenKind{ .delimiter = .Colon })) {
-            try self.advance();
-
-            type_annotation = try self.parseTypeExpr();
-            errdefer {
-                type_annotation.deinit(self.allocator);
-                self.allocator.destroy(type_annotation);
-            }
-        }
-
-        _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
-
-        const value = try self.parseExpression();
-
-        const node = try self.allocator.create(ast.Node);
-        errdefer {
-            value.deinit(self.allocator);
-
-            if (type_annotation) |ta| {
-                ta.deinit(self.allocator);
-                self.allocator.destroy(ta);
-            }
-
-            self.allocator.destroy(node);
-        }
-
-        node.* = .{
-            .function_decl = .{
-                .name = name.lexeme,
-                .type_annotation = type_annotation,
-                .value = value,
-                .token = token,
-            },
-        };
-
-        return node;
-    }
-
-    /// Parses a lambda expression of the form: \param1 param2 => expr
-    ///
-    /// A lambda expression consists of:
-    /// - A lambda symbol (\)
-    /// - One or more parameters (lowercase identifiers)
-    /// - A double arrow (=>)
-    /// - An expression body
-    ///
-    /// Examples:
-    /// - `\x => x + 1`
-    /// - `\x y => x * y`
-    /// - `\a b c => a + b + c`
-    fn parseLambdaExpr(self: *Parser) ParserError!*ast.Node {
-        const token = try self.expect(lexer.TokenKind{ .operator = .Lambda });
-
-        var params = std.ArrayList([]const u8).init(self.allocator);
-        errdefer params.deinit();
-
-        while (self.check(lexer.TokenKind{ .identifier = .Lower })) {
-            const param = try self.expect(lexer.TokenKind{ .identifier = .Lower });
-            try params.append(param.lexeme);
-        }
-
-        if (params.items.len == 0) return error.EmptyLambdaParams;
-
-        _ = try self.expect(lexer.TokenKind{ .symbol = .DoubleArrowRight });
-        const body = try self.parseExpression();
-        errdefer {
-            params.deinit();
-            body.deinit(self.allocator);
-            self.allocator.destroy(body);
-        }
-
-        const node = try self.allocator.create(ast.Node);
-        errdefer {
-            params.deinit();
-            body.deinit(self.allocator);
-            self.allocator.destroy(body);
-            self.allocator.destroy(node);
-        }
-
-        node.* = .{
-            .lambda_expr = .{
-                .params = params,
-                .body = body,
-                .token = token,
-            },
-        };
-
-        return node;
-    }
-
-    /// Parses a type expression, which can be a simple type name or a more complex
-    /// parameterized type.
-    ///
-    /// Examples:
-    /// - `Int`
-    /// - `Maybe a`
-    /// - `List String`
-    fn parseTypeExpr(self: *Parser) ParserError!*ast.Node {
-        const start_token = self.current_token;
-        var first_type = try self.parseSimpleType();
-        errdefer {
-            first_type.deinit(self.allocator);
-            self.allocator.destroy(first_type);
-        }
-
-        if (!try self.match(lexer.TokenKind{ .symbol = .ArrowRight })) {
-            return first_type;
-        }
-
-        const second_type = try self.parseTypeExpr();
-        errdefer {
-            second_type.deinit(self.allocator);
-            self.allocator.destroy(second_type);
-        }
-
-        var param_types = std.ArrayList(*ast.Node).init(self.allocator);
-        errdefer {
-            for (param_types.items) |param| {
-                param.deinit(self.allocator);
-                self.allocator.destroy(param);
-            }
-
-            param_types.deinit();
-        }
-
-        try param_types.append(first_type);
-
-        if (second_type.* == .function_type) {
-            for (second_type.function_type.param_types.items) |param| {
-                try param_types.append(param);
-            }
-
-            second_type.function_type.param_types.deinit();
-            self.allocator.destroy(second_type);
-        } else {
-            try param_types.append(second_type);
-        }
-
-        const node = try self.allocator.create(ast.Node);
-        errdefer self.allocator.destroy(node);
-
-        node.* = .{
-            .function_type = .{
-                .param_types = param_types,
-                .token = start_token,
-            },
-        };
-
-        return node;
-    }
-
-    /// Helper function to parse non-function types
-    fn parseSimpleType(self: *Parser) ParserError!*ast.Node {
-        if (self.check(lexer.TokenKind{ .identifier = .Upper })) {
-            const type_token = self.current_token;
-            const base_type = try self.parseUpperIdentifier();
-
-            const base_node = try self.allocator.create(ast.Node);
-            errdefer self.allocator.destroy(base_node);
-
-            base_node.* = .{
-                .upper_identifier = base_type,
-            };
-
-            // Check for type arguments
-            var type_args = std.ArrayList(*ast.Node).init(self.allocator);
-            errdefer {
-                for (type_args.items) |arg| {
-                    arg.deinit(self.allocator);
-                    self.allocator.destroy(arg);
-                }
-
-                type_args.deinit();
-            }
-
-            var has_args = false;
-
-            // Parse sequence of type arguments which can be:
-            // 1. Lower identifiers (type variables like 'a')
-            // 2. Upper identifiers (concrete types like 'String')
-            // 3. Parenthesized type expressions (like '(Maybe a)')
-            while (true) {
-                if (self.check(lexer.TokenKind{ .identifier = .Lower })) {
-                    // Handle type variables (e.g., 'a' in 'List a')
-                    has_args = true;
-
-                    const arg_node = try self.allocator.create(ast.Node);
-                    errdefer self.allocator.destroy(arg_node);
-
-                    const arg = try self.parseLowerIdentifier();
-                    arg_node.* = .{
-                        .lower_identifier = arg,
-                    };
-
-                    try type_args.append(arg_node);
-                } else if (self.check(lexer.TokenKind{ .identifier = .Upper })) {
-                    // Handle concrete types (e.g., 'String' in 'List String')
-                    has_args = true;
-
-                    const arg_node = try self.allocator.create(ast.Node);
-                    errdefer self.allocator.destroy(arg_node);
-
-                    const arg = try self.parseUpperIdentifier();
-                    arg_node.* = .{
-                        .upper_identifier = arg,
-                    };
-
-                    try type_args.append(arg_node);
-                } else if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
-                    // Handle complex type expressions (e.g., '(Maybe a)' in 'List (Maybe a)')
-                    has_args = true;
-
-                    const inner_type = try self.parseTypeExpr();
-                    errdefer {
-                        inner_type.deinit(self.allocator);
-                        self.allocator.destroy(inner_type);
-                    }
-
-                    _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
-
-                    try type_args.append(inner_type);
-                } else {
-                    break;
-                }
-            }
-
-            if (!has_args) return base_node;
-
-            const node = try self.allocator.create(ast.Node);
-            errdefer {
-                base_node.deinit(self.allocator);
-                self.allocator.destroy(base_node);
-
-                for (type_args.items) |arg| {
-                    arg.deinit(self.allocator);
-                    self.allocator.destroy(arg);
-                }
-
-                type_args.deinit();
-                self.allocator.destroy(node);
-            }
-
-            node.* = .{
-                .type_application = .{
-                    .base = base_node,
-                    .args = type_args,
-                    .token = type_token,
-                },
-            };
-
-            return node;
-        }
-
-        // Handle type variables
-        if (self.check(lexer.TokenKind{ .identifier = .Lower })) {
-            const type_var = try self.expect(lexer.TokenKind{ .identifier = .Lower });
-
-            const node = try self.allocator.create(ast.Node);
-            errdefer self.allocator.destroy(node);
-
-            node.* = .{
-                .lower_identifier = .{
-                    .name = type_var.lexeme,
-                    .token = type_var,
-                },
-            };
-
-            return node;
-        }
-
-        // Handle parenthesized type expressions
-        if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
-            const inner_type = try self.parseTypeExpr();
-            errdefer {
-                inner_type.deinit(self.allocator);
-                self.allocator.destroy(inner_type);
-            }
-
-            _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
-
-            return inner_type;
-        }
-
-        return error.UnexpectedToken;
     }
 
     /// Parses a type declaration, which can be a type alias, record type, or variant type.
@@ -1154,6 +660,55 @@ pub const Parser = struct {
         return error.UnexpectedToken;
     }
 
+    /// Parses a function declaration with an optional type annotation.
+    ///
+    /// Examples:
+    /// - `let add = \x y => x + y`
+    /// - `let factorial : Int -> Int = \n => if n == 0 then 1 else n * factorial (n - 1)`
+    /// - `let const : a -> b -> a = \x y => x`
+    fn parseFunctionDecl(self: *Parser) ParserError!*ast.Node {
+        const token = try self.expect(lexer.TokenKind{ .keyword = .Let });
+        const name = try self.expect(lexer.TokenKind{ .identifier = .Lower });
+
+        var type_annotation: ?*ast.Node = null;
+        if (self.check(lexer.TokenKind{ .delimiter = .Colon })) {
+            try self.advance();
+
+            type_annotation = try self.parseTypeExpr();
+            errdefer {
+                type_annotation.deinit(self.allocator);
+                self.allocator.destroy(type_annotation);
+            }
+        }
+
+        _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
+
+        const value = try self.parseExpression();
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer {
+            value.deinit(self.allocator);
+
+            if (type_annotation) |ta| {
+                ta.deinit(self.allocator);
+                self.allocator.destroy(ta);
+            }
+
+            self.allocator.destroy(node);
+        }
+
+        node.* = .{
+            .function_decl = .{
+                .name = name.lexeme,
+                .type_annotation = type_annotation,
+                .value = value,
+                .token = token,
+            },
+        };
+
+        return node;
+    }
+
     /// Parses a foreign function declaration that links to external code.
     /// The declaration specifies an internal function name and type signature
     /// along with the external symbol name to link against.
@@ -1225,43 +780,265 @@ pub const Parser = struct {
         return node;
     }
 
-    /// Parses a module path consisting of one or more uppercase identifiers separated by dots.
-    /// Used by module declarations, includes, and imports.
-    ///
-    /// Syntax:
-    /// ModulePath = UpperIdent ("." UpperIdent)*
-    ///
-    /// Examples:
-    /// - `MyModule`
-    /// - `Std.List`
-    /// - `Parser.Internal.Utils`
-    fn parseModulePath(self: *Parser) ParserError!*ast.Node {
-        var segments = std.ArrayList([]const u8).init(self.allocator);
+    /// Parses a complete expression by starting the precedence climbing algorithm
+    /// at the lowest precedence level (0). This is the main entry point for
+    /// parsing any expression.
+    fn parseExpression(self: *Parser) ParserError!*ast.Node {
+        // Start at highest precedence level
+        const expr = try self.parseBinaryExpr(0);
         errdefer {
-            for (segments.items) |seg| {
-                self.allocator.free(seg);
+            expr.deinit(self.allocator);
+            self.allocator.destroy(expr);
+        }
+
+        return expr;
+    }
+
+    /// Implements precedence climbing to parse binary operator expressions.
+    /// Uses operator precedence and associativity from getOperatorInfo() to build
+    /// correctly structured expression trees.
+    fn parseBinaryExpr(self: *Parser, min_precedence: u8) ParserError!*ast.Node {
+        var left = try self.parseSimpleExpr();
+        errdefer {
+            left.deinit(self.allocator);
+            self.allocator.destroy(left);
+        }
+
+        while (true) {
+            const op_info = if (Parser.getOperatorInfo(self.current_token.kind)) |info| info else break;
+
+            if (op_info.precedence < min_precedence) break;
+
+            const operator = self.current_token;
+            try self.advance();
+
+            // Determine minimum precedence for right side
+            const next_min = switch (op_info.associativity) {
+                .Left => op_info.precedence + 1,
+                .Right => op_info.precedence,
+                .None => op_info.precedence + 1,
+            };
+
+            const right = try self.parseBinaryExpr(next_min);
+            errdefer {
+                right.deinit(self.allocator);
+                self.allocator.destroy(right);
             }
 
-            segments.deinit();
+            const node = try self.allocator.create(ast.Node);
+            errdefer {
+                right.deinit(self.allocator);
+                self.allocator.destroy(right);
+                self.allocator.destroy(node);
+            }
+
+            node.* = switch (operator.kind) {
+                .operator => |op| switch (op) {
+                    .Exp,
+                    .FloatAdd,
+                    .FloatDiv,
+                    .FloatMul,
+                    .FloatSub,
+                    .IntAdd,
+                    .IntDiv,
+                    .IntMul,
+                    .IntSub,
+                    => .{
+                        .arithmetic_expr = .{
+                            .left = left,
+                            .operator = operator,
+                            .right = right,
+                        },
+                    },
+                    .LogicalAnd,
+                    .LogicalOr,
+                    => .{
+                        .logical_expr = .{
+                            .left = left,
+                            .operator = operator,
+                            .right = right,
+                        },
+                    },
+                    .Equality,
+                    .GreaterThan,
+                    .GreaterThanEqual,
+                    .LessThan,
+                    .LessThanEqual,
+                    .NotEqual,
+                    => .{
+                        .comparison_expr = .{
+                            .left = left,
+                            .operator = operator,
+                            .right = right,
+                        },
+                    },
+                    else => unreachable,
+                },
+                else => unreachable,
+            };
+
+            left = node;
         }
 
-        const first_segment = try self.parseUpperIdentifier();
-        const first_duped = try self.allocator.dupe(u8, first_segment.name);
-        try segments.append(first_duped);
+        return left;
+    }
 
-        while (try self.match(lexer.TokenKind{ .delimiter = .Dot })) {
-            const next_segment = try self.parseUpperIdentifier();
-            const next_duped = try self.allocator.dupe(u8, next_segment.name);
-            try segments.append(next_duped);
+    /// Identify if the current token _could_ be used as a unary operator.
+    fn isUnaryOp(self: *Parser) bool {
+        return self.check(lexer.TokenKind{ .operator = .IntSub });
+    }
+
+    /// Parses a simple expression, such as a unary operation or a primary expression.
+    /// If the current token represents a unary operator, it parses the operator and its operand.
+    /// Otherwise, delegates to `parsePrimaryExpr` for parsing primary expressions.
+    fn parseSimpleExpr(self: *Parser) ParserError!*ast.Node {
+        if (self.isUnaryOp()) {
+            const node = try self.allocator.create(ast.Node);
+            errdefer self.allocator.destroy(node);
+
+            const operator = self.current_token;
+            try self.advance();
+
+            const operand = try self.parseSimpleExpr();
+            errdefer {
+                operand.deinit(self.allocator);
+                self.allocator.destroy(operand);
+            }
+
+            node.* = .{
+                .unary_expr = .{
+                    .operator = operator,
+                    .operand = operand,
+                },
+            };
+
+            return node;
         }
 
+        return self.parsePrimaryExpr();
+    }
+
+    /// Parses a primary expression, such as literals, identifiers, or parenthesized expressions.
+    /// Handles cases for basic literals (int, float, string, char), identifiers (lower and upper),
+    /// and parenthesized expressions.
+    fn parsePrimaryExpr(self: *Parser) ParserError!*ast.Node {
         const node = try self.allocator.create(ast.Node);
         errdefer self.allocator.destroy(node);
 
+        switch (self.current_token.kind) {
+            .literal => |lit| switch (lit) {
+                .Char => {
+                    const char_literal = try self.parseCharLiteral();
+                    node.* = .{ .char_literal = char_literal };
+                },
+                .Float => {
+                    const float_literal = try self.parseFloatLiteral();
+                    node.* = .{ .float_literal = float_literal };
+                },
+                .Int => {
+                    const int_literal = try self.parseIntLiteral();
+                    node.* = .{ .int_literal = int_literal };
+                },
+                .String => {
+                    const str_literal = try self.parseStrLiteral();
+                    node.* = .{ .str_literal = str_literal };
+                },
+                .MultilineString => {
+                    self.allocator.destroy(node);
+
+                    return error.UnexpectedToken;
+                },
+            },
+            .identifier => |ident| switch (ident) {
+                .Lower => {
+                    const identifier = try self.parseLowerIdentifier();
+                    node.* = .{ .lower_identifier = identifier };
+                },
+                .Upper => {
+                    const identifier = try self.parseUpperIdentifier();
+                    node.* = .{ .upper_identifier = identifier };
+                },
+            },
+            .operator => |op| switch (op) {
+                .Lambda => return try self.parseLambdaExpr(),
+                else => {
+                    self.allocator.destroy(node);
+
+                    return error.UnexpectedToken;
+                },
+            },
+            .delimiter => |delim| switch (delim) {
+                .LeftParen => {
+                    try self.advance();
+
+                    const expr = try self.parseExpression();
+
+                    _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+
+                    return expr;
+                },
+                else => {
+                    self.allocator.destroy(node);
+
+                    return error.UnexpectedToken;
+                },
+            },
+            else => {
+                self.allocator.destroy(node);
+
+                return error.UnexpectedToken;
+            },
+        }
+
+        return node;
+    }
+
+    /// Parses a lambda expression of the form: \param1 param2 => expr
+    ///
+    /// A lambda expression consists of:
+    /// - A lambda symbol (\)
+    /// - One or more parameters (lowercase identifiers)
+    /// - A double arrow (=>)
+    /// - An expression body
+    ///
+    /// Examples:
+    /// - `\x => x + 1`
+    /// - `\x y => x * y`
+    /// - `\a b c => a + b + c`
+    fn parseLambdaExpr(self: *Parser) ParserError!*ast.Node {
+        const token = try self.expect(lexer.TokenKind{ .operator = .Lambda });
+
+        var params = std.ArrayList([]const u8).init(self.allocator);
+        errdefer params.deinit();
+
+        while (self.check(lexer.TokenKind{ .identifier = .Lower })) {
+            const param = try self.expect(lexer.TokenKind{ .identifier = .Lower });
+            try params.append(param.lexeme);
+        }
+
+        if (params.items.len == 0) return error.EmptyLambdaParams;
+
+        _ = try self.expect(lexer.TokenKind{ .symbol = .DoubleArrowRight });
+        const body = try self.parseExpression();
+        errdefer {
+            params.deinit();
+            body.deinit(self.allocator);
+            self.allocator.destroy(body);
+        }
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer {
+            params.deinit();
+            body.deinit(self.allocator);
+            self.allocator.destroy(body);
+            self.allocator.destroy(node);
+        }
+
         node.* = .{
-            .module_path = .{
-                .segments = segments,
-                .token = first_segment.token,
+            .lambda_expr = .{
+                .params = params,
+                .body = body,
+                .token = token,
             },
         };
 
@@ -1310,50 +1087,273 @@ pub const Parser = struct {
         return node;
     }
 
-    /// Parses a single top-level declaration based on the current token.
-    fn parseTopLevel(self: *Parser) ParserError!*ast.Node {
-        switch (self.current_token.kind) {
-            .keyword => |kw| switch (kw) {
-                .Foreign => return self.parseForeignFunctionDecl(),
-                .Include => return self.parseInclude(),
-                .Let => return self.parseFunctionDecl(),
-                // .Module => return self.parseModuleDecl(),
-                // .Open => return self.parseImportSpec(),
-                .Type => return self.parseTypeDecl(),
-                else => return error.UnexpectedToken,
-            },
-            .comment => |c| switch (c) {
-                .Doc => return self.parseDocComment(),
-                .Regular => return self.parseComment(),
-            },
-            else => return error.UnexpectedToken,
-        }
-    }
-
-    /// Parses a complete program, which consists of a sequence of top-level declarations.
-    pub fn parseProgram(self: *Parser) ParserError!*ast.Node {
-        var statements = std.ArrayList(*ast.Node).init(self.allocator);
+    /// Parses a type expression, which can be a simple type name or a more complex
+    /// parameterized type.
+    ///
+    /// Examples:
+    /// - `Int`
+    /// - `Maybe a`
+    /// - `List String`
+    fn parseTypeExpr(self: *Parser) ParserError!*ast.Node {
+        const start_token = self.current_token;
+        var first_type = try self.parseSimpleType();
         errdefer {
-            for (statements.items) |stmt| {
-                stmt.deinit(self.allocator);
-                self.allocator.destroy(stmt);
+            first_type.deinit(self.allocator);
+            self.allocator.destroy(first_type);
+        }
+
+        if (!try self.match(lexer.TokenKind{ .symbol = .ArrowRight })) {
+            return first_type;
+        }
+
+        const second_type = try self.parseTypeExpr();
+        errdefer {
+            second_type.deinit(self.allocator);
+            self.allocator.destroy(second_type);
+        }
+
+        var param_types = std.ArrayList(*ast.Node).init(self.allocator);
+        errdefer {
+            for (param_types.items) |param| {
+                param.deinit(self.allocator);
+                self.allocator.destroy(param);
             }
 
-            statements.deinit();
+            param_types.deinit();
         }
 
-        while (!self.check(lexer.TokenKind{ .special = .Eof })) {
-            const stmt = try self.parseTopLevel();
-            try statements.append(stmt);
+        try param_types.append(first_type);
+
+        if (second_type.* == .function_type) {
+            for (second_type.function_type.param_types.items) |param| {
+                try param_types.append(param);
+            }
+
+            second_type.function_type.param_types.deinit();
+            self.allocator.destroy(second_type);
+        } else {
+            try param_types.append(second_type);
         }
 
         const node = try self.allocator.create(ast.Node);
         errdefer self.allocator.destroy(node);
 
         node.* = .{
-            .program = .{
-                .statements = statements,
-                .token = self.current_token,
+            .function_type = .{
+                .param_types = param_types,
+                .token = start_token,
+            },
+        };
+
+        return node;
+    }
+
+    /// Helper function to parse non-function types
+    fn parseSimpleType(self: *Parser) ParserError!*ast.Node {
+        if (self.check(lexer.TokenKind{ .identifier = .Upper })) {
+            const type_token = self.current_token;
+            const base_type = try self.parseUpperIdentifier();
+
+            const base_node = try self.allocator.create(ast.Node);
+            errdefer self.allocator.destroy(base_node);
+
+            base_node.* = .{
+                .upper_identifier = base_type,
+            };
+
+            // Check for type arguments
+            var type_args = std.ArrayList(*ast.Node).init(self.allocator);
+            errdefer {
+                for (type_args.items) |arg| {
+                    arg.deinit(self.allocator);
+                    self.allocator.destroy(arg);
+                }
+
+                type_args.deinit();
+            }
+
+            var has_args = false;
+
+            // Parse sequence of type arguments which can be:
+            // 1. Lower identifiers (type variables like 'a')
+            // 2. Upper identifiers (concrete types like 'String')
+            // 3. Parenthesized type expressions (like '(Maybe a)')
+            while (true) {
+                if (self.check(lexer.TokenKind{ .identifier = .Lower })) {
+                    // Handle type variables (e.g., 'a' in 'List a')
+                    has_args = true;
+
+                    const arg_node = try self.allocator.create(ast.Node);
+                    errdefer self.allocator.destroy(arg_node);
+
+                    const arg = try self.parseLowerIdentifier();
+                    arg_node.* = .{
+                        .lower_identifier = arg,
+                    };
+
+                    try type_args.append(arg_node);
+                } else if (self.check(lexer.TokenKind{ .identifier = .Upper })) {
+                    // Handle concrete types (e.g., 'String' in 'List String')
+                    has_args = true;
+
+                    const arg_node = try self.allocator.create(ast.Node);
+                    errdefer self.allocator.destroy(arg_node);
+
+                    const arg = try self.parseUpperIdentifier();
+                    arg_node.* = .{
+                        .upper_identifier = arg,
+                    };
+
+                    try type_args.append(arg_node);
+                } else if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
+                    // Handle complex type expressions (e.g., '(Maybe a)' in 'List (Maybe a)')
+                    has_args = true;
+
+                    const inner_type = try self.parseTypeExpr();
+                    errdefer {
+                        inner_type.deinit(self.allocator);
+                        self.allocator.destroy(inner_type);
+                    }
+
+                    _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+
+                    try type_args.append(inner_type);
+                } else {
+                    break;
+                }
+            }
+
+            if (!has_args) return base_node;
+
+            const node = try self.allocator.create(ast.Node);
+            errdefer {
+                base_node.deinit(self.allocator);
+                self.allocator.destroy(base_node);
+
+                for (type_args.items) |arg| {
+                    arg.deinit(self.allocator);
+                    self.allocator.destroy(arg);
+                }
+
+                type_args.deinit();
+                self.allocator.destroy(node);
+            }
+
+            node.* = .{
+                .type_application = .{
+                    .base = base_node,
+                    .args = type_args,
+                    .token = type_token,
+                },
+            };
+
+            return node;
+        }
+
+        // Handle type variables
+        if (self.check(lexer.TokenKind{ .identifier = .Lower })) {
+            const type_var = try self.expect(lexer.TokenKind{ .identifier = .Lower });
+
+            const node = try self.allocator.create(ast.Node);
+            errdefer self.allocator.destroy(node);
+
+            node.* = .{
+                .lower_identifier = .{
+                    .name = type_var.lexeme,
+                    .token = type_var,
+                },
+            };
+
+            return node;
+        }
+
+        // Handle parenthesized type expressions
+        if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
+            const inner_type = try self.parseTypeExpr();
+            errdefer {
+                inner_type.deinit(self.allocator);
+                self.allocator.destroy(inner_type);
+            }
+
+            _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+
+            return inner_type;
+        }
+
+        return error.UnexpectedToken;
+    }
+
+    /// Parses a module path consisting of one or more uppercase identifiers separated by dots.
+    /// Used by module declarations, includes, and imports.
+    ///
+    /// Syntax:
+    /// ModulePath = UpperIdent ("." UpperIdent)*
+    ///
+    /// Examples:
+    /// - `MyModule`
+    /// - `Std.List`
+    /// - `Parser.Internal.Utils`
+    fn parseModulePath(self: *Parser) ParserError!*ast.Node {
+        var segments = std.ArrayList([]const u8).init(self.allocator);
+        errdefer {
+            for (segments.items) |seg| {
+                self.allocator.free(seg);
+            }
+
+            segments.deinit();
+        }
+
+        const first_segment = try self.parseUpperIdentifier();
+        const first_duped = try self.allocator.dupe(u8, first_segment.name);
+        try segments.append(first_duped);
+
+        while (try self.match(lexer.TokenKind{ .delimiter = .Dot })) {
+            const next_segment = try self.parseUpperIdentifier();
+            const next_duped = try self.allocator.dupe(u8, next_segment.name);
+            try segments.append(next_duped);
+        }
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer self.allocator.destroy(node);
+
+        node.* = .{
+            .module_path = .{
+                .segments = segments,
+                .token = first_segment.token,
+            },
+        };
+
+        return node;
+    }
+
+    /// Parses a regular comment node from the input.
+    fn parseComment(self: *Parser) ParserError!*ast.Node {
+        const token = try self.expect(lexer.TokenKind{ .comment = .Regular });
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer self.allocator.destroy(node);
+
+        node.* = .{
+            .comment = .{
+                .content = token.lexeme,
+                .token = token,
+            },
+        };
+
+        return node;
+    }
+
+    /// Parses a documentation comment node from the input.
+    fn parseDocComment(self: *Parser) ParserError!*ast.Node {
+        const token = try self.expect(lexer.TokenKind{ .comment = .Doc });
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer self.allocator.destroy(node);
+
+        node.* = .{
+            .doc_comment = .{
+                .content = token.lexeme,
+                .token = token,
             },
         };
 
