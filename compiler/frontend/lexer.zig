@@ -123,7 +123,7 @@ pub const TokenKind = union(enum) {
     symbol: SymbolKind,
 };
 
-/// Represents a location in the source buffer using raw byte indices.
+/// A structure representing raw buffer locations.
 pub const Span = struct {
     /// The start index of the lexeme in the source buffer (inclusive).
     start: usize,
@@ -132,7 +132,7 @@ pub const Span = struct {
     end: usize,
 };
 
-/// Represents a human-readable location in the source file.
+/// A human-readable line/column position.
 pub const SourceLoc = struct {
     /// The line number in the source file (1-based).
     line: usize,
@@ -141,7 +141,9 @@ pub const SourceLoc = struct {
     col: usize,
 };
 
-/// Represents the complete location of a token, combining buffer and source information.
+/// Combines both raw and human-readable locations.
+/// This dual representation enables both efficient string slicing (Span)
+/// and meaningful error reporting (SourceLoc) without conversion overhead.
 pub const TokenLoc = struct {
     /// The name of the source file where the token originated.
     filename: []const u8,
@@ -197,8 +199,16 @@ pub const LexerError = error{
 };
 
 /// A lexer that processes source code into a sequence of tokens.
-/// Tracks position, line number, and column in the source while handling
-/// lexical analysis including identifiers, literals, operators, and comments.
+///
+/// The lexer is implemented as a deterministic finite automaton (DFA) with
+/// single-character lookahead. This design choice means:
+/// 1. Each state transition depends only on the current state and next character
+/// 2. The lexer can make decisions with just one character of lookahead (peek)
+/// 3. Token boundaries are determined without backtracking
+/// 4. Error reporting is precise and immediate
+///
+/// This approach provides a good balance of simplicity, performance, and error
+/// handling capability while keeping memory usage constant.
 pub const Lexer = struct {
     /// The source code to be lexed.
     source: []const u8,
@@ -1478,6 +1488,7 @@ pub const Lexer = struct {
         assert(self.loc.span.end > self.loc.span.start);
     }
 
+    /// Advances past whitespace and synchronizes span positions.
     fn skipWhitespace(self: *Lexer) void {
         const initial_pos = self.loc.span.end;
 
