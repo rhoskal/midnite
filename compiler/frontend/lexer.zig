@@ -226,9 +226,11 @@ pub const Lexer = struct {
         assert(self.loc.span.end >= self.loc.span.start);
         assert(self.loc.span.start <= self.source.len);
 
-        if (self.loc.span.end >= self.source.len) return null;
-
-        return self.source[self.loc.span.end];
+        if (self.loc.span.end < self.source.len) {
+            return self.source[self.loc.span.end];
+        } else {
+            return null;
+        }
     }
 
     /// Advances the lexer by one position in the source code.
@@ -257,9 +259,11 @@ pub const Lexer = struct {
         const initial_pos = self.loc.span.end;
 
         while (self.peek()) |c| {
-            if (!ascii.isWhitespace(c)) break;
-
-            self.advance();
+            if (ascii.isWhitespace(c)) {
+                self.advance();
+            } else {
+                break;
+            }
         }
 
         self.loc.span.start = self.loc.span.end;
@@ -291,24 +295,24 @@ pub const Lexer = struct {
         const is_exact_match = self.loc.span.end - start == len and
             std.mem.eql(u8, lexeme, keyword);
 
-        if (!is_exact_match) return null;
+        if (is_exact_match) {
+            // Assert our column calculation is valid
+            assert(self.loc.src.col >= len);
 
-        const end_loc = TokenLoc{
-            .filename = self.loc.filename,
-            .span = .{
-                .start = start,
-                .end = self.loc.span.end,
-            },
-            .src = .{
-                .line = self.loc.src.line,
-                .col = self.loc.src.col - len,
-            },
-        };
-
-        // Assert our column calculation is valid
-        assert(self.loc.src.col >= len);
-
-        return Token.init(kind, lexeme, end_loc);
+            return Token.init(kind, lexeme, TokenLoc{
+                .filename = self.loc.filename,
+                .span = .{
+                    .start = start,
+                    .end = self.loc.span.end,
+                },
+                .src = .{
+                    .line = self.loc.src.line,
+                    .col = self.loc.src.col - len,
+                },
+            });
+        } else {
+            return null;
+        }
     }
 
     fn isBinDigit(c: u8) bool {
@@ -459,7 +463,30 @@ pub const Lexer = struct {
             }
 
             const lexeme = self.source[position_start..self.loc.span.end];
-            const end_loc = TokenLoc{
+
+            return Token.init(
+                .{ .literal = .Float },
+                lexeme,
+                TokenLoc{
+                    .filename = self.loc.filename,
+                    .span = .{
+                        .start = position_start,
+                        .end = self.loc.span.end,
+                    },
+                    .src = .{
+                        .line = self.loc.src.line,
+                        .col = col_offset,
+                    },
+                },
+            );
+        }
+
+        const lexeme = self.source[position_start..self.loc.span.end];
+
+        return Token.init(
+            .{ .literal = .Int },
+            lexeme,
+            TokenLoc{
                 .filename = self.loc.filename,
                 .span = .{
                     .start = position_start,
@@ -469,25 +496,8 @@ pub const Lexer = struct {
                     .line = self.loc.src.line,
                     .col = col_offset,
                 },
-            };
-
-            return Token.init(.{ .literal = .Float }, lexeme, end_loc);
-        }
-
-        const lexeme = self.source[position_start..self.loc.span.end];
-        const end_loc = TokenLoc{
-            .filename = self.loc.filename,
-            .span = .{
-                .start = position_start,
-                .end = self.loc.span.end,
             },
-            .src = .{
-                .line = self.loc.src.line,
-                .col = col_offset,
-            },
-        };
-
-        return Token.init(.{ .literal = .Int }, lexeme, end_loc);
+        );
     }
 
     fn isValidUnicodeCodepoint(value: u21) bool {
@@ -521,13 +531,18 @@ pub const Lexer = struct {
         var unicode_value: u21 = 0;
         var digit_count: usize = 0;
         while (digit_count < 6) : (digit_count += 1) {
-            const hex = self.peek() orelse break;
-            if (!ascii.isHex(hex)) break;
+            if (self.peek()) |hex| {
+                if (ascii.isHex(hex)) {
+                    const digit_value = hexDigitToValue(hex);
+                    unicode_value = (unicode_value << 4) | digit_value;
 
-            const digit_value = hexDigitToValue(hex);
-            unicode_value = (unicode_value << 4) | digit_value;
-
-            self.advance();
+                    self.advance();
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
         }
 
         if (self.peek()) |next| {
@@ -573,19 +588,21 @@ pub const Lexer = struct {
         const start_col = self.loc.src.col;
 
         const c = self.peek() orelse {
-            const end_loc = TokenLoc{
-                .filename = self.loc.filename,
-                .span = .{
-                    .start = span_start,
-                    .end = self.loc.span.start,
+            return Token.init(
+                .{ .special = .Eof },
+                "",
+                TokenLoc{
+                    .filename = self.loc.filename,
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.start,
+                    },
+                    .src = .{
+                        .line = start_line,
+                        .col = start_col,
+                    },
                 },
-                .src = .{
-                    .line = start_line,
-                    .col = start_col,
-                },
-            };
-
-            return Token.init(.{ .special = .Eof }, "", end_loc);
+            );
         };
 
         switch (c) {
@@ -593,22 +610,24 @@ pub const Lexer = struct {
                 self.advance();
 
                 if (self.peek() == null) {
-                    const end_loc = TokenLoc{
-                        .filename = self.loc.filename,
-                        .span = .{
-                            .start = span_start,
-                            .end = self.loc.span.end,
+                    return Token.init(
+                        .{ .special = .Hole },
+                        "?",
+                        TokenLoc{
+                            .filename = self.loc.filename,
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
+                            },
+                            .src = .{
+                                .line = start_line,
+                                .col = start_col,
+                            },
                         },
-                        .src = .{
-                            .line = start_line,
-                            .col = start_col,
-                        },
-                    };
-
-                    return Token.init(.{ .special = .Hole }, "?", end_loc);
+                    );
+                } else {
+                    return error.InvalidIdentifier;
                 }
-
-                return error.InvalidIdentifier;
             },
             '#' => {
                 const position_start = span_start;
@@ -641,19 +660,22 @@ pub const Lexer = struct {
 
                 const kind = if (is_doc) TokenKind{ .comment = .Doc } else TokenKind{ .comment = .Regular };
                 const lexeme = self.source[position_start..self.loc.span.end];
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
 
-                return Token.init(kind, lexeme, end_loc);
+                return Token.init(
+                    kind,
+                    lexeme,
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
+                    },
+                );
             },
             '"' => {
                 const position_start = span_start;
@@ -713,39 +735,47 @@ pub const Lexer = struct {
                                     }
                                 }
 
-                                if (!found_end) return error.UnterminatedStrLiteral;
+                                if (found_end) {
+                                    const lexeme = self.source[position_start..self.loc.span.end];
 
-                                const lexeme = self.source[position_start..self.loc.span.end];
-                                const end_loc = TokenLoc{
-                                    .filename = self.loc.filename,
-                                    .span = .{
-                                        .start = position_start,
-                                        .end = self.loc.span.end,
-                                    },
-                                    .src = .{
-                                        .line = start_line,
-                                        .col = start_col,
-                                    },
-                                };
-
-                                return Token.init(.{ .literal = .MultilineString }, lexeme, end_loc);
+                                    return Token.init(
+                                        .{ .literal = .MultilineString },
+                                        lexeme,
+                                        TokenLoc{
+                                            .filename = self.loc.filename,
+                                            .span = .{
+                                                .start = position_start,
+                                                .end = self.loc.span.end,
+                                            },
+                                            .src = .{
+                                                .line = start_line,
+                                                .col = start_col,
+                                            },
+                                        },
+                                    );
+                                } else {
+                                    return error.UnterminatedStrLiteral;
+                                }
                             }
                         }
 
                         const lexeme = self.source[position_start..self.loc.span.end];
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = position_start,
-                                .end = self.loc.span.end,
-                            },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
 
-                        return Token.init(.{ .literal = .String }, lexeme, end_loc);
+                        return Token.init(
+                            .{ .literal = .String },
+                            lexeme,
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = position_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
+                            },
+                        );
                     }
                 }
 
@@ -762,11 +792,14 @@ pub const Lexer = struct {
                     if (next == '\\') {
                         self.advance();
 
-                        const escaped_char = self.peek() orelse return error.UnterminatedStrLiteral;
-                        switch (escaped_char) {
-                            '\\', '"', 'n', 't', 'r' => self.advance(),
-                            'u' => try self.handleUnicodeEscape(),
-                            else => return error.UnrecognizedStrEscapeSequence,
+                        if (self.peek()) |escaped_char| {
+                            switch (escaped_char) {
+                                '\\', '"', 'n', 't', 'r' => self.advance(),
+                                'u' => try self.handleUnicodeEscape(),
+                                else => return error.UnrecognizedStrEscapeSequence,
+                            }
+                        } else {
+                            return error.UnterminatedStrLiteral;
                         }
                     } else {
                         const utf8_len = std.unicode.utf8ByteSequenceLength(next) catch {
@@ -783,22 +816,27 @@ pub const Lexer = struct {
                     }
                 }
 
-                if (!found_closing_quote) return error.UnterminatedStrLiteral;
+                if (found_closing_quote) {
+                    const lexeme = self.source[position_start..self.loc.span.end];
 
-                const lexeme = self.source[position_start..self.loc.span.end];
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = position_start,
-                        .end = self.loc.span.end,
-                    },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .literal = .String }, lexeme, end_loc);
+                    return Token.init(
+                        .{ .literal = .String },
+                        lexeme,
+                        TokenLoc{
+                            .filename = self.loc.filename,
+                            .span = .{
+                                .start = position_start,
+                                .end = self.loc.span.end,
+                            },
+                            .src = .{
+                                .line = start_line,
+                                .col = start_col,
+                            },
+                        },
+                    );
+                } else {
+                    return error.UnterminatedStrLiteral;
+                }
             },
             '\'' => {
                 const position_start = span_start;
@@ -822,11 +860,12 @@ pub const Lexer = struct {
 
                         char_count += 1;
 
-                        const escaped_char = self.peek() orelse return error.UnterminatedCharLiteral;
-                        switch (escaped_char) {
-                            '\\', '\'', 'n', 't', 'r' => self.advance(),
-                            'u' => try self.handleUnicodeEscape(),
-                            else => return error.UnrecognizedCharEscapeSequence,
+                        if (self.peek()) |escaped_char| {
+                            switch (escaped_char) {
+                                '\\', '\'', 'n', 't', 'r' => self.advance(),
+                                'u' => try self.handleUnicodeEscape(),
+                                else => return error.UnrecognizedCharEscapeSequence,
+                            }
                         }
                     } else {
                         char_count += 1;
@@ -844,24 +883,31 @@ pub const Lexer = struct {
                     }
                 }
 
-                if (!found_closing_quote) return error.UnterminatedCharLiteral;
+                if (found_closing_quote) {
+                    if (char_count == 1) {
+                        const lexeme = self.source[position_start..self.loc.span.end];
 
-                if (char_count > 1) return error.MultipleCharsInLiteral;
-
-                const lexeme = self.source[position_start..self.loc.span.end];
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = position_start,
-                        .end = self.loc.span.end,
-                    },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .literal = .Char }, lexeme, end_loc);
+                        return Token.init(
+                            .{ .literal = .Char },
+                            lexeme,
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = position_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
+                            },
+                        );
+                    } else {
+                        return error.MultipleCharsInLiteral;
+                    }
+                } else {
+                    return error.UnterminatedCharLiteral;
+                }
             },
             '+' => {
                 self.advance();
@@ -870,19 +916,21 @@ pub const Lexer = struct {
                     if (next == '.') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .FloatAdd },
+                            "+.",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .FloatAdd }, "+.", end_loc);
+                        );
                     }
                 }
 
@@ -890,35 +938,39 @@ pub const Lexer = struct {
                     if (next == '+') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .ListConcat },
+                            "++",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .ListConcat }, "++", end_loc);
+                        );
                     }
                 }
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .operator = .IntAdd },
+                    "+",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .operator = .IntAdd }, "+", end_loc);
+                );
             },
             '-' => {
                 self.advance();
@@ -927,53 +979,59 @@ pub const Lexer = struct {
                     if (next == '>') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .symbol = .ArrowRight },
+                            "->",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .symbol = .ArrowRight }, "->", end_loc);
+                        );
                     }
 
                     if (next == '.') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .FloatSub },
+                            "-.",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .FloatSub }, "-.", end_loc);
+                        );
                     }
                 }
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .operator = .IntSub },
+                    "-",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .operator = .IntSub }, "-", end_loc);
+                );
             },
             '*' => {
                 self.advance();
@@ -982,53 +1040,59 @@ pub const Lexer = struct {
                     if (next == '*') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .Exp },
+                            "**",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .Exp }, "**", end_loc);
+                        );
                     }
 
                     if (next == '.') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .FloatMul },
+                            "*.",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .FloatMul }, "*.", end_loc);
+                        );
                     }
                 }
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .operator = .IntMul },
+                    "*",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .operator = .IntMul }, "*", end_loc);
+                );
             },
             '/' => {
                 self.advance();
@@ -1037,53 +1101,59 @@ pub const Lexer = struct {
                     if (next == '=') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .NotEqual },
+                            "/=",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .NotEqual }, "/=", end_loc);
+                        );
                     }
 
                     if (next == '.') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .FloatDiv },
+                            "/.",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .FloatDiv }, "/.", end_loc);
+                        );
                     }
                 }
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .operator = .IntDiv },
+                    "/",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .operator = .IntDiv }, "/", end_loc);
+                );
             },
             '<' => {
                 self.advance();
@@ -1092,89 +1162,99 @@ pub const Lexer = struct {
                     if (next == '=') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .LessThanEqual },
+                            "<=",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .LessThanEqual }, "<=", end_loc);
+                        );
                     }
 
                     if (next == '>') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .StrConcat },
+                            "<>",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .StrConcat }, "<>", end_loc);
+                        );
                     }
 
                     if (next == '|') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .PipeLeft },
+                            "<|",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .PipeLeft }, "<|", end_loc);
+                        );
                     }
 
                     if (next == '<') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .ComposeLeft },
+                            "<<",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .ComposeLeft }, "<<", end_loc);
+                        );
                     }
                 }
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .operator = .LessThan },
+                    "<",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .operator = .LessThan }, "<", end_loc);
+                );
             },
             '>' => {
                 self.advance();
@@ -1183,53 +1263,59 @@ pub const Lexer = struct {
                     if (next == '=') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .GreaterThanEqual },
+                            ">=",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .GreaterThanEqual }, ">=", end_loc);
+                        );
                     }
 
                     if (next == '>') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .ComposeRight },
+                            ">>",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .ComposeRight }, ">>", end_loc);
+                        );
                     }
                 }
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .operator = .GreaterThan },
+                    ">",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .operator = .GreaterThan }, ">", end_loc);
+                );
             },
             '&' => {
                 self.advance();
@@ -1238,35 +1324,39 @@ pub const Lexer = struct {
                     if (next == '&') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .LogicalAnd },
+                            "&&",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .LogicalAnd }, "&&", end_loc);
+                        );
                     }
                 }
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .special = .Unrecognized },
+                    "&",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .special = .Unrecognized }, "&", end_loc);
+                );
             },
             '|' => {
                 self.advance();
@@ -1275,70 +1365,78 @@ pub const Lexer = struct {
                     if (next == '|') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .LogicalOr },
+                            "||",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .LogicalOr }, "||", end_loc);
+                        );
                     }
 
                     if (next == '>') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .PipeRight },
+                            "|>",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .PipeRight }, "|>", end_loc);
+                        );
                     }
                 }
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .symbol = .Pipe },
+                    "|",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .symbol = .Pipe }, "|", end_loc);
+                );
             },
             '\\' => {
                 self.advance();
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .operator = .Lambda },
+                    "\\",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .operator = .Lambda }, "\\", end_loc);
+                );
             },
             ':' => {
                 self.advance();
@@ -1347,52 +1445,58 @@ pub const Lexer = struct {
                     if (next == ':') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .Cons },
+                            "::",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .Cons }, "::", end_loc);
+                        );
                     }
                 }
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .delimiter = .Colon },
+                    ":",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .delimiter = .Colon }, ":", end_loc);
+                );
             },
             ',' => {
                 self.advance();
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .delimiter = .Comma },
+                    ",",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .delimiter = .Comma }, ",", end_loc);
+                );
             },
             '.' => {
                 self.advance();
@@ -1403,69 +1507,77 @@ pub const Lexer = struct {
                     if (next == '.') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .Expand },
+                            "..",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .Expand }, "..", end_loc);
+                        );
                     }
                 }
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .delimiter = .Dot },
+                    ".",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .delimiter = .Dot }, ".", end_loc);
+                );
             },
             '{' => {
                 self.advance();
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .delimiter = .LeftBrace },
+                    "{",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .delimiter = .LeftBrace }, "{", end_loc);
+                );
             },
             '}' => {
                 self.advance();
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .delimiter = .RightBrace },
+                    "}",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .delimiter = .RightBrace }, "}", end_loc);
+                );
             },
             '=' => {
                 self.advance();
@@ -1474,121 +1586,135 @@ pub const Lexer = struct {
                     if (next == '>') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .symbol = .DoubleArrowRight },
+                            "=>",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .symbol = .DoubleArrowRight }, "=>", end_loc);
+                        );
                     }
 
                     if (next == '=') {
                         self.advance();
 
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
+                        return Token.init(
+                            .{ .operator = .Equality },
+                            "==",
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
                             },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
-
-                        return Token.init(.{ .operator = .Equality }, "==", end_loc);
+                        );
                     }
                 }
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .operator = .Equal },
+                    "=",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .operator = .Equal }, "=", end_loc);
+                );
             },
             '(' => {
                 self.advance();
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .delimiter = .LeftParen },
+                    "(",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .delimiter = .LeftParen }, "(", end_loc);
+                );
             },
             ')' => {
                 self.advance();
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .delimiter = .RightParen },
+                    ")",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .delimiter = .RightParen }, ")", end_loc);
+                );
             },
             '[' => {
                 self.advance();
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .delimiter = .LeftBracket },
+                    "[",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .delimiter = .LeftBracket }, "[", end_loc);
+                );
             },
             ']' => {
                 self.advance();
 
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
+                return Token.init(
+                    .{ .delimiter = .RightBracket },
+                    "]",
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
                     },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
-
-                return Token.init(.{ .delimiter = .RightBracket }, "]", end_loc);
+                );
             },
             '0' => {
                 self.advance();
@@ -1615,19 +1741,22 @@ pub const Lexer = struct {
                 }
 
                 const lexeme = self.source[span_start..self.loc.span.end];
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
 
-                return Token.init(.{ .literal = .Int }, lexeme, end_loc);
+                return Token.init(
+                    .{ .literal = .Int },
+                    lexeme,
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
+                    },
+                );
             },
             '1'...'9' => {
                 return self.handleNumber(.Decimal);
@@ -1638,19 +1767,22 @@ pub const Lexer = struct {
 
                     if (self.peek() == null) {
                         const lexeme = self.source[span_start..self.loc.span.end];
-                        const end_loc = TokenLoc{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        };
 
-                        return Token.init(.{ .symbol = .Underscore }, lexeme, end_loc);
+                        return Token.init(
+                            .{ .symbol = .Underscore },
+                            lexeme,
+                            TokenLoc{
+                                .filename = self.loc.filename,
+                                .span = .{
+                                    .start = span_start,
+                                    .end = self.loc.span.end,
+                                },
+                                .src = .{
+                                    .line = start_line,
+                                    .col = start_col,
+                                },
+                            },
+                        );
                     }
 
                     if (self.peek()) |next| {
@@ -1677,51 +1809,58 @@ pub const Lexer = struct {
                                 }
 
                                 const lexeme = self.source[span_start..self.loc.span.end];
-                                const end_loc = TokenLoc{
-                                    .filename = self.loc.filename,
-                                    .span = .{
-                                        .start = span_start,
-                                        .end = self.loc.span.end,
-                                    },
-                                    .src = .{
-                                        .line = start_line,
-                                        .col = start_col,
-                                    },
-                                };
 
-                                return Token.init(.{ .identifier = .Lower }, lexeme, end_loc);
+                                return Token.init(
+                                    .{ .identifier = .Lower },
+                                    lexeme,
+                                    TokenLoc{
+                                        .filename = self.loc.filename,
+                                        .span = .{
+                                            .start = span_start,
+                                            .end = self.loc.span.end,
+                                        },
+                                        .src = .{
+                                            .line = start_line,
+                                            .col = start_col,
+                                        },
+                                    },
+                                );
                             },
                             else => {
-                                const end_loc = TokenLoc{
-                                    .filename = self.loc.filename,
-                                    .span = .{
-                                        .start = span_start,
-                                        .end = self.loc.span.end,
+                                return Token.init(
+                                    .{ .symbol = .Underscore },
+                                    "_",
+                                    TokenLoc{
+                                        .filename = self.loc.filename,
+                                        .span = .{
+                                            .start = span_start,
+                                            .end = self.loc.span.end,
+                                        },
+                                        .src = .{
+                                            .line = start_line,
+                                            .col = start_col,
+                                        },
                                     },
-                                    .src = .{
-                                        .line = start_line,
-                                        .col = start_col,
-                                    },
-                                };
-
-                                return Token.init(.{ .symbol = .Underscore }, "_", end_loc);
+                                );
                             },
                         }
                     }
 
-                    const end_loc = TokenLoc{
-                        .filename = self.loc.filename,
-                        .span = .{
-                            .start = span_start,
-                            .end = self.loc.span.end,
+                    return Token.init(
+                        .{ .symbol = .Underscore },
+                        "_",
+                        TokenLoc{
+                            .filename = self.loc.filename,
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
+                            },
+                            .src = .{
+                                .line = start_line,
+                                .col = start_col,
+                            },
                         },
-                        .src = .{
-                            .line = start_line,
-                            .col = start_col,
-                        },
-                    };
-
-                    return Token.init(.{ .symbol = .Underscore }, "_", end_loc);
+                    );
                 }
 
                 while (self.peek()) |next| {
@@ -1790,19 +1929,22 @@ pub const Lexer = struct {
                 self.advance();
 
                 const lexeme = self.source[span_start..self.loc.span.end];
-                const end_loc = TokenLoc{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                };
 
-                return Token.init(.{ .special = .Unrecognized }, lexeme, end_loc);
+                return Token.init(
+                    .{ .special = .Unrecognized },
+                    lexeme,
+                    TokenLoc{
+                        .filename = self.loc.filename,
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
+                        },
+                        .src = .{
+                            .line = start_line,
+                            .col = start_col,
+                        },
+                    },
+                );
             },
         }
     }
