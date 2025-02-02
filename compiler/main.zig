@@ -2,7 +2,8 @@ const std = @import("std");
 
 const lexer = @import("frontend/lexer.zig");
 const parser = @import("frontend/parser.zig");
-const diagnostics = @import("diagnostics.zig");
+const diagnostics = @import("frontend/diagnostics.zig");
+const ast_printer = @import("frontend/ast_printer.zig");
 
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -21,29 +22,39 @@ pub fn main() !void {
 
     const source = std.fs.cwd().readFileAlloc(allocator, file, 1024 * 1024) catch |err| {
         std.debug.print("Error reading file '{s}': {any}\n", .{ file, err });
+
         return err;
     };
 
-    var l = lexer.Lexer.init(source, file);
+    // First lexer instance for token printing
+    var token_lexer = lexer.Lexer.init(source, file);
     const stderr = std.io.getStdErr().writer();
+    const stdout = std.io.getStdOut().writer();
+
+    try stdout.print("\n=== Tokens ===\n", .{});
 
     while (true) {
-        const token = l.nextToken() catch |err| {
-            const report = diagnostics.Diagnostic.create(err, l.loc, l.source);
+        const token = token_lexer.nextToken() catch |err| {
+            const report = diagnostics.Diagnostic.create(err, token_lexer.loc, token_lexer.source);
             try report.format(stderr);
             std.process.exit(1);
         };
 
         if (std.meta.eql(token.kind, .{ .special = .Eof })) break;
 
-        const stdout = std.io.getStdOut().writer();
         try stdout.print("Token: {s} ({any})\n", .{ token.lexeme, token.kind });
     }
 
-    const p = try parser.Parser.init(allocator, &l);
+    // Second lexer instance for parsing
+    var parse_lexer = lexer.Lexer.init(source, file);
+    const p = try parser.Parser.init(allocator, &parse_lexer);
     const ast = try p.parseProgram();
     defer ast.deinit(allocator);
-    std.debug.print("\n{}\n", .{ast});
+
+    try stdout.print("\n=== AST ===\n", .{});
+
+    var printer = ast_printer.AstPrinter.init(allocator, std.io.getStdOut().writer());
+    try printer.printNode(ast);
 
     // try frontend.semantic_analyzer.analyze(ast);
     // try backend.type_checker.check(ast);

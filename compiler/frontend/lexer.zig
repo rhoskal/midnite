@@ -121,6 +121,27 @@ pub const TokenKind = union(enum) {
     operator: OperatorKind,
     special: SpecialKind,
     symbol: SymbolKind,
+
+    pub fn format(
+        kind: TokenKind,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+
+        switch (kind) {
+            .comment => |v| try writer.print(".comment = {s}", .{@tagName(v)}),
+            .delimiter => |v| try writer.print(".delimiter = {s}", .{@tagName(v)}),
+            .identifier => |v| try writer.print(".identifier = {s}", .{@tagName(v)}),
+            .keyword => |v| try writer.print(".keyword = {s}", .{@tagName(v)}),
+            .literal => |v| try writer.print(".literal = {s}", .{@tagName(v)}),
+            .operator => |v| try writer.print(".operator = {s}", .{@tagName(v)}),
+            .special => |v| try writer.print(".special = {s}", .{@tagName(v)}),
+            .symbol => |v| try writer.print(".symbol = {s}", .{@tagName(v)}),
+        }
+    }
 };
 
 /// A structure representing raw buffer locations.
@@ -181,6 +202,18 @@ pub const Token = struct {
             .lexeme = lexeme,
             .loc = loc,
         };
+    }
+
+    pub fn format(
+        token: Token,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+
+        try writer.print("Token: {s} ({s})", .{ token.lexeme, token.kind });
     }
 };
 

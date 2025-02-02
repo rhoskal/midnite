@@ -872,6 +872,13 @@ pub const Parser = struct {
                             .right = right,
                         },
                     },
+                    .StrConcat => .{
+                        .str_concat_expr = .{
+                            .left = left,
+                            .operator = operator,
+                            .right = right,
+                        },
+                    },
                     else => unreachable,
                 },
                 else => unreachable,
@@ -926,6 +933,40 @@ pub const Parser = struct {
         errdefer self.allocator.destroy(node);
 
         switch (self.current_token.kind) {
+            .delimiter => |delim| switch (delim) {
+                .LeftParen => {
+                    try self.advance();
+
+                    const expr = try self.parseExpression();
+
+                    _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+
+                    return expr;
+                },
+                else => {
+                    self.allocator.destroy(node);
+
+                    return error.UnexpectedToken;
+                },
+            },
+            .identifier => |ident| switch (ident) {
+                .Lower => {
+                    const identifier = try self.parseLowerIdentifier();
+                    node.* = .{ .lower_identifier = identifier };
+                },
+                .Upper => {
+                    const identifier = try self.parseUpperIdentifier();
+                    node.* = .{ .upper_identifier = identifier };
+                },
+            },
+            .keyword => |kw| switch (kw) {
+                .If => return try self.parseIfThenElse(),
+                else => {
+                    self.allocator.destroy(node);
+
+                    return error.UnexpectedToken;
+                },
+            },
             .literal => |lit| switch (lit) {
                 .Char => {
                     const char_literal = try self.parseCharLiteral();
@@ -949,34 +990,8 @@ pub const Parser = struct {
                     return error.UnexpectedToken;
                 },
             },
-            .identifier => |ident| switch (ident) {
-                .Lower => {
-                    const identifier = try self.parseLowerIdentifier();
-                    node.* = .{ .lower_identifier = identifier };
-                },
-                .Upper => {
-                    const identifier = try self.parseUpperIdentifier();
-                    node.* = .{ .upper_identifier = identifier };
-                },
-            },
             .operator => |op| switch (op) {
                 .Lambda => return try self.parseLambdaExpr(),
-                else => {
-                    self.allocator.destroy(node);
-
-                    return error.UnexpectedToken;
-                },
-            },
-            .delimiter => |delim| switch (delim) {
-                .LeftParen => {
-                    try self.advance();
-
-                    const expr = try self.parseExpression();
-
-                    _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
-
-                    return expr;
-                },
                 else => {
                     self.allocator.destroy(node);
 
