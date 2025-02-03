@@ -5,11 +5,22 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const exe = b.addExecutable(.{
-        .name = "moxc",
-        .root_source_file = b.path("compiler/main.zig"),
+        .name = "mox",
+        .root_source_file = b.path("cli/main.zig"),
         .target = target,
         .optimize = optimize,
     });
+
+    const compiler_module = b.addModule("compiler", .{
+        .root_source_file = b.path("compiler/root.zig"),
+    });
+
+    const formatter_module = b.addModule("formatter", .{
+        .root_source_file = b.path("formatter/root.zig"),
+    });
+
+    exe.root_module.addImport("compiler", compiler_module);
+    exe.root_module.addImport("formatter", formatter_module);
 
     b.installArtifact(exe);
 
