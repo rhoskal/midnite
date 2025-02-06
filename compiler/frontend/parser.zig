@@ -929,9 +929,6 @@ pub const Parser = struct {
     /// Handles cases for basic literals (int, float, string, char), identifiers (lower and upper),
     /// and parenthesized expressions.
     fn parsePrimaryExpr(self: *Parser) ParserError!*ast.Node {
-        const node = try self.allocator.create(ast.Node);
-        errdefer self.allocator.destroy(node);
-
         switch (self.current_token.kind) {
             .delimiter => |delim| switch (delim) {
                 .LeftParen => {
@@ -943,69 +940,73 @@ pub const Parser = struct {
 
                     return expr;
                 },
-                else => {
-                    self.allocator.destroy(node);
-
-                    return error.UnexpectedToken;
-                },
+                else => return error.UnexpectedToken,
             },
-            .identifier => |ident| switch (ident) {
-                .Lower => {
-                    const identifier = try self.parseLowerIdentifier();
-                    node.* = .{ .lower_identifier = identifier };
-                },
-                .Upper => {
-                    const identifier = try self.parseUpperIdentifier();
-                    node.* = .{ .upper_identifier = identifier };
-                },
+            .identifier => |ident| {
+                const node = try self.allocator.create(ast.Node);
+                errdefer self.allocator.destroy(node);
+
+                switch (ident) {
+                    .Lower => {
+                        const identifier = try self.parseLowerIdentifier();
+                        node.* = .{ .lower_identifier = identifier };
+                    },
+                    .Upper => {
+                        const identifier = try self.parseUpperIdentifier();
+                        node.* = .{ .upper_identifier = identifier };
+                    },
+                }
+
+                return node;
             },
             .keyword => |kw| switch (kw) {
                 .If => return try self.parseIfThenElse(),
-                else => {
-                    self.allocator.destroy(node);
-
-                    return error.UnexpectedToken;
-                },
+                else => return error.UnexpectedToken,
             },
-            .literal => |lit| switch (lit) {
-                .Char => {
-                    const char_literal = try self.parseCharLiteral();
-                    node.* = .{ .char_literal = char_literal };
-                },
-                .Float => {
-                    const float_literal = try self.parseFloatLiteral();
-                    node.* = .{ .float_literal = float_literal };
-                },
-                .Int => {
-                    const int_literal = try self.parseIntLiteral();
-                    node.* = .{ .int_literal = int_literal };
-                },
-                .String => {
-                    const str_literal = try self.parseStrLiteral();
-                    node.* = .{ .str_literal = str_literal };
-                },
-                .MultilineString => {
-                    self.allocator.destroy(node);
+            .literal => |lit| {
+                const node = try self.allocator.create(ast.Node);
+                errdefer self.allocator.destroy(node);
 
-                    return error.UnexpectedToken;
-                },
+                switch (lit) {
+                    .Char => {
+                        const char_literal = try self.parseCharLiteral();
+
+                        node.* = .{
+                            .char_literal = char_literal,
+                        };
+                    },
+                    .Float => {
+                        const float_literal = try self.parseFloatLiteral();
+
+                        node.* = .{
+                            .float_literal = float_literal,
+                        };
+                    },
+                    .Int => {
+                        const int_literal = try self.parseIntLiteral();
+
+                        node.* = .{
+                            .int_literal = int_literal,
+                        };
+                    },
+                    .String => {
+                        const str_literal = try self.parseStrLiteral();
+
+                        node.* = .{
+                            .str_literal = str_literal,
+                        };
+                    },
+                    .MultilineString => return error.UnexpectedToken,
+                }
+
+                return node;
             },
             .operator => |op| switch (op) {
                 .Lambda => return try self.parseLambdaExpr(),
-                else => {
-                    self.allocator.destroy(node);
-
-                    return error.UnexpectedToken;
-                },
+                else => return error.UnexpectedToken,
             },
-            else => {
-                self.allocator.destroy(node);
-
-                return error.UnexpectedToken;
-            },
+            else => return error.UnexpectedToken,
         }
-
-        return node;
     }
 
     /// Parses a lambda expression of the form: \param1 param2 => expr

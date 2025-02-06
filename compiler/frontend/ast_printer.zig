@@ -93,7 +93,6 @@ pub const AstPrinter = struct {
                 try self.writer.styled(term.Color.Dim, "}\n");
             },
             .comparison_expr => |expr| {
-                try self.printIndent();
                 try self.writer.styled(term.Color.Bold, "ComparisonExpr");
                 try self.writer.styled(term.Color.Dim, " {\n");
 

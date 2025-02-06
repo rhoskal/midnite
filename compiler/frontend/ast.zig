@@ -978,6 +978,7 @@ pub const Node = union(enum) {
                 }
 
                 prog.statements.deinit();
+                allocator.destroy(self);
             },
             else => {}, // Other nodes don't own any memory
         }
