@@ -627,9 +627,20 @@ pub const Parser = struct {
                     next_params.deinit();
                 }
 
-                // Parse any parameters that follow this constructor
+                // When parsing variant type declarations in an ML-style language without explicit
+                // terminators (like semicolons), we must determine where declarations end by recognizing
+                // tokens that can only start new top-level declarations. This means checking for keywords
+                // like 'type', 'let', 'foreign' etc. When we see one of these tokens, we know the
+                // current declaration must be complete because these keywords can only appear at the
+                // start of a new top-level declaration.
                 while (!self.check(lexer.TokenKind{ .symbol = .Pipe }) and
-                    !self.check(lexer.TokenKind{ .special = .Eof }))
+                    !self.check(lexer.TokenKind{ .special = .Eof }) and
+                    !self.check(lexer.TokenKind{ .keyword = .Foreign }) and
+                    !self.check(lexer.TokenKind{ .keyword = .Include }) and
+                    !self.check(lexer.TokenKind{ .keyword = .Let }) and
+                    !self.check(lexer.TokenKind{ .comment = .Regular }) and
+                    !self.check(lexer.TokenKind{ .comment = .Doc }) and
+                    !self.check(lexer.TokenKind{ .keyword = .Type }))
                 {
                     const param = try self.parseTypeExpr();
                     try next_params.append(param);

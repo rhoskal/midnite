@@ -69,13 +69,13 @@ pub const Formatter = struct {
 
                 try self.write("= ");
                 try self.formatNode(atype.value);
+                try self.write("\n");
             },
             .record_type => |rtype| {
                 try self.write("type ");
                 try self.write(rtype.name);
                 try self.write(" ");
 
-                // Format type parameters if any
                 for (rtype.type_params.items) |param| {
                     try self.write(param);
                     try self.write(" ");
@@ -106,11 +106,20 @@ pub const Formatter = struct {
                 try self.write("}");
 
                 self.indent_level -= 1;
+
+                try self.write("\n");
             },
             .variant_type => |vtype| {
                 try self.write("type ");
                 try self.write(vtype.name);
-                try self.write(" =");
+                try self.write(" ");
+
+                for (vtype.type_params.items) |param| {
+                    try self.write(param);
+                    try self.write(" ");
+                }
+
+                try self.write("=");
                 try self.write("\n");
 
                 self.indent_level += 1;
@@ -122,7 +131,11 @@ pub const Formatter = struct {
 
                     for (constructor.params.items) |param| {
                         try self.write(" ");
+
+                        const needs_parens = (param.* == .type_application);
+                        if (needs_parens) try self.write("(");
                         try self.formatNode(param);
+                        if (needs_parens) try self.write(")");
                     }
 
                     if (i < vtype.constructors.items.len - 1) {
@@ -131,6 +144,8 @@ pub const Formatter = struct {
                 }
 
                 self.indent_level -= 1;
+
+                try self.write("\n");
             },
             .function_type => |ftype| {
                 for (ftype.param_types.items, 0..) |param, i| {
@@ -146,7 +161,12 @@ pub const Formatter = struct {
                 try self.write(" ");
 
                 for (app.args.items, 0..) |arg, i| {
+                    const needs_parens = (arg.* == .type_application);
+                    if (needs_parens) try self.write("(");
+
                     try self.formatNode(arg);
+
+                    if (needs_parens) try self.write(")");
 
                     if (i < app.args.items.len - 1) {
                         try self.write(" ");
@@ -163,6 +183,168 @@ pub const Formatter = struct {
                         try self.write(".");
                     }
                 }
+
+                try self.write("\n");
+            },
+            .foreign_function_decl => |decl| {
+                try self.write("foreign ");
+                try self.write(decl.name);
+
+                try self.write(" : ");
+                try self.formatNode(decl.type_annotation);
+
+                try self.write(" = ");
+                try self.write("\"");
+                try self.write(decl.external_name);
+                try self.write("\"");
+
+                try self.write("\n");
+            },
+            .function_decl => |decl| {
+                try self.write("let ");
+                try self.write(decl.name);
+
+                if (decl.type_annotation) |anno| {
+                    try self.write(" : ");
+                    try self.formatNode(anno);
+                }
+
+                try self.write(" = ");
+                try self.formatNode(decl.value);
+
+                try self.write("\n");
+            },
+            .lambda_expr => |expr| {
+                try self.write("\\");
+
+                for (expr.params.items, 0..) |param, i| {
+                    try self.write(param);
+
+                    if (i < expr.params.items.len - 1) {
+                        try self.write(" ");
+                    }
+                }
+
+                try self.write(" => ");
+
+                try self.formatNode(expr.body);
+            },
+            .arithmetic_expr => |expr| {
+                try self.formatNode(expr.left);
+
+                switch (expr.operator.kind) {
+                    .operator => |op| {
+                        if (op == .FloatAdd) try self.write(" +. ");
+                        if (op == .FloatDiv) try self.write(" /. ");
+                        if (op == .FloatMul) try self.write(" *. ");
+                        if (op == .FloatSub) try self.write(" -. ");
+                        if (op == .IntAdd) try self.write(" + ");
+                        if (op == .IntDiv) try self.write(" / ");
+                        if (op == .IntMul) try self.write(" * ");
+                        if (op == .IntSub) try self.write(" - ");
+                    },
+                    else => {},
+                }
+
+                try self.formatNode(expr.right);
+            },
+            .comparison_expr => |expr| {
+                try self.formatNode(expr.left);
+
+                switch (expr.operator.kind) {
+                    .operator => |op| {
+                        if (op == .Equality) try self.write(" == ");
+                        if (op == .GreaterThan) try self.write(" > ");
+                        if (op == .GreaterThanEqual) try self.write(" >= ");
+                        if (op == .LessThan) try self.write(" < ");
+                        if (op == .LessThanEqual) try self.write(" <= ");
+                        if (op == .NotEqual) try self.write(" /= ");
+                    },
+                    else => {},
+                }
+
+                try self.formatNode(expr.right);
+            },
+            .composition_expr => |expr| {
+                try self.formatNode(expr.first);
+
+                switch (expr.operator.kind) {
+                    .operator => |op| {
+                        if (op == .ComposeLeft) try self.write(" << ");
+                        if (op == .ComposeRight) try self.write(" >> ");
+                    },
+                    else => {},
+                }
+
+                try self.formatNode(expr.second);
+            },
+            .cons_expr => |expr| {
+                try self.formatNode(expr.head);
+                try self.write(" :: ");
+                try self.formatNode(expr.tail);
+            },
+            .list_concat_expr => |expr| {
+                try self.formatNode(expr.left);
+                try self.write(" ++ ");
+                try self.formatNode(expr.right);
+            },
+            .logical_expr => |expr| {
+                try self.formatNode(expr.left);
+
+                switch (expr.operator.kind) {
+                    .operator => |op| {
+                        if (op == .LogicalAnd) try self.write(" && ");
+                        if (op == .LogicalOr) try self.write(" || ");
+                    },
+                    else => {},
+                }
+
+                try self.formatNode(expr.right);
+            },
+            .pipe_expr => |expr| {
+                switch (expr.operator.kind) {
+                    .operator => |op| {
+                        if (op == .PipeLeft) {
+                            try self.formatNode(expr.func);
+                            try self.write(" <| ");
+                            try self.formatNode(expr.value);
+                        }
+
+                        if (op == .PipeRight) {
+                            try self.formatNode(expr.value);
+                            try self.write(" |> ");
+                            try self.formatNode(expr.func);
+                        }
+                    },
+                    else => {},
+                }
+            },
+            .str_concat_expr => |expr| {
+                try self.formatNode(expr.left);
+                try self.write(" <> ");
+                try self.formatNode(expr.right);
+            },
+            .unary_expr => |expr| {
+                try self.write("-");
+                try self.formatNode(expr.operand);
+            },
+            .if_then_else_stmt => |stmt| {
+                try self.write("if ");
+                try self.formatNode(stmt.condition);
+
+                try self.write(" then\n");
+                self.indent_level += 1;
+                try self.writeIndent();
+                try self.formatNode(stmt.then_branch);
+                try self.write("\n");
+                self.indent_level -= 1;
+
+                try self.write("else\n");
+                self.indent_level += 1;
+                try self.writeIndent();
+                try self.formatNode(stmt.else_branch);
+                try self.write("\n");
+                self.indent_level -= 1;
             },
             .int_literal => |lit| {
                 // For integer literals, just write the lexeme directly
