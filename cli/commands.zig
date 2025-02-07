@@ -6,7 +6,7 @@ const formatter = @import("formatter");
 pub const Command = union(enum) {
     build: []const u8,
     docs,
-    fmt,
+    fmt: []const u8,
     init,
     lint,
     lsp,
@@ -19,6 +19,10 @@ pub const Command = union(enum) {
             return Command{ .build = "" };
         }
 
+        if (std.mem.eql(u8, str, "fmt")) {
+            return Command{ .fmt = "" };
+        }
+
         // Handle all other commands normally
         const command_type = std.meta.stringToEnum(
             std.meta.Tag(Command),
@@ -28,7 +32,7 @@ pub const Command = union(enum) {
         return switch (command_type) {
             .build => unreachable,
             .docs => Command.docs,
-            .fmt => Command.fmt,
+            .fmt => unreachable,
             .init => Command.init,
             .lint => Command.lint,
             .lsp => Command.lsp,
@@ -45,23 +49,24 @@ pub const Command = union(enum) {
 // };
 
 pub fn executeCommand(allocator: std.mem.Allocator, command: Command) !void {
-    _ = allocator;
-
     switch (command) {
         .build => |filepath| {
             const stdout = std.io.getStdOut().writer();
 
-            var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-            defer arena.deinit();
-
-            try compiler.compile(arena.allocator(), stdout, filepath);
+            try compiler.compile(allocator, stdout, filepath);
         },
         .docs => {
             std.debug.print("Command 'docs' not implemented yet\n", .{});
         },
-        .fmt => {
-            // formatter.format(allocator: std.mem.Allocator, node: *const ast.Node)
-            std.debug.print("Command 'fmt' not implemented yet\n", .{});
+        .fmt => |filepath| {
+            const formatted = try formatter.format(allocator, filepath);
+            defer allocator.free(formatted);
+
+            try std.fs.cwd().writeFile(.{
+                .sub_path = filepath,
+                .data = formatted,
+                .flags = .{},
+            });
         },
         .init => {
             std.debug.print("Command 'init' not implemented yet\n", .{});

@@ -18,6 +18,7 @@ pub fn build(b: *std.Build) void {
     const formatter_module = b.addModule("formatter", .{
         .root_source_file = b.path("formatter/root.zig"),
     });
+    formatter_module.addImport("compiler", compiler_module);
 
     exe.root_module.addImport("compiler", compiler_module);
     exe.root_module.addImport("formatter", formatter_module);

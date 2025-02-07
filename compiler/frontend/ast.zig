@@ -854,6 +854,8 @@ pub const Node = union(enum) {
                 ftype.param_types.deinit();
             },
             .record_type => |*rtype| {
+                allocator.free(rtype.name);
+
                 for (rtype.type_params.items) |param| {
                     allocator.free(param);
                 }
@@ -933,6 +935,8 @@ pub const Node = union(enum) {
                 path.segments.deinit();
             },
             .type_alias => |*alias| {
+                allocator.free(alias.name);
+
                 for (alias.type_params.items) |param| {
                     allocator.free(param);
                 }
@@ -954,6 +958,8 @@ pub const Node = union(enum) {
                 app.args.deinit();
             },
             .variant_type => |*vtype| {
+                allocator.free(vtype.name);
+
                 for (vtype.type_params.items) |param| {
                     allocator.free(param);
                 }

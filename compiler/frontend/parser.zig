@@ -1349,9 +1349,16 @@ pub const Parser = struct {
         const node = try self.allocator.create(ast.Node);
         errdefer self.allocator.destroy(node);
 
+        // Content starts after '# ' prefix
+        var content_start: usize = 1;
+        while (content_start < token.lexeme.len and std.ascii.isWhitespace(token.lexeme[content_start])) {
+            content_start += 1;
+        }
+        const trimmed = std.mem.trimRight(u8, token.lexeme[content_start..], &std.ascii.whitespace);
+
         node.* = .{
             .comment = .{
-                .content = token.lexeme,
+                .content = trimmed,
                 .token = token,
             },
         };
@@ -1366,9 +1373,16 @@ pub const Parser = struct {
         const node = try self.allocator.create(ast.Node);
         errdefer self.allocator.destroy(node);
 
+        // Content starts after '## ' prefix
+        var content_start: usize = 2;
+        while (content_start < token.lexeme.len and std.ascii.isWhitespace(token.lexeme[content_start])) {
+            content_start += 1;
+        }
+        const trimmed = std.mem.trimRight(u8, token.lexeme[content_start..], &std.ascii.whitespace);
+
         node.* = .{
             .doc_comment = .{
-                .content = token.lexeme,
+                .content = trimmed,
                 .token = token,
             },
         };
@@ -1383,11 +1397,12 @@ const TEST_FILE = "test.mox";
 
 test "[comment]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     const source = "# This is a regular comment";
+    const expected_content = "This is a regular comment";
     var l = lexer.Lexer.init(source, TEST_FILE);
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
@@ -1408,16 +1423,17 @@ test "[comment]" {
     try testing.expectEqual(lexer.TokenKind{ .comment = .Regular }, comment.token.kind);
 
     // Ensure the content of the comment matches the source
-    try testing.expectEqualStrings(source, comment.content);
+    try testing.expectEqualStrings(expected_content, comment.content);
 }
 
 test "[doc_comment]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     const source = "## This is a doc comment";
+    const expected_content = "This is a doc comment";
     var l = lexer.Lexer.init(source, TEST_FILE);
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
@@ -1438,10 +1454,15 @@ test "[doc_comment]" {
     try testing.expectEqual(lexer.TokenKind{ .comment = .Doc }, comment.token.kind);
 
     // Ensure the content of the comment matches the source
-    try testing.expectEqualStrings(source, comment.content);
+    try testing.expectEqualStrings(expected_content, comment.content);
 }
 
 test "[int_literal]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
     const TestCase = struct {
         source: []const u8,
         expected: i64,
@@ -1462,11 +1483,6 @@ test "[int_literal]" {
         .{ .source = "0b1010", .expected = 10 },
         .{ .source = "0b1010_1010", .expected = 170 },
     };
-
-    // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
 
     for (cases) |case| {
         var l = lexer.Lexer.init(case.source, TEST_FILE);
@@ -1489,6 +1505,11 @@ test "[int_literal]" {
 }
 
 test "[float_literal]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
     const TestCase = struct {
         source: []const u8,
         expected: f64,
@@ -1501,11 +1522,6 @@ test "[float_literal]" {
         .{ .source = "1.23e-4", .expected = 0.000123 },
         .{ .source = "1_234.567_89", .expected = 1234.56789 },
     };
-
-    // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
 
     for (cases) |case| {
         var l = lexer.Lexer.init(case.source, TEST_FILE);
@@ -1528,6 +1544,11 @@ test "[float_literal]" {
 }
 
 test "[str_literal]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
     const TestCase = struct {
         source: []const u8,
         expected: []const u8,
@@ -1579,11 +1600,6 @@ test "[str_literal]" {
         .{ .source = "\"Escaped\\tand\\u{1F496}direct💖mixed\"", .expected = "Escaped\tand💖direct💖mixed" },
     };
 
-    // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
-
     for (cases) |case| {
         var l = lexer.Lexer.init(case.source, TEST_FILE);
         var parser = try Parser.init(allocator, &l);
@@ -1606,6 +1622,11 @@ test "[str_literal]" {
 }
 
 test "[char_literal]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
     const TestCase = struct {
         source: []const u8,
         expected: u21,
@@ -1631,11 +1652,6 @@ test "[char_literal]" {
         .{ .source = "'😀'", .expected = 0x1F600 },
     };
 
-    // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
-
     for (cases) |case| {
         var l = lexer.Lexer.init(case.source, TEST_FILE);
         var parser = try Parser.init(allocator, &l);
@@ -1657,6 +1673,11 @@ test "[char_literal]" {
 }
 
 test "[lower_identifier]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
     const TestCase = struct {
         source: []const u8,
         expected: []const u8,
@@ -1668,11 +1689,6 @@ test "[lower_identifier]" {
         .{ .source = "valid?", .expected = "valid?" },
         .{ .source = "foo_bar", .expected = "foo_bar" },
     };
-
-    // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
 
     for (cases) |case| {
         var l = lexer.Lexer.init(case.source, TEST_FILE);
@@ -1695,6 +1711,11 @@ test "[lower_identifier]" {
 }
 
 test "[upper_identifier]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
     const TestCase = struct {
         source: []const u8,
         expected: []const u8,
@@ -1707,11 +1728,6 @@ test "[upper_identifier]" {
         .{ .source = "FooBar42", .expected = "FooBar42" },
         .{ .source = "Foo_Bar", .expected = "Foo_Bar" },
     };
-
-    // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
 
     for (cases) |case| {
         var l = lexer.Lexer.init(case.source, TEST_FILE);
@@ -1735,9 +1751,9 @@ test "[upper_identifier]" {
 
 test "[unary_expr]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     const source = "-42";
     var l = lexer.Lexer.init(source, TEST_FILE);
@@ -1770,9 +1786,9 @@ test "[unary_expr]" {
 
 test "[arithmetic_expr]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     const source = "42 + 24";
     var l = lexer.Lexer.init(source, TEST_FILE);
@@ -1812,9 +1828,9 @@ test "[arithmetic_expr]" {
 
 test "[comparison_expr]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     const TestCase = struct {
         source: []const u8,
@@ -1901,9 +1917,9 @@ test "[comparison_expr]" {
 
 test "[logical_expr]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     const TestCase = struct {
         source: []const u8,
@@ -1960,9 +1976,9 @@ test "[logical_expr]" {
 
 test "[operator precedence]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     const TestCase = struct {
         source: []const u8,
@@ -2086,9 +2102,9 @@ test "[operator precedence]" {
 
 test "[operator precedence] (structural)" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     {
         var l = lexer.Lexer.init("1 + 2 * 3", TEST_FILE);
@@ -2193,9 +2209,9 @@ test "[operator precedence] (structural)" {
 
 test "[lambda_expr]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     const source = "\\x => x + 1";
     var l = lexer.Lexer.init(source, TEST_FILE);
@@ -2225,9 +2241,9 @@ test "[lambda_expr]" {
 
 test "[if_then_else_stmt]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     const source = "if x > 0 then 1 else -1";
     var l = lexer.Lexer.init(source, TEST_FILE);
@@ -2282,9 +2298,9 @@ test "[if_then_else_stmt]" {
 
 test "[function_decl] (simple)" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     // Test a simple function declaration without type annotation
     const source = "let add = \\x y => x + y";
@@ -2342,9 +2358,9 @@ test "[function_decl] (simple)" {
 
 test "[function_decl] (w/ type annotation)" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     // Test function declaration with type annotation
     const source = "let inc : Int -> Int = \\x => x + 1";
@@ -2413,9 +2429,9 @@ test "[function_decl] (w/ type annotation)" {
 
 test "[foreign_function_decl]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     // foreign sqrt : Float -> Float = "c_sqrt"
 
@@ -2460,9 +2476,9 @@ test "[foreign_function_decl]" {
 
 test "[module_path]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     const source = "Std.List";
     var l = lexer.Lexer.init(source, TEST_FILE);
@@ -2492,9 +2508,9 @@ test "[module_path]" {
 
 test "[include]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     const source = "include Std.List";
     var l = lexer.Lexer.init(source, TEST_FILE);
@@ -2524,9 +2540,9 @@ test "[include]" {
 
 test "[type_alias]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     {
         // Basic type
@@ -2744,9 +2760,9 @@ test "[type_alias]" {
 
 test "[record_type]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     {
         const source = "type User = { name: String, age: Int }";
@@ -3039,11 +3055,11 @@ test "[record_type]" {
     }
 }
 
-test "[type_variant]" {
+test "[variant_type]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     {
         const source = "type Boolean = | True | False";

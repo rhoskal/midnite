@@ -39,6 +39,19 @@ pub fn main() !void {
             return;
         }
 
+        if (std.mem.eql(u8, arg, "fmt")) {
+            const filepath = args.next() orelse {
+                std.debug.print("Error: fmt command requires a filepath\n", .{});
+                std.debug.print("Usage: mox fmt <filepath>\n", .{});
+                std.process.exit(1);
+            };
+
+            const cmd = commands.Command{ .fmt = filepath };
+            try commands.executeCommand(allocator, cmd);
+
+            return;
+        }
+
         const cmd = commands.Command.fromString(arg) orelse {
             std.debug.print("Unknown command: {s}\n", .{arg});
             commands.printUsage();
