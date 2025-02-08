@@ -456,14 +456,26 @@ pub const Parser = struct {
             self.allocator.destroy(path_node);
         }
 
+        var kind: ast.ImportKind = .Simple;
+
+        var alias: ?[]const u8 = null;
+        errdefer if (alias) |a| self.allocator.free(a);
+
+        if (try self.match(lexer.TokenKind{ .keyword = .As })) {
+            kind = .Alias;
+
+            const ident = try self.expect(lexer.TokenKind{ .identifier = .Upper });
+            alias = try self.allocator.dupe(u8, ident.lexeme);
+        }
+
         const node = try self.allocator.create(ast.Node);
         errdefer self.allocator.destroy(node);
 
         node.* = .{
             .import_spec = .{
                 .path = path_node.module_path,
-                .kind = .Simple,
-                .alias = null,
+                .kind = kind,
+                .alias = alias,
                 .items = null,
                 .token = token,
             },
@@ -2703,6 +2715,49 @@ test "[import_spec]" {
 
         // Verify the module name is "MyModule"
         try testing.expectEqualStrings("MyModule", import_spec.path.segments.items[0]);
+
+        // Verify the token is the 'open' keyword
+        try testing.expectEqual(lexer.TokenKind{ .keyword = .Open }, import_spec.token.kind);
+        try testing.expectEqualStrings("open", import_spec.token.lexeme);
+    }
+
+    {
+        // Alias import
+        const source = "open MyModule as M";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseImportSpec();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify the node is an import specification
+        try testing.expect(node.* == .import_spec);
+
+        const import_spec = node.import_spec;
+
+        // Verify it's an alias import
+        try testing.expectEqual(ast.ImportKind.Alias, import_spec.kind);
+
+        // Verify the module path has exactly one segment
+        try testing.expectEqual(@as(usize, 1), import_spec.path.segments.items.len);
+
+        // Verify the module name is "MyModule"
+        try testing.expectEqualStrings("MyModule", import_spec.path.segments.items[0]);
+
+        // Verify it has an alias
+        try testing.expect(import_spec.alias != null);
+
+        // Verify the alias is "M"
+        try testing.expectEqualStrings("M", import_spec.alias.?);
+
+        // Verify it has no items list
+        try testing.expect(import_spec.items == null);
 
         // Verify the token is the 'open' keyword
         try testing.expectEqual(lexer.TokenKind{ .keyword = .Open }, import_spec.token.kind);

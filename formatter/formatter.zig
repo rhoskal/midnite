@@ -195,6 +195,11 @@ pub const Formatter = struct {
                     try self.write(segment);
                 }
 
+                if (spec.kind == .Alias) {
+                    try self.write(" as ");
+                    try self.write(spec.alias.?);
+                }
+
                 try self.write("\n");
             },
             .foreign_function_decl => |decl| {
