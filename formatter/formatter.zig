@@ -376,6 +376,19 @@ pub const Formatter = struct {
             .float_literal => |lit| {
                 try self.write(lit.token.lexeme);
             },
+            .list => |list| {
+                try self.write("[");
+
+                for (list.elements.items, 0..) |element, i| {
+                    try self.formatNode(element);
+
+                    if (i < list.elements.items.len - 1) {
+                        try self.write(", ");
+                    }
+                }
+
+                try self.write("]");
+            },
             .doc_comment => |comment| {
                 try self.write("## ");
                 try self.write(comment.content);

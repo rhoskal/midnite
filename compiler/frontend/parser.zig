@@ -576,7 +576,6 @@ pub const Parser = struct {
         }
 
         if (try self.match(lexer.TokenKind{ .symbol = .Pipe })) {
-            // Parse variant type constructors
             var constructors = std.ArrayList(ast.VariantConstructorNode).init(self.allocator);
             errdefer {
                 for (constructors.items) |*constructor| {
@@ -942,6 +941,7 @@ pub const Parser = struct {
     fn parsePrimaryExpr(self: *Parser) ParserError!*ast.Node {
         switch (self.current_token.kind) {
             .delimiter => |delim| switch (delim) {
+                .LeftBracket => return self.parseList(),
                 .LeftParen => {
                     try self.advance();
 
@@ -1077,6 +1077,68 @@ pub const Parser = struct {
         return node;
     }
 
+    /// Parses a list expression surrounded by square brackets with comma-separated elements.
+    ///
+    /// Syntax:
+    /// List = "[" Element ("," Element)* "]"
+    ///      | "[" "]"  // Empty list
+    ///
+    /// Examples:
+    /// - `[]` (empty list)
+    /// - `[1, 2, 3]`
+    /// - `[True, False]`
+    /// - `["hello", "world"]`
+    fn parseList(self: *Parser) ParserError!*ast.Node {
+        const start_token = try self.expect(lexer.TokenKind{ .delimiter = .LeftBracket });
+
+        // Handle empty list case
+        if (try self.match(lexer.TokenKind{ .delimiter = .RightBracket })) {
+            const node = try self.allocator.create(ast.Node);
+            errdefer self.allocator.destroy(node);
+
+            node.* = .{
+                .list = .{
+                    .elements = std.ArrayList(*ast.Node).init(self.allocator),
+                    .token = start_token,
+                },
+            };
+
+            return node;
+        }
+
+        // Parse first element (required)
+        var elements = std.ArrayList(*ast.Node).init(self.allocator);
+        errdefer {
+            for (elements.items) |element| {
+                element.deinit(self.allocator);
+                self.allocator.destroy(element);
+            }
+
+            elements.deinit();
+        }
+
+        const first_element = try self.parseExpression();
+        try elements.append(first_element);
+
+        while (try self.match(lexer.TokenKind{ .delimiter = .Comma })) {
+            const element = try self.parseExpression();
+            try elements.append(element);
+        }
+
+        _ = try self.expect(lexer.TokenKind{ .delimiter = .RightBracket });
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer self.allocator.destroy(node);
+
+        node.* = .{
+            .list = .{
+                .elements = elements,
+                .token = start_token,
+            },
+        };
+
+        return node;
+    }
     /// Parses a conditional expression with a required 'then' and 'else' branch.
     /// The condition must evaluate to a boolean value. If true, the 'then' branch
     /// is evaluated; otherwise, the 'else' branch is evaluated.
@@ -3283,5 +3345,142 @@ test "[variant_type]" {
                 try testing.expectEqualStrings("a", app.args.items[0].lower_identifier.name);
             }
         }
+    }
+}
+
+test "[list]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    {
+        // []
+
+        // Action
+        var empty_list = try allocator.create(ast.Node);
+        defer {
+            empty_list.deinit(allocator);
+            allocator.destroy(empty_list);
+        }
+
+        empty_list.* = .{
+            .list = .{
+                .elements = std.ArrayList(*ast.Node).init(allocator),
+                .token = lexer.Token{
+                    .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
+                    .lexeme = "[",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 1 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        // Assertions
+        // Verify that the node type is a list.
+        try testing.expect(empty_list.* == .list);
+        // Ensure the list has no elements.
+        try testing.expectEqual(@as(usize, 0), empty_list.list.elements.items.len);
+    }
+
+    {
+        // [1, 2, 3]
+
+        // Action
+        var elements = std.ArrayList(*ast.Node).init(allocator);
+
+        const one = try allocator.create(ast.Node);
+        one.* = .{
+            .int_literal = .{
+                .value = 1,
+                .token = lexer.Token{
+                    .kind = lexer.TokenKind{ .literal = .Int },
+                    .lexeme = "1",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 1, .end = 2 },
+                        .src = .{ .line = 1, .col = 2 },
+                    },
+                },
+            },
+        };
+
+        const two = try allocator.create(ast.Node);
+        two.* = .{
+            .int_literal = .{
+                .value = 2,
+                .token = lexer.Token{
+                    .kind = lexer.TokenKind{ .literal = .Int },
+                    .lexeme = "2",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 4, .end = 5 },
+                        .src = .{ .line = 1, .col = 5 },
+                    },
+                },
+            },
+        };
+
+        const three = try allocator.create(ast.Node);
+        three.* = .{
+            .int_literal = .{
+                .value = 3,
+                .token = lexer.Token{
+                    .kind = lexer.TokenKind{ .literal = .Int },
+                    .lexeme = "3",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 7, .end = 8 },
+                        .src = .{ .line = 1, .col = 8 },
+                    },
+                },
+            },
+        };
+
+        try elements.append(one);
+        try elements.append(two);
+        try elements.append(three);
+
+        var populated_list = try allocator.create(ast.Node);
+        defer {
+            populated_list.deinit(allocator);
+            allocator.destroy(populated_list);
+        }
+
+        populated_list.* = .{
+            .list = .{
+                .elements = elements,
+                .token = lexer.Token{
+                    .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
+                    .lexeme = "[",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 1 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        // Assertions
+        // Verify that the node type is a list.
+        try testing.expect(populated_list.* == .list);
+        // Ensure the list contains exactly 3 elements.
+        try testing.expectEqual(@as(usize, 3), populated_list.list.elements.items.len);
+
+        // Test first element (1)
+        try testing.expect(populated_list.list.elements.items[0].* == .int_literal);
+        try testing.expectEqual(@as(i64, 1), populated_list.list.elements.items[0].int_literal.value);
+
+        // Test second element (2)
+        try testing.expect(populated_list.list.elements.items[1].* == .int_literal);
+        try testing.expectEqual(@as(i64, 2), populated_list.list.elements.items[1].int_literal.value);
+
+        // Test third element (3)
+        try testing.expect(populated_list.list.elements.items[2].* == .int_literal);
+        try testing.expectEqual(@as(i64, 3), populated_list.list.elements.items[2].int_literal.value);
     }
 }
