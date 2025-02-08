@@ -79,6 +79,21 @@ pub const ListNode = struct {
     token: lexer.Token,
 };
 
+/// Represents a tuple of elements enclosed in parentheses.
+/// Tuples are strictly pairs (two elements).
+///
+/// Examples:
+/// - `(1, 2)`
+/// - `(True, "hello")`
+/// - `(x, y)`
+pub const TupleNode = struct {
+    /// Array of pointers to the AST nodes representing tuple elements.
+    elements: std.ArrayList(*Node),
+
+    /// The token representing the start of this tuple.
+    token: lexer.Token,
+};
+
 /// Common structure for binary operations.
 pub const BinaryOp = struct {
     /// The AST node for the left operand.
@@ -694,6 +709,7 @@ pub const Node = union(enum) {
 
     // Data Structures
     list: ListNode,
+    tuple: TupleNode,
 
     // Expressions
     arithmetic_expr: ArithmeticExprNode,
@@ -757,6 +773,14 @@ pub const Node = union(enum) {
                 }
 
                 list.elements.deinit();
+            },
+            .tuple => |*tuple| {
+                for (tuple.elements.items) |element| {
+                    element.deinit(allocator);
+                    allocator.destroy(element);
+                }
+
+                tuple.elements.deinit();
             },
             .arithmetic_expr => |*expr| {
                 expr.left.deinit(allocator);
@@ -3882,4 +3906,87 @@ test "[MatchExprNode] (with guards)" {
 
     // Verify the expression in the catch-all case is the string literal "non-positive"
     try testing.expectEqualStrings("non-positive", catchall_case.expression.str_literal.value);
+}
+
+test "[TupleNode]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // (1, "hello")
+    var elements = std.ArrayList(*Node).init(allocator);
+
+    const first = try allocator.create(Node);
+    first.* = .{
+        .int_literal = .{
+            .value = 1,
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .literal = .Int },
+                .lexeme = "1",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 1, .end = 2 },
+                    .src = .{ .line = 1, .col = 2 },
+                },
+            },
+        },
+    };
+
+    const second = try allocator.create(Node);
+    second.* = .{
+        .str_literal = .{
+            .value = try allocator.dupe(u8, "hello"),
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .literal = .String },
+                .lexeme = "\"hello\"",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 4, .end = 11 },
+                    .src = .{ .line = 1, .col = 5 },
+                },
+            },
+        },
+    };
+
+    try elements.append(first);
+    try elements.append(second);
+
+    var tuple = try allocator.create(Node);
+    defer {
+        tuple.deinit(allocator);
+        allocator.destroy(tuple);
+    }
+
+    tuple.* = .{
+        .tuple = .{
+            .elements = elements,
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .delimiter = .LeftParen },
+                .lexeme = "(",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    // Assertions
+    // Verify the node is a tuple.
+    try testing.expect(tuple.* == .tuple);
+    // Verify the tuple contains exactly 2 elements.
+    try testing.expectEqual(@as(usize, 2), tuple.tuple.elements.items.len);
+
+    // Test first element (1)
+    try testing.expect(tuple.tuple.elements.items[0].* == .int_literal);
+    try testing.expectEqual(@as(i64, 1), tuple.tuple.elements.items[0].int_literal.value);
+
+    // Test second element ("hello")
+    try testing.expect(tuple.tuple.elements.items[1].* == .str_literal);
+    try testing.expectEqualStrings("hello", tuple.tuple.elements.items[1].str_literal.value);
+
+    // Ensure the token kind is a left parenthesis '(' indicating its start.
+    try testing.expectEqual(lexer.TokenKind{ .delimiter = .LeftParen }, tuple.tuple.token.kind);
 }
