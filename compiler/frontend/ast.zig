@@ -84,11 +84,11 @@ pub const BinaryOp = struct {
     /// The AST node for the left operand.
     left: *Node,
 
-    /// The token representing the operator.
-    operator: lexer.Token,
-
     /// The AST node for the right operand.
     right: *Node,
+
+    /// The token representing the operator.
+    operator: lexer.Token,
 };
 
 /// A binary operation node representing arithmetic operations.
@@ -116,11 +116,11 @@ pub const ComparisonExprNode = BinaryOp;
 /// Examples:
 /// - Negation: (-)
 pub const UnaryExprNode = struct {
-    /// The token representing the operator.
-    operator: lexer.Token,
-
     /// The AST node representing the operand.
     operand: *Node,
+
+    /// The token representing the operator.
+    operator: lexer.Token,
 };
 
 /// Represents a complete match expression that tests a value against multiple patterns.
@@ -345,11 +345,11 @@ pub const ConsExprNode = struct {
     /// The AST node representing the element to prepend.
     head: *Node,
 
-    /// The token representing the cons operator.
-    operator: lexer.Token,
-
     /// The AST node representing the target list.
     tail: *Node,
+
+    /// The token representing the cons operator.
+    operator: lexer.Token,
 };
 
 /// Represents a binary operation that concatenates two strings.
@@ -376,11 +376,11 @@ pub const CompositionExprNode = struct {
     /// The AST node representing the first function in the composition.
     first: *Node,
 
-    /// The token representing the composition operator.
-    operator: lexer.Token,
-
     /// The AST node representing the second function in the composition.
     second: *Node,
+
+    /// The token representing the composition operator.
+    operator: lexer.Token,
 };
 
 /// Represents a binary operation that passes a value through a pipeline
@@ -393,11 +393,27 @@ pub const PipeExprNode = struct {
     /// The AST node representing the value being piped.
     value: *Node,
 
-    /// The token representing the pipe operator.
-    operator: lexer.Token,
-
     /// The AST node representing the function receiving the piped value.
     func: *Node,
+
+    /// The token representing the pipe operator.
+    operator: lexer.Token,
+};
+
+/// Represents a function application where a function is applied to an argument.
+///
+/// Examples:
+/// - `f 42`
+/// - `not (and x y)`
+pub const FuncApplicationNode = struct {
+    /// The AST node representing the function being applied.
+    function: *Node,
+
+    /// The AST node representing the argument the function is being applied to.
+    argument: *Node,
+
+    /// The token representing the start of this application (usually the function's token).
+    token: lexer.Token,
 };
 
 /// Represents a method of exposing items from a module.
@@ -406,7 +422,6 @@ pub const PipeExprNode = struct {
 /// Examples:
 /// - `exposing (..)`
 /// - `exposing (func1, Type1, Type2(..))`
-/// - `exposing ()`
 pub const ExportSpecNode = struct {
     /// Whether all items are being exposed (..).
     exposing_all: bool,
@@ -685,6 +700,7 @@ pub const Node = union(enum) {
     comparison_expr: ComparisonExprNode,
     composition_expr: CompositionExprNode,
     cons_expr: ConsExprNode,
+    function_application: FuncApplicationNode,
     lambda_expr: LambdaExprNode,
     list_concat_expr: ListConcatExprNode,
     logical_expr: LogicalExprNode,
@@ -765,6 +781,12 @@ pub const Node = union(enum) {
                 expr.tail.deinit(allocator);
                 allocator.destroy(expr.head);
                 allocator.destroy(expr.tail);
+            },
+            .function_application => |*expr| {
+                expr.argument.deinit(allocator);
+                expr.function.deinit(allocator);
+                allocator.destroy(expr.argument);
+                allocator.destroy(expr.function);
             },
             .lambda_expr => |*expr| {
                 expr.params.deinit();
@@ -1034,9 +1056,9 @@ const TEST_FILE = "test.mox";
 
 test "[BinaryExprNode]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     // 42 + 24
 
@@ -1110,9 +1132,9 @@ test "[BinaryExprNode]" {
 
 test "[UnaryExprNode]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     // -42
 
@@ -1172,9 +1194,9 @@ test "[UnaryExprNode]" {
 
 test "[LambdaExprNode]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     // \x y => x + y
 
@@ -1292,9 +1314,9 @@ test "[LambdaExprNode]" {
 
 test "[IfThenElseStmtNode]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     // if x == y then True else False
 
@@ -1445,9 +1467,9 @@ test "[IfThenElseStmtNode]" {
 
 test "[ForeignFunctionDeclNode]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     // foreign sqrt : Float -> Float = "c_sqrt"
 
@@ -1506,6 +1528,11 @@ test "[ForeignFunctionDeclNode]" {
     };
 
     const foreign_func = try allocator.create(Node);
+    defer {
+        foreign_func.deinit(allocator);
+        allocator.destroy(foreign_func);
+    }
+
     foreign_func.* = .{
         .foreign_function_decl = .{
             .name = "sqrt",
@@ -1538,9 +1565,9 @@ test "[ForeignFunctionDeclNode]" {
 
 test "[FunctionTypeNode]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     // : Int -> Int -> Int
 
@@ -1660,9 +1687,9 @@ test "[FunctionTypeNode]" {
 
 test "[FunctionDeclNode]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     // let add : Int -> Int -> Int = \x y => x + y
 
@@ -1904,9 +1931,9 @@ test "[FunctionDeclNode]" {
 
 test "[ConsExprNode]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     // 1 :: [2, 3]
 
@@ -2033,11 +2060,90 @@ test "[ConsExprNode]" {
     try testing.expectEqual(@as(i64, 3), list_elements[1].int_literal.value);
 }
 
+test "[FuncApplicationNode]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // not True
+
+    // Action
+    const func = try allocator.create(Node);
+    func.* = .{
+        .lower_identifier = .{
+            .name = "not",
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .identifier = .Lower },
+                .lexeme = "not",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 3 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    const arg = try allocator.create(Node);
+    arg.* = .{
+        .upper_identifier = .{
+            .name = "True",
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .identifier = .Upper },
+                .lexeme = "True",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 4, .end = 8 },
+                    .src = .{ .line = 1, .col = 5 },
+                },
+            },
+        },
+    };
+
+    var func_app = try allocator.create(Node);
+    defer {
+        func_app.deinit(allocator);
+        allocator.destroy(func_app);
+    }
+
+    func_app.* = .{
+        .function_application = .{
+            .function = func,
+            .argument = arg,
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .identifier = .Lower },
+                .lexeme = "not",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 3 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        },
+    };
+
+    // Assertions
+    const app = func_app.function_application;
+
+    // Verify that the function is a lower identifier named "not"
+    try testing.expect(app.function.* == .lower_identifier);
+    try testing.expectEqualStrings("not", app.function.lower_identifier.name);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, app.function.lower_identifier.token.kind);
+    try testing.expectEqualStrings("not", app.function.lower_identifier.token.lexeme);
+
+    // Verify that the argument is an upper identifier named "True"
+    try testing.expect(app.argument.* == .upper_identifier);
+    try testing.expectEqualStrings("True", app.argument.upper_identifier.name);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, app.argument.upper_identifier.token.kind);
+    try testing.expectEqualStrings("True", app.argument.upper_identifier.token.lexeme);
+}
+
 test "[StrConcatExprNode]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     // "Hello" <> "World"
 
@@ -2114,9 +2220,9 @@ test "[StrConcatExprNode]" {
 
 test "[ListConcatExprNode]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     // [1, 2] ++ [3, 4]
 
@@ -2289,9 +2395,9 @@ test "[ListConcatExprNode]" {
 
 test "[CompositionExprNode]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     // Action
     const f = try allocator.create(Node);
@@ -2429,9 +2535,9 @@ test "[CompositionExprNode]" {
 
 test "[PipeExprNode]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     // Action
     const value = try allocator.create(Node);
@@ -2568,12 +2674,14 @@ test "[PipeExprNode]" {
 }
 
 test "[TypeAliasNode]" {
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     // type alias UserId = String
 
+    // Action
     const value = try allocator.create(Node);
     value.* = .{
         .upper_identifier = .{
@@ -2590,18 +2698,17 @@ test "[TypeAliasNode]" {
         },
     };
 
+    const type_params = std.ArrayList([]const u8).init(allocator);
+
     const node = try allocator.create(Node);
     defer {
         node.deinit(allocator);
         allocator.destroy(node);
     }
 
-    const type_params = std.ArrayList([]const u8).init(allocator);
-    defer type_params.deinit();
-
     node.* = .{
         .type_alias = .{
-            .name = "UserId",
+            .name = try allocator.dupe(u8, "UserId"),
             .type_params = type_params,
             .value = value,
             .token = .{
@@ -2745,9 +2852,9 @@ test "[TypeApplicationNode]" {
 
 test "[VariantTypeNode]" {
     // Setup
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     // type Result e a = | Err e | Ok a
 
@@ -2837,7 +2944,7 @@ test "[VariantTypeNode]" {
 
     node.* = .{
         .variant_type = .{
-            .name = "Result",
+            .name = try allocator.dupe(u8, "Result"),
             .type_params = type_params,
             .constructors = constructors,
             .token = .{
@@ -2979,7 +3086,7 @@ test "[RecordTypeNode]" {
 
     node.* = .{
         .record_type = .{
-            .name = "Point",
+            .name = try allocator.dupe(u8, "Point"),
             .type_params = type_params,
             .fields = fields,
             .token = .{

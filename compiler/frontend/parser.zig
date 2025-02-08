@@ -1038,8 +1038,13 @@ pub const Parser = struct {
         var params = std.ArrayList([]const u8).init(self.allocator);
         errdefer params.deinit();
 
-        while (self.check(lexer.TokenKind{ .identifier = .Lower })) {
-            const param = try self.expect(lexer.TokenKind{ .identifier = .Lower });
+        while (self.check(lexer.TokenKind{ .identifier = .Lower }) or
+            self.check(lexer.TokenKind{ .symbol = .Underscore }))
+        {
+            const param = self.current_token;
+
+            try self.advance();
+
             try params.append(param.lexeme);
         }
 

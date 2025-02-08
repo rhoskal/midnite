@@ -229,6 +229,18 @@ pub const Formatter = struct {
 
                 try self.formatNode(expr.body);
             },
+            .function_application => |app| {
+                try self.formatNode(app.function);
+
+                try self.write(" ");
+
+                const needs_parens = (app.argument.* == .function_application);
+                if (needs_parens) try self.write("(");
+
+                try self.formatNode(app.argument);
+
+                if (needs_parens) try self.write(")");
+            },
             .arithmetic_expr => |expr| {
                 try self.formatNode(expr.left);
 
