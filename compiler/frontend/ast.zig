@@ -496,6 +496,15 @@ pub const ModuleDeclNode = struct {
     token: lexer.Token,
 };
 
+/// The kind of import being performed.
+pub const ImportKind = enum {
+    Simple,
+    Alias,
+    Using,
+    Renaming,
+    Hiding,
+};
+
 /// Represents an import specification that controls how a module is imported.
 /// Can include renaming, selective imports, hiding, or using clauses.
 ///
@@ -506,14 +515,6 @@ pub const ModuleDeclNode = struct {
 /// - `open Std.List renaming (map to list_map)`
 /// - `open MyModule hiding (internal_func)`
 pub const ImportSpecNode = struct {
-    const ImportKind = enum {
-        Simple,
-        Alias,
-        Using,
-        Renaming,
-        Hiding,
-    };
-
     const RenameItem = struct {
         /// The original name of the imported item.
         old_name: []const u8,

@@ -427,7 +427,7 @@ pub const Parser = struct {
                 .Include => return self.parseInclude(),
                 .Let => return self.parseFunctionDecl(),
                 // .Module => return self.parseModuleDecl(),
-                // .Open => return self.parseImportSpec(),
+                .Open => return self.parseImportSpec(),
                 .Type => return self.parseTypeDecl(),
                 else => return error.UnexpectedToken,
             },
@@ -437,6 +437,41 @@ pub const Parser = struct {
             },
             else => return error.UnexpectedToken,
         }
+    }
+
+    /// Parses an import specification that controls how a module is imported.
+    ///
+    /// Examples:
+    /// - `open MyModule`
+    /// - `open MyModule as M`
+    /// - `open MyModule using (map, filter)`
+    /// - `open Std.List renaming (map to list_map)`
+    /// - `open MyModule hiding (internal_func)`
+    fn parseImportSpec(self: *Parser) ParserError!*ast.Node {
+        const token = try self.expect(lexer.TokenKind{ .keyword = .Open });
+
+        const path_node = try self.parseModulePath();
+        errdefer {
+            path_node.deinit(self.allocator);
+            self.allocator.destroy(path_node);
+        }
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer self.allocator.destroy(node);
+
+        node.* = .{
+            .import_spec = .{
+                .path = path_node.module_path,
+                .kind = .Simple,
+                .alias = null,
+                .items = null,
+                .token = token,
+            },
+        };
+
+        self.allocator.destroy(path_node);
+
+        return node;
     }
 
     /// Parses a type declaration, which can be a type alias, record type, or variant type.
@@ -1139,6 +1174,18 @@ pub const Parser = struct {
 
         return node;
     }
+
+    /// Parses a tuple expression surrounded by parentheses with 2 comma-separated elements.
+    ///
+    /// Syntax:
+    /// Tuple = "(" Expression ("," Expression)* ")"
+    ///
+    /// Examples:
+    /// - `(1, "hello")`
+    /// - `(x, True)`
+    /// - `(42, some_func x)`
+    // fn parseTuple(self: *Parser) ParserError!*ast.Node {}
+
     /// Parses a conditional expression with a required 'then' and 'else' branch.
     /// The condition must evaluate to a boolean value. If true, the 'then' branch
     /// is evaluated; otherwise, the 'else' branch is evaluated.
@@ -2614,6 +2661,53 @@ test "[include]" {
     // Verify the segments
     try testing.expectEqualStrings("Std", include.path.segments.items[0]);
     try testing.expectEqualStrings("List", include.path.segments.items[1]);
+}
+
+test "[import_spec]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    {
+        // Simple import
+        const source = "open MyModule";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseImportSpec();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify the node is an import specification
+        try testing.expect(node.* == .import_spec);
+
+        const import_spec = node.import_spec;
+
+        // Verify it's a simple import
+        try testing.expectEqual(ast.ImportKind.Simple, import_spec.kind);
+
+        // Verify it has no alias
+        try testing.expect(import_spec.alias == null);
+
+        // Verify it has no items list
+        try testing.expect(import_spec.items == null);
+
+        // Verify the module path has exactly one segment
+        try testing.expectEqual(@as(usize, 1), import_spec.path.segments.items.len);
+
+        // Verify the module name is "MyModule"
+        try testing.expectEqualStrings("MyModule", import_spec.path.segments.items[0]);
+
+        // Verify the token is the 'open' keyword
+        try testing.expectEqual(lexer.TokenKind{ .keyword = .Open }, import_spec.token.kind);
+        try testing.expectEqualStrings("open", import_spec.token.lexeme);
+    }
 }
 
 test "[type_alias]" {

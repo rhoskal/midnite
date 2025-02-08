@@ -186,6 +186,17 @@ pub const Formatter = struct {
 
                 try self.write("\n");
             },
+            .import_spec => |spec| {
+                try self.write("open ");
+
+                for (spec.path.segments.items, 0..) |segment, i| {
+                    if (i > 0) try self.write(".");
+
+                    try self.write(segment);
+                }
+
+                try self.write("\n");
+            },
             .foreign_function_decl => |decl| {
                 try self.write("foreign ");
                 try self.write(decl.name);
@@ -388,6 +399,19 @@ pub const Formatter = struct {
                 }
 
                 try self.write("]");
+            },
+            .tuple => |tuple| {
+                try self.write("(");
+
+                for (tuple.elements.items, 0..) |element, i| {
+                    try self.formatNode(element);
+
+                    if (i < tuple.elements.items.len - 1) {
+                        try self.write(", ");
+                    }
+                }
+
+                try self.write(")");
             },
             .doc_comment => |comment| {
                 try self.write("## ");
