@@ -28,26 +28,6 @@ pub const Formatter = struct {
         self.writer.context.deinit();
     }
 
-    /// Writes the current indentation level as spaces.
-    fn writeIndent(self: *Formatter) !void {
-        const spaces = self.indent_level * self.indent_width;
-        var i: usize = 0;
-        while (i < spaces) : (i += 1) {
-            try self.writer.writeByte(' ');
-        }
-    }
-
-    /// Helper to write a string.
-    fn write(self: *Formatter, str: []const u8) !void {
-        try self.writer.writeAll(str);
-    }
-
-    /// Helper to write a newline followed by indentation.
-    fn writeNewlineAndIndent(self: *Formatter) !void {
-        try self.write("\n");
-        try self.writeIndent();
-    }
-
     /// Formats a node and returns the formatted string.
     pub fn formatNode(self: *Formatter, node: *const ast.Node) !void {
         switch (node.*) {
@@ -95,14 +75,12 @@ pub const Formatter = struct {
                     try self.formatNode(field.type);
 
                     if (i < rtype.fields.items.len - 1) {
-                        try self.write("\n");
-                        try self.writeIndent();
+                        try self.writeNewlineAndIndent();
                         try self.write(", ");
                     }
                 }
 
-                try self.write("\n");
-                try self.writeIndent();
+                try self.writeNewlineAndIndent();
                 try self.write("}");
 
                 self.indent_level -= 1;
@@ -195,9 +173,95 @@ pub const Formatter = struct {
                     try self.write(segment);
                 }
 
-                if (spec.kind == .Alias) {
-                    try self.write(" as ");
-                    try self.write(spec.alias.?);
+                switch (spec.kind) {
+                    .Simple => {},
+                    .Alias => {
+                        try self.write(" as ");
+                        try self.write(spec.alias.?);
+                    },
+                    .Using => {
+                        try self.write(" using (");
+
+                        if (spec.items) |items| {
+                            var sorted = try sortImportItems(items.allocator, items);
+                            defer sorted.deinit();
+
+                            for (sorted.items, 0..) |item, i| {
+                                switch (item) {
+                                    .function => |f| {
+                                        try self.write(f.name);
+
+                                        if (f.alias) |alias| {
+                                            try self.write(" as ");
+                                            try self.write(alias);
+                                        }
+                                    },
+                                    .operator => |op| {
+                                        try self.write("(");
+                                        try self.write(op.symbol);
+                                        try self.write(")");
+
+                                        if (op.alias) |alias| {
+                                            try self.write(" as ");
+                                            try self.write(alias);
+                                        }
+                                    },
+                                    .type => |t| {
+                                        try self.write(t.name);
+
+                                        if (t.expose_constructors) {
+                                            try self.write("(..)");
+                                        }
+
+                                        if (t.alias) |alias| {
+                                            try self.write(" as ");
+                                            try self.write(alias);
+                                        }
+                                    },
+                                }
+
+                                if (i < items.items.len - 1) {
+                                    try self.write(", ");
+                                }
+                            }
+                        }
+
+                        try self.write(")");
+                    },
+                    .Hiding => {
+                        try self.write(" hiding (");
+
+                        if (spec.items) |items| {
+                            var sorted = try sortImportItems(items.allocator, items);
+                            defer sorted.deinit();
+
+                            for (sorted.items, 0..) |item, i| {
+                                switch (item) {
+                                    .function => |f| {
+                                        try self.write(f.name);
+                                    },
+                                    .operator => |op| {
+                                        try self.write("(");
+                                        try self.write(op.symbol);
+                                        try self.write(")");
+                                    },
+                                    .type => |t| {
+                                        try self.write(t.name);
+
+                                        if (t.expose_constructors) {
+                                            try self.write("(..)");
+                                        }
+                                    },
+                                }
+
+                                if (i < items.items.len - 1) {
+                                    try self.write(", ");
+                                }
+                            }
+                        }
+
+                        try self.write(")");
+                    },
                 }
 
                 try self.write("\n");
@@ -361,17 +425,23 @@ pub const Formatter = struct {
                 try self.formatNode(stmt.condition);
 
                 try self.write(" then\n");
+
                 self.indent_level += 1;
+
                 try self.writeIndent();
                 try self.formatNode(stmt.then_branch);
                 try self.write("\n");
+
                 self.indent_level -= 1;
 
                 try self.write("else\n");
+
                 self.indent_level += 1;
+
                 try self.writeIndent();
                 try self.formatNode(stmt.else_branch);
                 try self.write("\n");
+
                 self.indent_level -= 1;
             },
             .int_literal => |lit| {
@@ -431,5 +501,97 @@ pub const Formatter = struct {
                 std.debug.print("Node type: {any}\n", .{node.*});
             },
         }
+    }
+
+    /// Writes the current indentation level as spaces.
+    fn writeIndent(self: *Formatter) !void {
+        const spaces = self.indent_level * self.indent_width;
+        var i: usize = 0;
+        while (i < spaces) : (i += 1) {
+            try self.writer.writeByte(' ');
+        }
+    }
+
+    /// Helper to write a string.
+    fn write(self: *Formatter, str: []const u8) !void {
+        try self.writer.writeAll(str);
+    }
+
+    /// Helper to write a newline followed by indentation.
+    fn writeNewlineAndIndent(self: *Formatter) !void {
+        try self.write("\n");
+        try self.writeIndent();
+    }
+
+    /// Takes a list of import items and returns a new sorted list where:
+    /// - Types come first, sorted alphabetically
+    /// - Functions come second, sorted alphabetically
+    /// - Operators come last, sorted alphabetically
+    /// All original items are preserved, only their order changes.
+    ///
+    /// Memory: Caller owns the returned ArrayList and must call deinit on it.
+    ///
+    /// Example input:  `[(++), map, Maybe(..), filter, (>>=), Tree(..)]`
+    /// Example output: `[Maybe(..), Tree(..), filter, map, (++), (>>=)]`
+    fn sortImportItems(
+        allocator: std.mem.Allocator,
+        items: std.ArrayList(ast.ImportItem),
+    ) !std.ArrayList(ast.ImportItem) {
+        var types = std.ArrayList(ast.ImportItem).init(allocator);
+        defer types.deinit();
+
+        var functions = std.ArrayList(ast.ImportItem).init(allocator);
+        defer functions.deinit();
+
+        var operators = std.ArrayList(ast.ImportItem).init(allocator);
+        defer operators.deinit();
+
+        var result = std.ArrayList(ast.ImportItem).init(allocator);
+        errdefer result.deinit();
+
+        for (items.items) |item| {
+            switch (item) {
+                .type => try types.append(item),
+                .function => try functions.append(item),
+                .operator => try operators.append(item),
+            }
+        }
+
+        const typeSort = struct {
+            fn lessThan(_: void, a: ast.ImportItem, b: ast.ImportItem) bool {
+                const a_name = if (a == .type) a.type.name else unreachable;
+                const b_name = if (b == .type) b.type.name else unreachable;
+
+                return std.mem.lessThan(u8, a_name, b_name);
+            }
+        }.lessThan;
+
+        const functionSort = struct {
+            fn lessThan(_: void, a: ast.ImportItem, b: ast.ImportItem) bool {
+                const a_name = if (a == .function) a.function.name else unreachable;
+                const b_name = if (b == .function) b.function.name else unreachable;
+
+                return std.mem.lessThan(u8, a_name, b_name);
+            }
+        }.lessThan;
+
+        const operatorSort = struct {
+            fn lessThan(_: void, a: ast.ImportItem, b: ast.ImportItem) bool {
+                const a_sym = if (a == .operator) a.operator.symbol else unreachable;
+                const b_sym = if (b == .operator) b.operator.symbol else unreachable;
+
+                return std.mem.lessThan(u8, a_sym, b_sym);
+            }
+        }.lessThan;
+
+        std.mem.sort(ast.ImportItem, types.items, {}, typeSort);
+        std.mem.sort(ast.ImportItem, functions.items, {}, functionSort);
+        std.mem.sort(ast.ImportItem, operators.items, {}, operatorSort);
+
+        try result.appendSlice(types.items);
+        try result.appendSlice(functions.items);
+        try result.appendSlice(operators.items);
+
+        return result;
     }
 };

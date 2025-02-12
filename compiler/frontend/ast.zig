@@ -498,34 +498,83 @@ pub const ModuleDeclNode = struct {
 
 /// The kind of import being performed.
 pub const ImportKind = enum {
+    /// Simple import of an entire module.
+    ///
+    /// Examples:
+    /// - `open MyModule`
     Simple,
+
+    /// Import an entire module with an alias.
+    ///
+    /// Examples:
+    /// - `open MyModule as M`
     Alias,
+
+    /// Selective import of specific items, optionally with aliases.
+    ///
+    /// Examples:
+    /// - `open Std.List using (map as list_map, filter)`
     Using,
-    Renaming,
+
+    /// Import a module while excluding specific items.
+    ///
+    /// Examples:
+    /// - `open MyModule hiding (internal_func)`
     Hiding,
 };
 
+/// Items that can be imported from a module, potentially with aliases.
+/// These represent what appears in the parentheses after `using` or `hiding`.
+pub const ImportItem = union(enum) {
+    /// Import a function, optionally with an alias.
+    ///
+    /// Examples:
+    /// - `map as list_map` or just `map`
+    function: struct {
+        /// The original name of the function in the module.
+        name: []const u8,
+
+        /// Optional alias to use in the importing module.
+        alias: ?[]const u8,
+    },
+
+    /// Import an operator (like >>=).
+    ///
+    /// Examples:
+    /// - `(>>=)` or `(>>=) as bind`
+    operator: struct {
+        /// The operator symbol.
+        symbol: []const u8,
+
+        /// Optional alias to use in the importing module.
+        alias: ?[]const u8,
+    },
+
+    /// Import a type, optionally exposing its constructors and/or with an alias.
+    ///
+    /// Examples:
+    /// - `Maybe(..)` or `Maybe(..) as Optional`
+    type: struct {
+        /// The name of the type.
+        name: []const u8,
+
+        /// Whether to expose type constructors (indicated by (..)).
+        expose_constructors: bool,
+
+        /// Optional alias to use in the importing module.
+        alias: ?[]const u8,
+    },
+};
+
 /// Represents an import specification that controls how a module is imported.
-/// Can include renaming, selective imports, hiding, or using clauses.
 ///
 /// Examples:
 /// - `open MyModule`
 /// - `open MyModule as M`
-/// - `open MyModule using (map, filter)`
-/// - `open Std.List renaming (map to list_map)`
+/// - `open Std.List using (map, filter)`
+/// - `open Std.List using (map as list_map)`
 /// - `open MyModule hiding (internal_func)`
 pub const ImportSpecNode = struct {
-    const RenameItem = struct {
-        /// The original name of the imported item.
-        old_name: []const u8,
-
-        /// The new name to use locally.
-        new_name: []const u8,
-
-        /// The token representing the start of this declaration.
-        token: lexer.Token,
-    };
-
     /// The module path being imported.
     path: ModulePathNode,
 
@@ -533,13 +582,12 @@ pub const ImportSpecNode = struct {
     kind: ImportKind,
 
     /// Optional alias name for the imported module.
+    /// Only used when kind is .Alias
     alias: ?[]const u8,
 
     /// Optional list of items being imported or renamed.
-    items: ?std.ArrayList(union(enum) {
-        name: []const u8,
-        rename: RenameItem,
-    }),
+    /// Used when kind is .Using or .Hiding
+    items: ?std.ArrayList(ImportItem),
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
@@ -954,12 +1002,26 @@ pub const Node = union(enum) {
                 if (spec.items) |*items| {
                     for (items.items) |item| {
                         switch (item) {
-                            .name => |name| {
-                                allocator.free(name);
+                            .function => |f| {
+                                allocator.free(f.name);
+
+                                if (f.alias) |alias| {
+                                    allocator.free(alias);
+                                }
                             },
-                            .rename => |rename| {
-                                allocator.free(rename.old_name);
-                                allocator.free(rename.new_name);
+                            .operator => |op| {
+                                allocator.free(op.symbol);
+
+                                if (op.alias) |alias| {
+                                    allocator.free(alias);
+                                }
+                            },
+                            .type => |t| {
+                                allocator.free(t.name);
+
+                                if (t.alias) |alias| {
+                                    allocator.free(alias);
+                                }
                             },
                         }
                     }
@@ -3215,6 +3277,394 @@ test "[ModulePathNode]" {
 
     // Ensure the second segment of the include path is "List"
     try testing.expectEqualStrings("List", path.segments.items[1]);
+}
+
+test "[ImportSpecNode]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    {
+        // open MyModule
+        var segments = std.ArrayList([]const u8).init(allocator);
+        try segments.append(try allocator.dupe(u8, "MyModule"));
+
+        var import = try allocator.create(Node);
+        defer {
+            import.deinit(allocator);
+            allocator.destroy(import);
+        }
+
+        import.* = .{
+            .import_spec = .{
+                .path = .{
+                    .segments = segments,
+                    .token = lexer.Token{
+                        .kind = lexer.TokenKind{ .identifier = .Upper },
+                        .lexeme = "MyModule",
+                        .loc = .{
+                            .filename = TEST_FILE,
+                            .span = .{ .start = 5, .end = 13 },
+                            .src = .{ .line = 1, .col = 6 },
+                        },
+                    },
+                },
+                .kind = .Simple,
+                .alias = null,
+                .items = null,
+                .token = lexer.Token{
+                    .kind = lexer.TokenKind{ .keyword = .Open },
+                    .lexeme = "open",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 4 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        // Assertions
+        // Verify the node is an import specification
+        try testing.expect(import.* == .import_spec);
+
+        const spec = import.import_spec;
+
+        // Verify it's a simple import
+        try testing.expectEqual(ImportKind.Simple, spec.kind);
+
+        // Verify path has exactly one segment
+        try testing.expectEqual(@as(usize, 1), spec.path.segments.items.len);
+
+        // Verify the module name
+        try testing.expectEqualStrings("MyModule", spec.path.segments.items[0]);
+
+        // Verify it has no alias or items
+        try testing.expect(spec.alias == null);
+        try testing.expect(spec.items == null);
+    }
+
+    {
+        // open MyModule as M
+        var segments = std.ArrayList([]const u8).init(allocator);
+        try segments.append(try allocator.dupe(u8, "MyModule"));
+
+        var import = try allocator.create(Node);
+        defer {
+            import.deinit(allocator);
+            allocator.destroy(import);
+        }
+
+        import.* = .{
+            .import_spec = .{
+                .path = .{
+                    .segments = segments,
+                    .token = lexer.Token{
+                        .kind = lexer.TokenKind{ .identifier = .Upper },
+                        .lexeme = "MyModule",
+                        .loc = .{
+                            .filename = TEST_FILE,
+                            .span = .{ .start = 5, .end = 13 },
+                            .src = .{ .line = 1, .col = 6 },
+                        },
+                    },
+                },
+                .kind = .Alias,
+                .alias = try allocator.dupe(u8, "M"),
+                .items = null,
+                .token = lexer.Token{
+                    .kind = lexer.TokenKind{ .keyword = .Open },
+                    .lexeme = "open",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 4 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        // Assertions
+        // Verify the node is an import specification
+        try testing.expect(import.* == .import_spec);
+
+        const spec = import.import_spec;
+
+        // Verify it's an alias import
+        try testing.expectEqual(ImportKind.Alias, spec.kind);
+
+        // Verify path has exactly one segment
+        try testing.expectEqual(@as(usize, 1), spec.path.segments.items.len);
+
+        // Verify the module name
+        try testing.expectEqualStrings("MyModule", spec.path.segments.items[0]);
+
+        // Verify the alias
+        try testing.expect(spec.alias != null);
+        try testing.expectEqualStrings("M", spec.alias.?);
+
+        // Verify it has no items
+        try testing.expect(spec.items == null);
+    }
+
+    {
+        // open MyModule using (map, filter, Maybe, Either(..))
+        var segments = std.ArrayList([]const u8).init(allocator);
+        try segments.append(try allocator.dupe(u8, "MyModule"));
+
+        var items = std.ArrayList(ImportItem).init(allocator);
+        try items.append(.{
+            .function = .{
+                .name = try allocator.dupe(u8, "map"),
+                .alias = null,
+            },
+        });
+        try items.append(.{
+            .function = .{
+                .name = try allocator.dupe(u8, "filter"),
+                .alias = null,
+            },
+        });
+        try items.append(.{
+            .type = .{
+                .name = try allocator.dupe(u8, "Maybe"),
+                .expose_constructors = false,
+                .alias = null,
+            },
+        });
+        try items.append(.{
+            .type = .{
+                .name = try allocator.dupe(u8, "Either"),
+                .expose_constructors = true,
+                .alias = null,
+            },
+        });
+
+        var import = try allocator.create(Node);
+        defer {
+            import.deinit(allocator);
+            allocator.destroy(import);
+        }
+
+        import.* = .{
+            .import_spec = .{
+                .path = .{
+                    .segments = segments,
+                    .token = lexer.Token{
+                        .kind = lexer.TokenKind{ .identifier = .Upper },
+                        .lexeme = "MyModule",
+                        .loc = .{
+                            .filename = TEST_FILE,
+                            .span = .{ .start = 5, .end = 13 },
+                            .src = .{ .line = 1, .col = 6 },
+                        },
+                    },
+                },
+                .kind = .Using,
+                .alias = null,
+                .items = items,
+                .token = lexer.Token{
+                    .kind = lexer.TokenKind{ .keyword = .Open },
+                    .lexeme = "open",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 4 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        // Assertions
+        // Verify the node is an import specification
+        try testing.expect(import.* == .import_spec);
+
+        const spec = import.import_spec;
+
+        // Verify it's a using import
+        try testing.expectEqual(ImportKind.Using, spec.kind);
+
+        // Verify path has exactly one segment
+        try testing.expectEqual(@as(usize, 1), spec.path.segments.items.len);
+
+        // Verify the module name
+        try testing.expectEqualStrings("MyModule", spec.path.segments.items[0]);
+
+        // Verify it has no alias
+        try testing.expect(spec.alias == null);
+
+        // Verify items list
+        try testing.expect(spec.items != null);
+        try testing.expectEqual(@as(usize, 4), spec.items.?.items.len);
+
+        // Verify first two items are functions
+        try testing.expect(spec.items.?.items[0] == .function);
+        try testing.expectEqualStrings("map", spec.items.?.items[0].function.name);
+        try testing.expect(spec.items.?.items[0].function.alias == null);
+        try testing.expect(spec.items.?.items[1] == .function);
+        try testing.expectEqualStrings("filter", spec.items.?.items[1].function.name);
+        try testing.expect(spec.items.?.items[1].function.alias == null);
+
+        // Verify last two items are types
+        try testing.expect(spec.items.?.items[2] == .type);
+        try testing.expectEqualStrings("Maybe", spec.items.?.items[2].type.name);
+        try testing.expect(spec.items.?.items[2].type.alias == null);
+        try testing.expect(spec.items.?.items[2].type.expose_constructors == false);
+
+        try testing.expect(spec.items.?.items[3] == .type);
+        try testing.expectEqualStrings("Either", spec.items.?.items[3].type.name);
+        try testing.expect(spec.items.?.items[3].type.alias == null);
+        try testing.expect(spec.items.?.items[3].type.expose_constructors == true);
+    }
+
+    {
+        // open MyModule using (map as list_map)
+        var segments = std.ArrayList([]const u8).init(allocator);
+        try segments.append(try allocator.dupe(u8, "MyModule"));
+
+        var items = std.ArrayList(ImportItem).init(allocator);
+        try items.append(.{
+            .function = .{
+                .name = try allocator.dupe(u8, "map"),
+                .alias = try allocator.dupe(u8, "list_map"),
+            },
+        });
+
+        var import = try allocator.create(Node);
+        defer {
+            import.deinit(allocator);
+            allocator.destroy(import);
+        }
+
+        import.* = .{
+            .import_spec = .{
+                .path = .{
+                    .segments = segments,
+                    .token = lexer.Token{
+                        .kind = lexer.TokenKind{ .identifier = .Upper },
+                        .lexeme = "MyModule",
+                        .loc = .{
+                            .filename = TEST_FILE,
+                            .span = .{ .start = 5, .end = 13 },
+                            .src = .{ .line = 1, .col = 6 },
+                        },
+                    },
+                },
+                .kind = .Using,
+                .alias = null,
+                .items = items,
+                .token = lexer.Token{
+                    .kind = lexer.TokenKind{ .keyword = .Open },
+                    .lexeme = "open",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 4 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        // Assertions
+        // Verify the node is an import specification
+        try testing.expect(import.* == .import_spec);
+
+        const spec = import.import_spec;
+
+        // Verify it's an using import
+        try testing.expectEqual(ImportKind.Using, spec.kind);
+
+        // Verify path has exactly one segment
+        try testing.expectEqual(@as(usize, 1), spec.path.segments.items.len);
+
+        // Verify the module name
+        try testing.expectEqualStrings("MyModule", spec.path.segments.items[0]);
+
+        // Verify it has no alias
+        try testing.expect(spec.alias == null);
+
+        // Verify items list contains one item
+        try testing.expect(spec.items != null);
+        try testing.expectEqual(@as(usize, 1), spec.items.?.items.len);
+        try testing.expect(spec.items.?.items[0] == .function);
+        try testing.expectEqualStrings("map", spec.items.?.items[0].function.name);
+        try testing.expectEqualStrings("list_map", spec.items.?.items[0].function.alias.?);
+    }
+
+    {
+        // open MyModule hiding (internal_func)
+        var segments = std.ArrayList([]const u8).init(allocator);
+        try segments.append(try allocator.dupe(u8, "MyModule"));
+
+        var items = std.ArrayList(ImportItem).init(allocator);
+        try items.append(.{
+            .function = .{
+                .name = try allocator.dupe(u8, "internal_func"),
+                .alias = null,
+            },
+        });
+
+        var import = try allocator.create(Node);
+        defer {
+            import.deinit(allocator);
+            allocator.destroy(import);
+        }
+
+        import.* = .{
+            .import_spec = .{
+                .path = .{
+                    .segments = segments,
+                    .token = lexer.Token{
+                        .kind = lexer.TokenKind{ .identifier = .Upper },
+                        .lexeme = "MyModule",
+                        .loc = .{
+                            .filename = TEST_FILE,
+                            .span = .{ .start = 5, .end = 13 },
+                            .src = .{ .line = 1, .col = 6 },
+                        },
+                    },
+                },
+                .kind = .Hiding,
+                .alias = null,
+                .items = items,
+                .token = lexer.Token{
+                    .kind = lexer.TokenKind{ .keyword = .Open },
+                    .lexeme = "open",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 4 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        // Assertions
+        // Verify the node is an import specification
+        try testing.expect(import.* == .import_spec);
+
+        const spec = import.import_spec;
+
+        // Verify it's a hiding import
+        try testing.expectEqual(ImportKind.Hiding, spec.kind);
+
+        // Verify path has exactly one segment
+        try testing.expectEqual(@as(usize, 1), spec.path.segments.items.len);
+
+        // Verify the module name
+        try testing.expectEqualStrings("MyModule", spec.path.segments.items[0]);
+
+        // Verify it has no alias
+        try testing.expect(spec.alias == null);
+
+        // Verify items list contains one item to hide
+        try testing.expect(spec.items != null);
+        try testing.expectEqual(@as(usize, 1), spec.items.?.items.len);
+        try testing.expect(spec.items.?.items[0] == .function);
+        try testing.expectEqualStrings("internal_func", spec.items.?.items[0].function.name);
+        try testing.expect(spec.items.?.items[0].function.alias == null);
+    }
 }
 
 test "[IncludeNode]" {

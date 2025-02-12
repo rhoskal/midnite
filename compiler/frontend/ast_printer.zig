@@ -649,10 +649,8 @@ pub const AstPrinter = struct {
 
                 for (spec.path.segments.items, 0..) |segment, i| {
                     if (i > 0) try self.writer.plain(".");
-
                     try self.writer.styled(term.Color.Magenta, segment);
                 }
-
                 try self.writer.plain("\n");
 
                 if (spec.alias) |alias| {
@@ -672,23 +670,81 @@ pub const AstPrinter = struct {
                         try self.printIndent();
 
                         switch (item) {
-                            .name => |name| {
-                                try self.writer.styled(term.Color.Bold, "Name");
-                                try self.writer.plain("(");
-                                try self.writer.styled(term.Color.Magenta, name);
-                                try self.writer.plain(")");
+                            .function => |f| {
+                                try self.writer.styled(term.Color.Bold, "Function");
+                                try self.writer.styled(term.Color.Dim, " {\n");
+
+                                self.indent_level += 1;
+
+                                try self.printIndent();
+                                try self.writer.styled(term.Color.Cyan, "name: ");
+                                try self.writer.styled(term.Color.Magenta, f.name);
+                                try self.writer.plain("\n");
+
+                                if (f.alias) |alias| {
+                                    try self.printIndent();
+                                    try self.writer.styled(term.Color.Cyan, "alias: ");
+                                    try self.writer.styled(term.Color.Magenta, alias);
+                                    try self.writer.plain("\n");
+                                }
+
+                                self.indent_level -= 1;
+
+                                try self.printIndent();
+                                try self.writer.styled(term.Color.Dim, "}\n");
                             },
-                            .rename => |rename| {
-                                try self.writer.styled(term.Color.Bold, "Rename");
-                                try self.writer.plain("(");
-                                try self.writer.styled(term.Color.Magenta, rename.old_name);
-                                try self.writer.plain(" to ");
-                                try self.writer.styled(term.Color.Magenta, rename.new_name);
-                                try self.writer.plain(")");
+                            .operator => |op| {
+                                try self.writer.styled(term.Color.Bold, "Operator");
+                                try self.writer.styled(term.Color.Dim, " {\n");
+
+                                self.indent_level += 1;
+
+                                try self.printIndent();
+                                try self.writer.styled(term.Color.Cyan, "symbol: ");
+                                try self.writer.styled(term.Color.Yellow, op.symbol);
+                                try self.writer.plain("\n");
+
+                                if (op.alias) |alias| {
+                                    try self.printIndent();
+                                    try self.writer.styled(term.Color.Cyan, "alias: ");
+                                    try self.writer.styled(term.Color.Magenta, alias);
+                                    try self.writer.plain("\n");
+                                }
+
+                                self.indent_level -= 1;
+
+                                try self.printIndent();
+                                try self.writer.styled(term.Color.Dim, "}\n");
+                            },
+                            .type => |t| {
+                                try self.writer.styled(term.Color.Bold, "Type");
+                                try self.writer.styled(term.Color.Dim, " {\n");
+
+                                self.indent_level += 1;
+
+                                try self.printIndent();
+                                try self.writer.styled(term.Color.Cyan, "name: ");
+                                try self.writer.styled(term.Color.Magenta, t.name);
+                                try self.writer.plain("\n");
+
+                                try self.printIndent();
+                                try self.writer.styled(term.Color.Cyan, "expose_constructors: ");
+                                try self.writer.styled(term.Color.Yellow, if (t.expose_constructors) "true" else "false");
+                                try self.writer.plain("\n");
+
+                                if (t.alias) |alias| {
+                                    try self.printIndent();
+                                    try self.writer.styled(term.Color.Cyan, "alias: ");
+                                    try self.writer.styled(term.Color.Magenta, alias);
+                                    try self.writer.plain("\n");
+                                }
+
+                                self.indent_level -= 1;
+
+                                try self.printIndent();
+                                try self.writer.styled(term.Color.Dim, "}\n");
                             },
                         }
-
-                        try self.writer.plain("\n");
                     }
 
                     self.indent_level -= 1;

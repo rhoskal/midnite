@@ -22,9 +22,7 @@ pub const KeywordKind = enum {
     Module,
     On,
     Open,
-    Renaming,
     Then,
-    To,
     Type,
     Using,
     When,
@@ -1432,9 +1430,7 @@ pub const Lexer = struct {
                 if (self.checkExactMatch(span_start, "module", .{ .keyword = .Module })) |token| return token;
                 if (self.checkExactMatch(span_start, "on", .{ .keyword = .On })) |token| return token;
                 if (self.checkExactMatch(span_start, "open", .{ .keyword = .Open })) |token| return token;
-                if (self.checkExactMatch(span_start, "renaming", .{ .keyword = .Renaming })) |token| return token;
                 if (self.checkExactMatch(span_start, "then", .{ .keyword = .Then })) |token| return token;
-                if (self.checkExactMatch(span_start, "to", .{ .keyword = .To })) |token| return token;
                 if (self.checkExactMatch(span_start, "type", .{ .keyword = .Type })) |token| return token;
                 if (self.checkExactMatch(span_start, "using", .{ .keyword = .Using })) |token| return token;
                 if (self.checkExactMatch(span_start, "when", .{ .keyword = .When })) |token| return token;
@@ -2122,19 +2118,9 @@ test "[keyword]" {
             .lexeme = "open",
         },
         .{
-            .source = "renaming",
-            .kind = .{ .keyword = .Renaming },
-            .lexeme = "renaming",
-        },
-        .{
             .source = "then",
             .kind = .{ .keyword = .Then },
             .lexeme = "then",
-        },
-        .{
-            .source = "to",
-            .kind = .{ .keyword = .To },
-            .lexeme = "to",
         },
         .{
             .source = "type",

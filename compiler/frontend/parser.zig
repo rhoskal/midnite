@@ -4,11 +4,14 @@ const ast = @import("ast.zig");
 const lexer = @import("lexer.zig");
 
 pub const ParseError = error{
+    EmptyImportList,
     EmptyLambdaParams,
     InvalidCharLiteral,
     InvalidFloatLiteral,
+    InvalidImportItem,
     InvalidIntLiteral,
     InvalidStrLiteral,
+    MissingParentheses,
     UnexpectedToken,
 };
 
@@ -444,9 +447,9 @@ pub const Parser = struct {
     /// Examples:
     /// - `open MyModule`
     /// - `open MyModule as M`
-    /// - `open MyModule using (map, filter)`
-    /// - `open Std.List renaming (map to list_map)`
-    /// - `open MyModule hiding (internal_func)`
+    /// - `open Std.List using (map, filter)`
+    /// - `open Std.List using (map as list_map)`
+    /// - `open Foo.Bar hiding (internal_func)`
     fn parseImportSpec(self: *Parser) ParserError!*ast.Node {
         const token = try self.expect(lexer.TokenKind{ .keyword = .Open });
 
@@ -457,15 +460,266 @@ pub const Parser = struct {
         }
 
         var kind: ast.ImportKind = .Simple;
-
         var alias: ?[]const u8 = null;
-        errdefer if (alias) |a| self.allocator.free(a);
+        var items: ?std.ArrayList(ast.ImportItem) = null;
+        errdefer {
+            if (alias) |a| self.allocator.free(a);
 
-        if (try self.match(lexer.TokenKind{ .keyword = .As })) {
-            kind = .Alias;
+            if (items) |*list| {
+                for (list.items) |item| {
+                    switch (item) {
+                        .function => |f| {
+                            self.allocator.free(f.name);
 
-            const ident = try self.expect(lexer.TokenKind{ .identifier = .Upper });
-            alias = try self.allocator.dupe(u8, ident.lexeme);
+                            if (f.alias) |a| self.allocator.free(a);
+                        },
+                        .operator => |op| {
+                            self.allocator.free(op.symbol);
+
+                            if (op.alias) |a| self.allocator.free(a);
+                        },
+                        .type => |t| {
+                            self.allocator.free(t.name);
+
+                            if (t.alias) |a| self.allocator.free(a);
+                        },
+                    }
+                }
+
+                list.deinit();
+            }
+        }
+
+        switch (self.current_token.kind) {
+            .keyword => |kw| switch (kw) {
+                .As => {
+                    try self.advance();
+
+                    kind = .Alias;
+
+                    const ident = try self.expect(lexer.TokenKind{ .identifier = .Upper });
+                    alias = try self.allocator.dupe(u8, ident.lexeme);
+                },
+                .Using => {
+                    try self.advance();
+
+                    kind = .Using;
+
+                    _ = try self.expect(lexer.TokenKind{ .delimiter = .LeftParen });
+
+                    var list = std.ArrayList(ast.ImportItem).init(self.allocator);
+                    errdefer {
+                        for (list.items) |item| {
+                            switch (item) {
+                                .function => |f| {
+                                    self.allocator.free(f.name);
+
+                                    if (f.alias) |a| self.allocator.free(a);
+                                },
+                                .operator => |op| {
+                                    self.allocator.free(op.symbol);
+
+                                    if (op.alias) |a| self.allocator.free(a);
+                                },
+                                .type => |t| {
+                                    self.allocator.free(t.name);
+
+                                    if (t.alias) |a| self.allocator.free(a);
+                                },
+                            }
+                        }
+
+                        list.deinit();
+                    }
+
+                    while (!self.check(lexer.TokenKind{ .delimiter = .RightParen })) {
+                        switch (self.current_token.kind) {
+                            .identifier => |ident| switch (ident) {
+                                .Lower => {
+                                    const func = try self.parseLowerIdentifier();
+
+                                    var func_alias: ?[]const u8 = null;
+                                    errdefer if (func_alias) |a| self.allocator.free(a);
+
+                                    if (try self.match(lexer.TokenKind{ .keyword = .As })) {
+                                        const alias_ident = try self.parseLowerIdentifier();
+                                        func_alias = try self.allocator.dupe(u8, alias_ident.name);
+                                    }
+
+                                    try list.append(.{
+                                        .function = .{
+                                            .name = try self.allocator.dupe(u8, func.name),
+                                            .alias = func_alias,
+                                        },
+                                    });
+                                },
+                                .Upper => {
+                                    const type_name = try self.parseUpperIdentifier();
+
+                                    var expose_constructors = false;
+                                    var type_alias: ?[]const u8 = null;
+                                    errdefer if (type_alias) |a| self.allocator.free(a);
+
+                                    if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
+                                        _ = try self.expect(lexer.TokenKind{ .operator = .Expand });
+                                        _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+                                        expose_constructors = true;
+                                    }
+
+                                    if (try self.match(lexer.TokenKind{ .keyword = .As })) {
+                                        const alias_ident = try self.parseUpperIdentifier();
+                                        type_alias = try self.allocator.dupe(u8, alias_ident.name);
+                                    }
+
+                                    try list.append(.{
+                                        .type = .{
+                                            .name = try self.allocator.dupe(u8, type_name.name),
+                                            .expose_constructors = expose_constructors,
+                                            .alias = type_alias,
+                                        },
+                                    });
+                                },
+                            },
+                            .delimiter => |delim| switch (delim) {
+                                .LeftParen => {
+                                    try self.advance();
+
+                                    const op = self.current_token.lexeme;
+                                    try self.advance();
+
+                                    _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+
+                                    var op_alias: ?[]const u8 = null;
+                                    errdefer if (op_alias) |a| self.allocator.free(a);
+
+                                    if (try self.match(lexer.TokenKind{ .keyword = .As })) {
+                                        const alias_ident = try self.parseLowerIdentifier();
+                                        op_alias = try self.allocator.dupe(u8, alias_ident.name);
+                                    }
+
+                                    try list.append(.{
+                                        .operator = .{
+                                            .symbol = try self.allocator.dupe(u8, op),
+                                            .alias = op_alias,
+                                        },
+                                    });
+                                },
+                                else => return error.InvalidImportItem,
+                            },
+                            else => return error.InvalidImportItem,
+                        }
+
+                        // If not at closing paren, expect a comma
+                        if (!self.check(lexer.TokenKind{ .delimiter = .RightParen })) {
+                            _ = try self.expect(lexer.TokenKind{ .delimiter = .Comma });
+                        }
+                    }
+
+                    if (list.items.len == 0) return error.EmptyImportList;
+
+                    _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+                    items = list;
+                },
+                .Hiding => {
+                    try self.advance();
+
+                    kind = .Hiding;
+
+                    _ = try self.expect(lexer.TokenKind{ .delimiter = .LeftParen });
+
+                    var list = std.ArrayList(ast.ImportItem).init(self.allocator);
+                    errdefer {
+                        for (list.items) |item| {
+                            switch (item) {
+                                .function => |f| {
+                                    self.allocator.free(f.name);
+
+                                    if (f.alias) |a| self.allocator.free(a);
+                                },
+                                .operator => |op| {
+                                    self.allocator.free(op.symbol);
+
+                                    if (op.alias) |a| self.allocator.free(a);
+                                },
+                                .type => |t| {
+                                    self.allocator.free(t.name);
+
+                                    if (t.alias) |a| self.allocator.free(a);
+                                },
+                            }
+                        }
+
+                        list.deinit();
+                    }
+
+                    while (!self.check(lexer.TokenKind{ .delimiter = .RightParen })) {
+                        switch (self.current_token.kind) {
+                            .identifier => |ident| switch (ident) {
+                                .Lower => {
+                                    const func = try self.parseLowerIdentifier();
+
+                                    try list.append(.{
+                                        .function = .{
+                                            .name = try self.allocator.dupe(u8, func.name),
+                                            .alias = null,
+                                        },
+                                    });
+                                },
+                                .Upper => {
+                                    const type_name = try self.parseUpperIdentifier();
+                                    var expose_constructors = false;
+
+                                    if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
+                                        _ = try self.expect(lexer.TokenKind{ .operator = .Expand });
+                                        _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+                                        expose_constructors = true;
+                                    }
+
+                                    try list.append(.{
+                                        .type = .{
+                                            .name = try self.allocator.dupe(u8, type_name.name),
+                                            .expose_constructors = expose_constructors,
+                                            .alias = null,
+                                        },
+                                    });
+                                },
+                            },
+                            .delimiter => |delim| switch (delim) {
+                                .LeftParen => {
+                                    try self.advance();
+
+                                    // Read the operator symbol
+                                    const op = self.current_token.lexeme;
+                                    try self.advance();
+
+                                    _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+
+                                    try list.append(.{
+                                        .operator = .{
+                                            .symbol = try self.allocator.dupe(u8, op),
+                                            .alias = null,
+                                        },
+                                    });
+                                },
+                                else => return error.InvalidImportItem,
+                            },
+                            else => return error.InvalidImportItem,
+                        }
+
+                        // If not at closing paren, expect a comma
+                        if (!self.check(lexer.TokenKind{ .delimiter = .RightParen })) {
+                            _ = try self.expect(lexer.TokenKind{ .delimiter = .Comma });
+                        }
+                    }
+
+                    if (list.items.len == 0) return error.EmptyImportList;
+
+                    _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+                    items = list;
+                },
+                else => {},
+            },
+            else => {},
         }
 
         const node = try self.allocator.create(ast.Node);
@@ -476,7 +730,7 @@ pub const Parser = struct {
                 .path = path_node.module_path,
                 .kind = kind,
                 .alias = alias,
-                .items = null,
+                .items = items,
                 .token = token,
             },
         };
@@ -2762,6 +3016,158 @@ test "[import_spec]" {
         // Verify the token is the 'open' keyword
         try testing.expectEqual(lexer.TokenKind{ .keyword = .Open }, import_spec.token.kind);
         try testing.expectEqualStrings("open", import_spec.token.lexeme);
+    }
+
+    {
+        // Using import
+        const source = "open Std.List using (map, filter, Maybe, Either(..))";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseImportSpec();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify the node is an import specification
+        try testing.expect(node.* == .import_spec);
+
+        const import_spec = node.import_spec;
+
+        // Verify it's a using import
+        try testing.expectEqual(ast.ImportKind.Using, import_spec.kind);
+
+        // Verify the module path has exactly two segments
+        try testing.expectEqual(@as(usize, 2), import_spec.path.segments.items.len);
+
+        // Verify the module name
+        try testing.expectEqualStrings("Std", import_spec.path.segments.items[0]);
+        try testing.expectEqualStrings("List", import_spec.path.segments.items[1]);
+
+        // Verify it has no alias
+        try testing.expect(import_spec.alias == null);
+
+        // Verify it has exactly 4 imported items
+        try testing.expect(import_spec.items.?.items.len == 4);
+
+        // Check first function import (map)
+        try testing.expect(import_spec.items.?.items[0] == .function);
+        try testing.expectEqualStrings("map", import_spec.items.?.items[0].function.name);
+        try testing.expect(import_spec.items.?.items[0].function.alias == null);
+
+        // Check second function import (filter)
+        try testing.expect(import_spec.items.?.items[1] == .function);
+        try testing.expectEqualStrings("filter", import_spec.items.?.items[1].function.name);
+        try testing.expect(import_spec.items.?.items[1].function.alias == null);
+
+        // Check first type import (Maybe without constructors)
+        try testing.expect(import_spec.items.?.items[2] == .type);
+        try testing.expectEqualStrings("Maybe", import_spec.items.?.items[2].type.name);
+        try testing.expect(import_spec.items.?.items[2].type.alias == null);
+        try testing.expect(import_spec.items.?.items[2].type.expose_constructors == false);
+
+        // Check second type import (Either with constructors)
+        try testing.expect(import_spec.items.?.items[3] == .type);
+        try testing.expectEqualStrings("Either", import_spec.items.?.items[3].type.name);
+        try testing.expect(import_spec.items.?.items[3].type.alias == null);
+        try testing.expect(import_spec.items.?.items[3].type.expose_constructors == true);
+    }
+
+    {
+        // using import (with aliased and regular functions)
+        const source = "open Std.List using (map as list_map, filter)";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseImportSpec();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify the node is an import specification
+        try testing.expect(node.* == .import_spec);
+
+        const import_spec = node.import_spec;
+
+        // Verify it's a using import
+        try testing.expectEqual(ast.ImportKind.Using, import_spec.kind);
+
+        // Verify it has no alias
+        try testing.expect(import_spec.alias == null);
+
+        // Verify the module path has exactly two segments
+        try testing.expectEqual(@as(usize, 2), import_spec.path.segments.items.len);
+
+        // Verify the module segments
+        try testing.expectEqualStrings("Std", import_spec.path.segments.items[0]);
+        try testing.expectEqualStrings("List", import_spec.path.segments.items[1]);
+
+        // Verify it has no alias
+        try testing.expect(import_spec.items != null);
+
+        // Check first item (map as list_map)
+        const item1 = import_spec.items.?.items[0];
+        try testing.expect(item1 == .function);
+        try testing.expectEqualStrings("map", item1.function.name);
+        try testing.expect(item1.function.alias != null);
+        try testing.expectEqualStrings("list_map", item1.function.alias.?);
+
+        // Check second item (filter)
+        const item2 = import_spec.items.?.items[1];
+        try testing.expect(item2 == .function);
+        try testing.expectEqualStrings("filter", item2.function.name);
+        try testing.expect(item2.function.alias == null);
+    }
+
+    {
+        // Hiding import
+        const source = "open Foo.Bar hiding (internal_func)";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseImportSpec();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify the node is an import specification
+        try testing.expect(node.* == .import_spec);
+
+        const import_spec = node.import_spec;
+
+        // Verify it's a hiding import
+        try testing.expectEqual(ast.ImportKind.Hiding, import_spec.kind);
+
+        // Verify the module path has exactly two segments
+        try testing.expectEqual(@as(usize, 2), import_spec.path.segments.items.len);
+
+        // Verify the module segments
+        try testing.expectEqualStrings("Foo", import_spec.path.segments.items[0]);
+        try testing.expectEqualStrings("Bar", import_spec.path.segments.items[1]);
+
+        // Verify it has no alias
+        try testing.expect(import_spec.alias == null);
+
+        // Verify it has exactly one hidden item
+        try testing.expect(import_spec.items.?.items.len == 1);
+
+        // Check the hidden function
+        const item = import_spec.items.?.items[0];
+        try testing.expect(item == .function);
+        try testing.expectEqualStrings("internal_func", item.function.name);
+        try testing.expect(item.function.alias == null);
     }
 }
 
