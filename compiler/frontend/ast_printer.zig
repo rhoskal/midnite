@@ -6,15 +6,20 @@ const term = @import("terminal.zig");
 /// A debug utility for printing AST nodes in a readable tree format.
 /// Useful for debugging the parser and examining expression structure.
 pub const AstPrinter = struct {
+    /// The underlying writer for output.
     writer: term.ColorWriter,
-    indent_level: usize = 0,
-    indent_str: []const u8 = "  ",
+
+    /// Current indentation level (number of levels deep).
+    indent_level: usize,
+
+    /// Memory allocator used for printing operations.
     allocator: std.mem.Allocator,
 
     /// Initialize a new AST printer that writes to the given writer.
     pub fn init(allocator: std.mem.Allocator, writer: std.fs.File.Writer) AstPrinter {
         return .{
             .writer = term.ColorWriter.init(writer),
+            .indent_level = 0,
             .allocator = allocator,
         };
     }
@@ -25,32 +30,40 @@ pub const AstPrinter = struct {
             .char_literal => |lit| {
                 try self.writer.styled(term.Color.Bold, "CharacterLiteral");
                 try self.writer.plain("('");
-                try self.writer.styled(term.Color.Green, try std.fmt.allocPrint(
-                    self.allocator,
-                    "{u}",
-                    .{lit.value},
-                ));
+                try self.writer.styled(
+                    term.Color.Green,
+                    try std.fmt.allocPrint(
+                        self.allocator,
+                        "{u}",
+                        .{lit.value},
+                    ),
+                );
                 try self.writer.plain("')\n");
             },
             .float_literal => |lit| {
                 try self.writer.styled(term.Color.Bold, "FloatLiteral");
                 try self.writer.plain("(");
-                try self.writer.styled(term.Color.Green, try std.fmt.allocPrint(
-                    self.allocator,
-                    "{d}",
-                    .{lit.value},
-                ));
+                try self.writer.styled(
+                    term.Color.Green,
+                    try std.fmt.allocPrint(
+                        self.allocator,
+                        "{d}",
+                        .{lit.value},
+                    ),
+                );
                 try self.writer.plain(")\n");
             },
             .int_literal => |lit| {
                 try self.writer.styled(term.Color.Bold, "IntegerLiteral");
                 try self.writer.plain("(");
+
                 const formatted = try std.fmt.allocPrint(
                     self.allocator,
                     "{d}",
                     .{lit.value},
                 );
                 defer self.allocator.free(formatted);
+
                 try self.writer.styled(term.Color.Green, formatted);
                 try self.writer.plain(")\n");
             },
@@ -295,7 +308,9 @@ pub const AstPrinter = struct {
                 try self.writer.styled(term.Color.Cyan, "params: [");
 
                 for (expr.params.items, 0..) |param, i| {
-                    if (i > 0) try self.writer.plain(", ");
+                    if (i > 0) {
+                        try self.writer.plain(", ");
+                    }
 
                     try self.writer.styled(term.Color.Magenta, param);
                 }
@@ -383,7 +398,9 @@ pub const AstPrinter = struct {
                 try self.writer.styled(term.Color.Cyan, "type_params: [");
 
                 for (decl.type_params.items, 0..) |param, i| {
-                    if (i > 0) try self.writer.plain(", ");
+                    if (i > 0) {
+                        try self.writer.plain(", ");
+                    }
 
                     try self.writer.styled(term.Color.Magenta, param);
                 }
@@ -444,7 +461,9 @@ pub const AstPrinter = struct {
                 try self.writer.styled(term.Color.Cyan, "type_params: [");
 
                 for (decl.type_params.items, 0..) |param, i| {
-                    if (i > 0) try self.writer.plain(", ");
+                    if (i > 0) {
+                        try self.writer.plain(", ");
+                    }
 
                     try self.writer.styled(term.Color.Magenta, param);
                 }
@@ -514,7 +533,9 @@ pub const AstPrinter = struct {
                 try self.writer.styled(term.Color.Cyan, "type_params: [");
 
                 for (decl.type_params.items, 0..) |param, i| {
-                    if (i > 0) try self.writer.plain(", ");
+                    if (i > 0) {
+                        try self.writer.plain(", ");
+                    }
 
                     try self.writer.styled(term.Color.Magenta, param);
                 }
@@ -572,7 +593,9 @@ pub const AstPrinter = struct {
                 for (inc.path.segments.items, 0..) |segment, i| {
                     try self.printIndent();
 
-                    if (i > 0) try self.writer.plain(".");
+                    if (i > 0) {
+                        try self.writer.plain(".");
+                    }
 
                     try self.writer.styled(term.Color.Magenta, segment);
                     try self.writer.plain("\n");
@@ -598,7 +621,9 @@ pub const AstPrinter = struct {
                 try self.writer.styled(term.Color.Cyan, "segments: [");
 
                 for (path.segments.items, 0..) |segment, i| {
-                    if (i > 0) try self.writer.plain(".");
+                    if (i > 0) {
+                        try self.writer.plain(".");
+                    }
 
                     try self.writer.styled(term.Color.Magenta, segment);
                 }
@@ -648,9 +673,13 @@ pub const AstPrinter = struct {
                 try self.writer.styled(term.Color.Cyan, "path: ");
 
                 for (spec.path.segments.items, 0..) |segment, i| {
-                    if (i > 0) try self.writer.plain(".");
+                    if (i > 0) {
+                        try self.writer.plain(".");
+                    }
+
                     try self.writer.styled(term.Color.Magenta, segment);
                 }
+
                 try self.writer.plain("\n");
 
                 if (spec.alias) |alias| {
@@ -819,7 +848,9 @@ pub const AstPrinter = struct {
                 try self.writer.styled(term.Color.Cyan, "path: [");
 
                 for (decl.path.segments.items, 0..) |segment, i| {
-                    if (i > 0) try self.writer.plain(".");
+                    if (i > 0) {
+                        try self.writer.plain(".");
+                    }
 
                     try self.writer.styled(term.Color.Magenta, segment);
                 }
@@ -941,7 +972,7 @@ pub const AstPrinter = struct {
     fn printIndent(self: *const AstPrinter) !void {
         var i: usize = 0;
         while (i < self.indent_level) : (i += 1) {
-            try self.writer.styled(term.Color.Dim, self.indent_str);
+            try self.writer.styled(term.Color.Dim, "    ");
         }
     }
 
@@ -1124,6 +1155,7 @@ test "example" {
     mul.* = .{
         .arithmetic_expr = .{
             .left = two,
+            .right = three,
             .operator = lexer.Token{
                 .kind = .{ .operator = .IntMul },
                 .lexeme = "*",
@@ -1133,7 +1165,6 @@ test "example" {
                     .src = .{ .line = 1, .col = 7 },
                 },
             },
-            .right = three,
         },
     };
 
@@ -1161,6 +1192,7 @@ test "example" {
     add.* = .{
         .arithmetic_expr = .{
             .left = one,
+            .right = mul,
             .operator = lexer.Token{
                 .kind = .{ .operator = .IntAdd },
                 .lexeme = "+",
@@ -1170,7 +1202,6 @@ test "example" {
                     .src = .{ .line = 1, .col = 3 },
                 },
             },
-            .right = mul,
         },
     };
 

@@ -111,9 +111,15 @@ pub const Formatter = struct {
                         try self.write(" ");
 
                         const needs_parens = (param.* == .type_application);
-                        if (needs_parens) try self.write("(");
+                        if (needs_parens) {
+                            try self.write("(");
+                        }
+
                         try self.formatNode(param);
-                        if (needs_parens) try self.write(")");
+
+                        if (needs_parens) {
+                            try self.write(")");
+                        }
                     }
 
                     if (i < vtype.constructors.items.len - 1) {
@@ -140,11 +146,15 @@ pub const Formatter = struct {
 
                 for (app.args.items, 0..) |arg, i| {
                     const needs_parens = (arg.* == .type_application);
-                    if (needs_parens) try self.write("(");
+                    if (needs_parens) {
+                        try self.write("(");
+                    }
 
                     try self.formatNode(arg);
 
-                    if (needs_parens) try self.write(")");
+                    if (needs_parens) {
+                        try self.write(")");
+                    }
 
                     if (i < app.args.items.len - 1) {
                         try self.write(" ");
@@ -168,7 +178,9 @@ pub const Formatter = struct {
                 try self.write("open ");
 
                 for (spec.path.segments.items, 0..) |segment, i| {
-                    if (i > 0) try self.write(".");
+                    if (i > 0) {
+                        try self.write(".");
+                    }
 
                     try self.write(segment);
                 }
@@ -315,25 +327,52 @@ pub const Formatter = struct {
                 try self.write(" ");
 
                 const needs_parens = (app.argument.* == .function_application);
-                if (needs_parens) try self.write("(");
+                if (needs_parens) {
+                    try self.write("(");
+                }
 
                 try self.formatNode(app.argument);
 
-                if (needs_parens) try self.write(")");
+                if (needs_parens) {
+                    try self.write(")");
+                }
             },
             .arithmetic_expr => |expr| {
                 try self.formatNode(expr.left);
 
                 switch (expr.operator.kind) {
                     .operator => |op| {
-                        if (op == .FloatAdd) try self.write(" +. ");
-                        if (op == .FloatDiv) try self.write(" /. ");
-                        if (op == .FloatMul) try self.write(" *. ");
-                        if (op == .FloatSub) try self.write(" -. ");
-                        if (op == .IntAdd) try self.write(" + ");
-                        if (op == .IntDiv) try self.write(" / ");
-                        if (op == .IntMul) try self.write(" * ");
-                        if (op == .IntSub) try self.write(" - ");
+                        if (op == .FloatAdd) {
+                            try self.write(" +. ");
+                        }
+
+                        if (op == .FloatDiv) {
+                            try self.write(" /. ");
+                        }
+
+                        if (op == .FloatMul) {
+                            try self.write(" *. ");
+                        }
+
+                        if (op == .FloatSub) {
+                            try self.write(" -. ");
+                        }
+
+                        if (op == .IntAdd) {
+                            try self.write(" + ");
+                        }
+
+                        if (op == .IntDiv) {
+                            try self.write(" / ");
+                        }
+
+                        if (op == .IntMul) {
+                            try self.write(" * ");
+                        }
+
+                        if (op == .IntSub) {
+                            try self.write(" - ");
+                        }
                     },
                     else => {},
                 }
@@ -345,12 +384,29 @@ pub const Formatter = struct {
 
                 switch (expr.operator.kind) {
                     .operator => |op| {
-                        if (op == .Equality) try self.write(" == ");
-                        if (op == .GreaterThan) try self.write(" > ");
-                        if (op == .GreaterThanEqual) try self.write(" >= ");
-                        if (op == .LessThan) try self.write(" < ");
-                        if (op == .LessThanEqual) try self.write(" <= ");
-                        if (op == .NotEqual) try self.write(" /= ");
+                        if (op == .Equality) {
+                            try self.write(" == ");
+                        }
+
+                        if (op == .GreaterThan) {
+                            try self.write(" > ");
+                        }
+
+                        if (op == .GreaterThanEqual) {
+                            try self.write(" >= ");
+                        }
+
+                        if (op == .LessThan) {
+                            try self.write(" < ");
+                        }
+
+                        if (op == .LessThanEqual) {
+                            try self.write(" <= ");
+                        }
+
+                        if (op == .NotEqual) {
+                            try self.write(" /= ");
+                        }
                     },
                     else => {},
                 }
@@ -362,8 +418,13 @@ pub const Formatter = struct {
 
                 switch (expr.operator.kind) {
                     .operator => |op| {
-                        if (op == .ComposeLeft) try self.write(" << ");
-                        if (op == .ComposeRight) try self.write(" >> ");
+                        if (op == .ComposeLeft) {
+                            try self.write(" << ");
+                        }
+
+                        if (op == .ComposeRight) {
+                            try self.write(" >> ");
+                        }
                     },
                     else => {},
                 }
@@ -385,8 +446,13 @@ pub const Formatter = struct {
 
                 switch (expr.operator.kind) {
                     .operator => |op| {
-                        if (op == .LogicalAnd) try self.write(" && ");
-                        if (op == .LogicalOr) try self.write(" || ");
+                        if (op == .LogicalAnd) {
+                            try self.write(" && ");
+                        }
+
+                        if (op == .LogicalOr) {
+                            try self.write(" || ");
+                        }
                     },
                     else => {},
                 }
@@ -445,18 +511,15 @@ pub const Formatter = struct {
                 self.indent_level -= 1;
             },
             .int_literal => |lit| {
-                // For integer literals, just write the lexeme directly
                 try self.write(lit.token.lexeme);
             },
             .lower_identifier => |ident| {
-                // For identifiers, write the name
                 try self.write(ident.name);
             },
             .upper_identifier => |ident| {
                 try self.write(ident.name);
             },
             .str_literal => |lit| {
-                // For string literals, write with quotes
                 try self.write(lit.token.lexeme);
             },
             .float_literal => |lit| {
@@ -531,7 +594,7 @@ pub const Formatter = struct {
     ///
     /// Memory: Caller owns the returned ArrayList and must call deinit on it.
     ///
-    /// Example input:  `[(++), map, Maybe(..), filter, (>>=), Tree(..)]`
+    /// Example input: `[(++), map, Maybe(..), filter, (>>=), Tree(..)]`
     /// Example output: `[Maybe(..), Tree(..), filter, map, (++), (>>=)]`
     fn sortImportItems(
         allocator: std.mem.Allocator,

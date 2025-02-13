@@ -33,7 +33,9 @@ pub const ColorWriter = struct {
     inner: std.fs.File.Writer,
 
     pub fn init(writer: std.fs.File.Writer) ColorWriter {
-        return .{ .inner = writer };
+        return .{
+            .inner = writer,
+        };
     }
 
     /// Writes text with the specified color/style, automatically resetting afterwards.
@@ -48,6 +50,7 @@ pub const ColorWriter = struct {
         try self.inner.writeAll(text);
     }
 
+    /// Formats and writes text using the given format string and arguments.
     pub fn format(self: ColorWriter, comptime fmt: []const u8, args: anytype) !void {
         try std.fmt.format(self.inner, fmt, args);
     }
