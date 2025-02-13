@@ -1137,6 +1137,7 @@ pub const Node = union(enum) {
                     for (items.items) |item| {
                         allocator.free(item.name);
                     }
+
                     items.deinit();
                 }
             },

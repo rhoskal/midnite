@@ -243,6 +243,7 @@ pub const Parser = struct {
     /// Underscores in numbers are allowed and ignored (e.g., 1_000_000).
     fn parseIntLiteral(self: *Parser) ParserError!ast.IntLiteralNode {
         const token = try self.expect(lexer.TokenKind{ .literal = .Int });
+
         const value = std.fmt.parseInt(i64, token.lexeme, 0) catch {
             return error.InvalidIntLiteral;
         };
@@ -258,6 +259,7 @@ pub const Parser = struct {
     /// Underscores in numbers are allowed and ignored (e.g., 3.141_592).
     fn parseFloatLiteral(self: *Parser) ParserError!ast.FloatLiteralNode {
         const token = try self.expect(lexer.TokenKind{ .literal = .Float });
+
         const value = std.fmt.parseFloat(f64, token.lexeme) catch {
             return error.InvalidFloatLiteral;
         };
@@ -471,17 +473,23 @@ pub const Parser = struct {
                         .function => |f| {
                             self.allocator.free(f.name);
 
-                            if (f.alias) |a| self.allocator.free(a);
+                            if (f.alias) |a| {
+                                self.allocator.free(a);
+                            }
                         },
                         .operator => |op| {
                             self.allocator.free(op.symbol);
 
-                            if (op.alias) |a| self.allocator.free(a);
+                            if (op.alias) |a| {
+                                self.allocator.free(a);
+                            }
                         },
                         .type => |t| {
                             self.allocator.free(t.name);
 
-                            if (t.alias) |a| self.allocator.free(a);
+                            if (t.alias) |a| {
+                                self.allocator.free(a);
+                            }
                         },
                     }
                 }
@@ -1037,6 +1045,7 @@ pub const Parser = struct {
         const name = try self.parseLowerIdentifier();
 
         _ = try self.expect(lexer.TokenKind{ .delimiter = .Colon });
+
         const type_annotation = try self.parseTypeExpr();
         errdefer type_annotation.deinit(self.allocator);
 
@@ -1242,7 +1251,9 @@ pub const Parser = struct {
     fn parsePrimaryExpr(self: *Parser) ParserError!*ast.Node {
         switch (self.current_token.kind) {
             .delimiter => |delim| switch (delim) {
-                .LeftBracket => return self.parseList(),
+                .LeftBracket => {
+                    return self.parseList();
+                },
                 .LeftParen => {
                     try self.advance();
 
@@ -1261,18 +1272,26 @@ pub const Parser = struct {
                 switch (ident) {
                     .Lower => {
                         const identifier = try self.parseLowerIdentifier();
-                        node.* = .{ .lower_identifier = identifier };
+
+                        node.* = .{
+                            .lower_identifier = identifier,
+                        };
                     },
                     .Upper => {
                         const identifier = try self.parseUpperIdentifier();
-                        node.* = .{ .upper_identifier = identifier };
+
+                        node.* = .{
+                            .upper_identifier = identifier,
+                        };
                     },
                 }
 
                 return node;
             },
             .keyword => |kw| switch (kw) {
-                .If => return try self.parseIfThenElse(),
+                .If => {
+                    return try self.parseIfThenElse();
+                },
                 else => return error.UnexpectedToken,
             },
             .literal => |lit| {
@@ -1314,7 +1333,9 @@ pub const Parser = struct {
                 return node;
             },
             .operator => |op| switch (op) {
-                .Lambda => return try self.parseLambdaExpr(),
+                .Lambda => {
+                    return try self.parseLambdaExpr();
+                },
                 else => return error.UnexpectedToken,
             },
             else => return error.UnexpectedToken,
@@ -1349,7 +1370,9 @@ pub const Parser = struct {
             try params.append(param.lexeme);
         }
 
-        if (params.items.len == 0) return error.EmptyLambdaParams;
+        if (params.items.len == 0) {
+            return error.EmptyLambdaParams;
+        }
 
         _ = try self.expect(lexer.TokenKind{ .symbol = .DoubleArrowRight });
         const body = try self.parseExpression();
@@ -1503,6 +1526,7 @@ pub const Parser = struct {
     /// - `List String`
     fn parseTypeExpr(self: *Parser) ParserError!*ast.Node {
         const start_token = self.current_token;
+
         var first_type = try self.parseSimpleType();
         errdefer {
             first_type.deinit(self.allocator);
@@ -1594,6 +1618,7 @@ pub const Parser = struct {
                     errdefer self.allocator.destroy(arg_node);
 
                     const arg = try self.parseLowerIdentifier();
+
                     arg_node.* = .{
                         .lower_identifier = arg,
                     };
@@ -1607,6 +1632,7 @@ pub const Parser = struct {
                     errdefer self.allocator.destroy(arg_node);
 
                     const arg = try self.parseUpperIdentifier();
+
                     arg_node.* = .{
                         .upper_identifier = arg,
                     };
