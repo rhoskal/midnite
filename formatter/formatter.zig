@@ -31,10 +31,389 @@ pub const Formatter = struct {
     /// Formats a node and returns the formatted string.
     pub fn formatNode(self: *Formatter, node: *const ast.Node) !void {
         switch (node.*) {
-            .program => |prog| {
-                for (prog.statements.items) |stmt| {
-                    try self.formatNode(stmt);
+            // Basic Literals
+            .comment => |comment| {
+                try self.write("# ");
+                try self.write(comment.content);
+            },
+            .doc_comment => |comment| {
+                try self.write("## ");
+                try self.write(comment.content);
+            },
+            .int_literal => |lit| {
+                try self.write(lit.token.lexeme);
+            },
+            .float_literal => |lit| {
+                try self.write(lit.token.lexeme);
+            },
+            .char_literal => |lit| {
+                try self.write(lit.token.lexeme);
+            },
+            .str_literal => |lit| {
+                try self.write(lit.token.lexeme);
+            },
+            .multiline_str_literal => |lit| {
+                try self.write(lit.token.lexeme);
+            },
+
+            // Identifiers
+            .lower_identifier => |ident| {
+                try self.write(ident.name);
+            },
+            .upper_identifier => |ident| {
+                try self.write(ident.name);
+            },
+
+            // Basic Data Structures
+            .list => |list| {
+                try self.write("[");
+
+                for (list.elements.items, 0..) |element, i| {
+                    try self.formatNode(element);
+
+                    if (i < list.elements.items.len - 1) {
+                        try self.write(", ");
+                    }
+                }
+
+                try self.write("]");
+            },
+            .tuple => |tuple| {
+                try self.write("(");
+
+                for (tuple.elements.items, 0..) |element, i| {
+                    try self.formatNode(element);
+
+                    if (i < tuple.elements.items.len - 1) {
+                        try self.write(", ");
+                    }
+                }
+
+                try self.write(")");
+            },
+
+            // Basic Expressions
+            .unary_expr => |expr| {
+                try self.write("-");
+                try self.formatNode(expr.operand);
+            },
+            .arithmetic_expr => |expr| {
+                try self.formatNode(expr.left);
+
+                switch (expr.operator.kind) {
+                    .operator => |op| {
+                        if (op == .FloatAdd) {
+                            try self.write(" +. ");
+                        }
+
+                        if (op == .FloatDiv) {
+                            try self.write(" /. ");
+                        }
+
+                        if (op == .FloatMul) {
+                            try self.write(" *. ");
+                        }
+
+                        if (op == .FloatSub) {
+                            try self.write(" -. ");
+                        }
+
+                        if (op == .IntAdd) {
+                            try self.write(" + ");
+                        }
+
+                        if (op == .IntDiv) {
+                            try self.write(" / ");
+                        }
+
+                        if (op == .IntMul) {
+                            try self.write(" * ");
+                        }
+
+                        if (op == .IntSub) {
+                            try self.write(" - ");
+                        }
+                    },
+                    else => {},
+                }
+
+                try self.formatNode(expr.right);
+            },
+            .logical_expr => |expr| {
+                try self.formatNode(expr.left);
+
+                switch (expr.operator.kind) {
+                    .operator => |op| {
+                        if (op == .LogicalAnd) {
+                            try self.write(" && ");
+                        }
+
+                        if (op == .LogicalOr) {
+                            try self.write(" || ");
+                        }
+                    },
+                    else => {},
+                }
+
+                try self.formatNode(expr.right);
+            },
+            .comparison_expr => |expr| {
+                try self.formatNode(expr.left);
+
+                switch (expr.operator.kind) {
+                    .operator => |op| {
+                        if (op == .Equality) {
+                            try self.write(" == ");
+                        }
+
+                        if (op == .GreaterThan) {
+                            try self.write(" > ");
+                        }
+
+                        if (op == .GreaterThanEqual) {
+                            try self.write(" >= ");
+                        }
+
+                        if (op == .LessThan) {
+                            try self.write(" < ");
+                        }
+
+                        if (op == .LessThanEqual) {
+                            try self.write(" <= ");
+                        }
+
+                        if (op == .NotEqual) {
+                            try self.write(" /= ");
+                        }
+                    },
+                    else => {},
+                }
+
+                try self.formatNode(expr.right);
+            },
+
+            // Pattern Matching
+            .pattern => |pat| {
+                switch (pat) {
+                    .wildcard => {
+                        try self.write("_");
+                    },
+                    .int_literal => |lit| {
+                        try self.formatNode(&.{ .int_literal = lit });
+                    },
+                    .float_literal => |lit| {
+                        try self.formatNode(&.{ .float_literal = lit });
+                    },
+                    .char_literal => |lit| {
+                        try self.formatNode(&.{ .char_literal = lit });
+                    },
+                    .string_literal => |lit| {
+                        try self.formatNode(&.{ .str_literal = lit });
+                    },
+                    .list => |list| {
+                        try self.write("[");
+
+                        for (list.elements.items, 0..) |element, i| {
+                            try self.formatNode(&.{ .pattern = element.* });
+
+                            if (i < list.elements.items.len - 1) {
+                                try self.write(", ");
+                            }
+                        }
+
+                        try self.write("]");
+                    },
+                    .variable => |var_pattern| {
+                        try self.formatNode(&.{
+                            .lower_identifier = .{
+                                .name = var_pattern.name,
+                                .token = var_pattern.token,
+                            },
+                        });
+                    },
+                    .constructor => |con| {
+                        try self.write(con.name);
+
+                        for (con.args.items) |arg| {
+                            try self.write(" ");
+                            try self.formatNode(&.{ .pattern = arg.* });
+                        }
+                    },
+                    .empty_list => {
+                        try self.write("[]");
+                    },
+                    .cons => |cons| {
+                        try self.formatNode(&.{ .pattern = cons.head.* });
+                        try self.write(" :: ");
+                        try self.formatNode(&.{ .pattern = cons.tail.* });
+                    },
+                }
+            },
+            .match_expr => |expr| {
+                try self.write("match ");
+                try self.formatNode(expr.value);
+                try self.write(" on\n");
+
+                for (expr.cases.items) |case| {
+                    try self.writeIndent();
+                    try self.write("| ");
+                    try self.formatNode(&.{ .pattern = case.pattern.* });
+
+                    if (case.guard) |guard| {
+                        try self.write(" when ");
+                        try self.formatNode(guard.condition);
+                    }
+
+                    try self.write(" => ");
+                    try self.formatNode(case.expression);
                     try self.write("\n");
+                }
+            },
+
+            // Functions and Applications
+            .function_type => |ftype| {
+                for (ftype.param_types.items, 0..) |param, i| {
+                    try self.formatNode(param);
+
+                    if (i < ftype.param_types.items.len - 1) {
+                        try self.write(" -> ");
+                    }
+                }
+            },
+            .lambda_expr => |expr| {
+                try self.write("\\");
+
+                for (expr.params.items, 0..) |param, i| {
+                    try self.write(param);
+
+                    if (i < expr.params.items.len - 1) {
+                        try self.write(" ");
+                    }
+                }
+
+                try self.write(" => ");
+
+                try self.formatNode(expr.body);
+            },
+            .function_application => |app| {
+                try self.formatNode(app.function);
+
+                try self.write(" ");
+
+                const needs_parens = (app.argument.* == .function_application);
+                if (needs_parens) {
+                    try self.write("(");
+                }
+
+                try self.formatNode(app.argument);
+
+                if (needs_parens) {
+                    try self.write(")");
+                }
+            },
+
+            // Advanced Expressions
+            .cons_expr => |expr| {
+                try self.formatNode(expr.head);
+                try self.write(" :: ");
+                try self.formatNode(expr.tail);
+            },
+            .str_concat_expr => |expr| {
+                try self.formatNode(expr.left);
+                try self.write(" <> ");
+                try self.formatNode(expr.right);
+            },
+            .list_concat_expr => |expr| {
+                try self.formatNode(expr.left);
+                try self.write(" ++ ");
+                try self.formatNode(expr.right);
+            },
+            .composition_expr => |expr| {
+                try self.formatNode(expr.first);
+
+                switch (expr.operator.kind) {
+                    .operator => |op| {
+                        if (op == .ComposeLeft) {
+                            try self.write(" << ");
+                        }
+
+                        if (op == .ComposeRight) {
+                            try self.write(" >> ");
+                        }
+                    },
+                    else => {},
+                }
+
+                try self.formatNode(expr.second);
+            },
+            .pipe_expr => |expr| {
+                switch (expr.operator.kind) {
+                    .operator => |op| {
+                        if (op == .PipeLeft) {
+                            try self.formatNode(expr.func);
+                            try self.write(" <| ");
+                            try self.formatNode(expr.value);
+                        }
+
+                        if (op == .PipeRight) {
+                            try self.formatNode(expr.value);
+                            try self.write(" |> ");
+                            try self.formatNode(expr.func);
+                        }
+                    },
+                    else => {},
+                }
+            },
+
+            // Control Flow
+            .if_then_else_stmt => |stmt| {
+                try self.write("if ");
+                try self.formatNode(stmt.condition);
+
+                try self.write(" then\n");
+
+                self.indent_level += 1;
+
+                try self.writeIndent();
+                try self.formatNode(stmt.then_branch);
+                try self.write("\n");
+
+                self.indent_level -= 1;
+
+                try self.write("else\n");
+
+                self.indent_level += 1;
+
+                try self.writeIndent();
+                try self.formatNode(stmt.else_branch);
+                try self.write("\n");
+
+                self.indent_level -= 1;
+            },
+
+            // Type System
+            .typed_hole => {
+                try self.write(" ? ");
+            },
+            .type_application => |app| {
+                try self.formatNode(app.base);
+                try self.write(" ");
+
+                for (app.args.items, 0..) |arg, i| {
+                    const needs_parens = (arg.* == .type_application);
+                    if (needs_parens) {
+                        try self.write("(");
+                    }
+
+                    try self.formatNode(arg);
+
+                    if (needs_parens) {
+                        try self.write(")");
+                    }
+
+                    if (i < app.args.items.len - 1) {
+                        try self.write(" ");
+                    }
                 }
             },
             .type_alias => |atype| {
@@ -49,42 +428,6 @@ pub const Formatter = struct {
 
                 try self.write("= ");
                 try self.formatNode(atype.value);
-                try self.write("\n");
-            },
-            .record_type => |rtype| {
-                try self.write("type ");
-                try self.write(rtype.name);
-                try self.write(" ");
-
-                for (rtype.type_params.items) |param| {
-                    try self.write(param);
-                    try self.write(" ");
-                }
-
-                try self.write("=");
-                try self.writeNewlineAndIndent();
-
-                self.indent_level += 1;
-
-                try self.writeIndent();
-                try self.write("{ ");
-
-                for (rtype.fields.items, 0..) |field, i| {
-                    try self.write(field.name);
-                    try self.write(" : ");
-                    try self.formatNode(field.type);
-
-                    if (i < rtype.fields.items.len - 1) {
-                        try self.writeNewlineAndIndent();
-                        try self.write(", ");
-                    }
-                }
-
-                try self.writeNewlineAndIndent();
-                try self.write("}");
-
-                self.indent_level -= 1;
-
                 try self.write("\n");
             },
             .variant_type => |vtype| {
@@ -131,48 +474,112 @@ pub const Formatter = struct {
 
                 try self.write("\n");
             },
-            .function_type => |ftype| {
-                for (ftype.param_types.items, 0..) |param, i| {
-                    try self.formatNode(param);
-
-                    if (i < ftype.param_types.items.len - 1) {
-                        try self.write(" -> ");
-                    }
-                }
-            },
-            .type_application => |app| {
-                try self.formatNode(app.base);
+            .record_type => |rtype| {
+                try self.write("type ");
+                try self.write(rtype.name);
                 try self.write(" ");
 
-                for (app.args.items, 0..) |arg, i| {
-                    const needs_parens = (arg.* == .type_application);
-                    if (needs_parens) {
-                        try self.write("(");
-                    }
+                for (rtype.type_params.items) |param| {
+                    try self.write(param);
+                    try self.write(" ");
+                }
 
-                    try self.formatNode(arg);
+                try self.write("=");
+                try self.writeNewlineAndIndent();
 
-                    if (needs_parens) {
-                        try self.write(")");
-                    }
+                self.indent_level += 1;
 
-                    if (i < app.args.items.len - 1) {
-                        try self.write(" ");
+                try self.writeIndent();
+                try self.write("{ ");
+
+                for (rtype.fields.items, 0..) |field, i| {
+                    try self.write(field.name);
+                    try self.write(" : ");
+                    try self.formatNode(field.type);
+
+                    if (i < rtype.fields.items.len - 1) {
+                        try self.writeNewlineAndIndent();
+                        try self.write(", ");
                     }
                 }
-            },
-            .include => |inc| {
-                try self.write("include ");
 
-                for (inc.path.segments.items, 0..) |segment, i| {
-                    try self.write(segment);
+                try self.writeNewlineAndIndent();
+                try self.write("}");
 
-                    if (i < inc.path.segments.items.len - 1) {
-                        try self.write(".");
-                    }
-                }
+                self.indent_level -= 1;
 
                 try self.write("\n");
+            },
+
+            // Module System
+            .module_path => |path| {
+                for (path.segments.items, 0..) |segment, i| {
+                    if (i > 0) {
+                        try self.write(".");
+                    }
+
+                    try self.write(segment);
+                }
+            },
+            .export_spec => |spec| {
+                try self.write("exposing ");
+
+                if (spec.exposing_all) {
+                    try self.write("(..)");
+
+                    return;
+                }
+
+                if (spec.items) |items| {
+                    var sorted = try sortExportItems(items.allocator, items);
+                    defer sorted.deinit();
+
+                    if (sorted.items.len == 0) {
+                        return error.InvalidEmptyExport;
+                    }
+
+                    if (sorted.items.len <= 2) {
+                        try self.write("(");
+                        for (sorted.items, 0..) |item, i| {
+                            try self.write(item.name);
+
+                            if (item.expose_constructors) {
+                                try self.write("(..)");
+                            }
+
+                            if (i < sorted.items.len - 1) {
+                                try self.write(", ");
+                            }
+                        }
+
+                        try self.write(")");
+                    } else {
+                        try self.write("(\n");
+
+                        self.indent_level += 1;
+
+                        for (items.items, 0..) |item, i| {
+                            try self.writeIndent();
+                            try self.write(item.name);
+
+                            if (item.expose_constructors) {
+                                try self.write("(..)");
+                            }
+
+                            if (i < items.items.len - 1) {
+                                try self.write(",\n");
+                            }
+                        }
+
+                        self.indent_level -= 1;
+
+                        try self.write("\n");
+                        try self.writeIndent();
+                        try self.write(")");
+                    }
+                } else {
+                    return error.MissingExportItems;
+                }
             },
             .import_spec => |spec| {
                 try self.write("open ");
@@ -278,20 +685,21 @@ pub const Formatter = struct {
 
                 try self.write("\n");
             },
-            .foreign_function_decl => |decl| {
-                try self.write("foreign ");
-                try self.write(decl.name);
+            .include => |inc| {
+                try self.write("include ");
 
-                try self.write(" : ");
-                try self.formatNode(decl.type_annotation);
+                for (inc.path.segments.items, 0..) |segment, i| {
+                    try self.write(segment);
 
-                try self.write(" = ");
-                try self.write("\"");
-                try self.write(decl.external_name);
-                try self.write("\"");
+                    if (i < inc.path.segments.items.len - 1) {
+                        try self.write(".");
+                    }
+                }
 
                 try self.write("\n");
             },
+
+            // Top-Level Declarations
             .function_decl => |decl| {
                 try self.write("let ");
                 try self.write(decl.name);
@@ -306,262 +714,55 @@ pub const Formatter = struct {
 
                 try self.write("\n");
             },
-            .lambda_expr => |expr| {
-                try self.write("\\");
+            .foreign_function_decl => |decl| {
+                try self.write("foreign ");
+                try self.write(decl.name);
 
-                for (expr.params.items, 0..) |param, i| {
-                    try self.write(param);
+                try self.write(" : ");
+                try self.formatNode(decl.type_annotation);
 
-                    if (i < expr.params.items.len - 1) {
-                        try self.write(" ");
-                    }
-                }
-
-                try self.write(" => ");
-
-                try self.formatNode(expr.body);
+                try self.write(" = ");
+                try self.write("\"");
+                try self.write(decl.external_name);
+                try self.write("\"");
             },
-            .function_application => |app| {
-                try self.formatNode(app.function);
+            .module_decl => |decl| {
+                try self.write("module ");
+
+                for (decl.path.segments.items, 0..) |segment, i| {
+                    if (i > 0) {
+                        try self.write(".");
+                    }
+
+                    try self.write(segment);
+                }
 
                 try self.write(" ");
 
-                const needs_parens = (app.argument.* == .function_application);
-                if (needs_parens) {
-                    try self.write("(");
-                }
-
-                try self.formatNode(app.argument);
-
-                if (needs_parens) {
-                    try self.write(")");
-                }
-            },
-            .arithmetic_expr => |expr| {
-                try self.formatNode(expr.left);
-
-                switch (expr.operator.kind) {
-                    .operator => |op| {
-                        if (op == .FloatAdd) {
-                            try self.write(" +. ");
-                        }
-
-                        if (op == .FloatDiv) {
-                            try self.write(" /. ");
-                        }
-
-                        if (op == .FloatMul) {
-                            try self.write(" *. ");
-                        }
-
-                        if (op == .FloatSub) {
-                            try self.write(" -. ");
-                        }
-
-                        if (op == .IntAdd) {
-                            try self.write(" + ");
-                        }
-
-                        if (op == .IntDiv) {
-                            try self.write(" / ");
-                        }
-
-                        if (op == .IntMul) {
-                            try self.write(" * ");
-                        }
-
-                        if (op == .IntSub) {
-                            try self.write(" - ");
-                        }
-                    },
-                    else => {},
-                }
-
-                try self.formatNode(expr.right);
-            },
-            .comparison_expr => |expr| {
-                try self.formatNode(expr.left);
-
-                switch (expr.operator.kind) {
-                    .operator => |op| {
-                        if (op == .Equality) {
-                            try self.write(" == ");
-                        }
-
-                        if (op == .GreaterThan) {
-                            try self.write(" > ");
-                        }
-
-                        if (op == .GreaterThanEqual) {
-                            try self.write(" >= ");
-                        }
-
-                        if (op == .LessThan) {
-                            try self.write(" < ");
-                        }
-
-                        if (op == .LessThanEqual) {
-                            try self.write(" <= ");
-                        }
-
-                        if (op == .NotEqual) {
-                            try self.write(" /= ");
-                        }
-                    },
-                    else => {},
-                }
-
-                try self.formatNode(expr.right);
-            },
-            .composition_expr => |expr| {
-                try self.formatNode(expr.first);
-
-                switch (expr.operator.kind) {
-                    .operator => |op| {
-                        if (op == .ComposeLeft) {
-                            try self.write(" << ");
-                        }
-
-                        if (op == .ComposeRight) {
-                            try self.write(" >> ");
-                        }
-                    },
-                    else => {},
-                }
-
-                try self.formatNode(expr.second);
-            },
-            .cons_expr => |expr| {
-                try self.formatNode(expr.head);
-                try self.write(" :: ");
-                try self.formatNode(expr.tail);
-            },
-            .list_concat_expr => |expr| {
-                try self.formatNode(expr.left);
-                try self.write(" ++ ");
-                try self.formatNode(expr.right);
-            },
-            .logical_expr => |expr| {
-                try self.formatNode(expr.left);
-
-                switch (expr.operator.kind) {
-                    .operator => |op| {
-                        if (op == .LogicalAnd) {
-                            try self.write(" && ");
-                        }
-
-                        if (op == .LogicalOr) {
-                            try self.write(" || ");
-                        }
-                    },
-                    else => {},
-                }
-
-                try self.formatNode(expr.right);
-            },
-            .pipe_expr => |expr| {
-                switch (expr.operator.kind) {
-                    .operator => |op| {
-                        if (op == .PipeLeft) {
-                            try self.formatNode(expr.func);
-                            try self.write(" <| ");
-                            try self.formatNode(expr.value);
-                        }
-
-                        if (op == .PipeRight) {
-                            try self.formatNode(expr.value);
-                            try self.write(" |> ");
-                            try self.formatNode(expr.func);
-                        }
-                    },
-                    else => {},
-                }
-            },
-            .str_concat_expr => |expr| {
-                try self.formatNode(expr.left);
-                try self.write(" <> ");
-                try self.formatNode(expr.right);
-            },
-            .unary_expr => |expr| {
-                try self.write("-");
-                try self.formatNode(expr.operand);
-            },
-            .if_then_else_stmt => |stmt| {
-                try self.write("if ");
-                try self.formatNode(stmt.condition);
-
-                try self.write(" then\n");
+                try self.formatNode(&.{ .export_spec = decl.exports });
+                try self.write("\n\n");
 
                 self.indent_level += 1;
 
-                try self.writeIndent();
-                try self.formatNode(stmt.then_branch);
-                try self.write("\n");
+                for (decl.declarations.items) |declaration| {
+                    try self.formatNode(declaration);
+                    try self.write("\n");
 
-                self.indent_level -= 1;
-
-                try self.write("else\n");
-
-                self.indent_level += 1;
-
-                try self.writeIndent();
-                try self.formatNode(stmt.else_branch);
-                try self.write("\n");
-
-                self.indent_level -= 1;
-            },
-            .int_literal => |lit| {
-                try self.write(lit.token.lexeme);
-            },
-            .lower_identifier => |ident| {
-                try self.write(ident.name);
-            },
-            .upper_identifier => |ident| {
-                try self.write(ident.name);
-            },
-            .str_literal => |lit| {
-                try self.write(lit.token.lexeme);
-            },
-            .float_literal => |lit| {
-                try self.write(lit.token.lexeme);
-            },
-            .list => |list| {
-                try self.write("[");
-
-                for (list.elements.items, 0..) |element, i| {
-                    try self.formatNode(element);
-
-                    if (i < list.elements.items.len - 1) {
-                        try self.write(", ");
+                    // Add extra newline between declarations for readability
+                    if (declaration.* != .comment and declaration.* != .doc_comment and declaration.* != .foreign_function_decl) {
+                        try self.write("\n");
                     }
                 }
 
-                try self.write("]");
+                self.indent_level -= 1;
+
+                try self.write("end");
             },
-            .tuple => |tuple| {
-                try self.write("(");
-
-                for (tuple.elements.items, 0..) |element, i| {
-                    try self.formatNode(element);
-
-                    if (i < tuple.elements.items.len - 1) {
-                        try self.write(", ");
-                    }
+            .program => |prog| {
+                for (prog.statements.items) |stmt| {
+                    try self.formatNode(stmt);
+                    try self.write("\n");
                 }
-
-                try self.write(")");
-            },
-            .doc_comment => |comment| {
-                try self.write("## ");
-                try self.write(comment.content);
-            },
-            .comment => |comment| {
-                try self.write("# ");
-                try self.write(comment.content);
-            },
-            else => {
-                // For now, skip other node types
-                std.debug.print("Node type: {any}\n", .{node.*});
             },
         }
     }
@@ -584,6 +785,32 @@ pub const Formatter = struct {
     fn writeNewlineAndIndent(self: *Formatter) !void {
         try self.write("\n");
         try self.writeIndent();
+    }
+
+    /// Takes a list of export items and returns a new sorted list alphabetically by name.
+    ///
+    /// Memory: Caller owns the returned ArrayList and must call deinit on it.
+    ///
+    /// Example input: `[filter, Maybe(..), map]`
+    /// Example output: `[Maybe(..), filter, map]`
+    fn sortExportItems(
+        allocator: std.mem.Allocator,
+        items: std.ArrayList(ast.ExportItem),
+    ) !std.ArrayList(ast.ExportItem) {
+        var result = std.ArrayList(ast.ExportItem).init(allocator);
+        errdefer result.deinit();
+
+        try result.appendSlice(items.items);
+
+        const customSort = struct {
+            fn lessThan(_: void, a: ast.ExportItem, b: ast.ExportItem) bool {
+                return std.mem.lessThan(u8, a.name, b.name);
+            }
+        }.lessThan;
+
+        std.mem.sort(ast.ExportItem, result.items, {}, customSort);
+
+        return result;
     }
 
     /// Takes a list of import items and returns a new sorted list where:
