@@ -27,30 +27,17 @@ pub const AstPrinter = struct {
     /// Print a complete AST node and its children.
     pub fn printNode(self: *AstPrinter, node: *const ast.Node) !void {
         switch (node.*) {
-            .char_literal => |lit| {
-                try self.writer.styled(term.Color.Bold, "CharacterLiteral");
-                try self.writer.plain("('");
-                try self.writer.styled(
-                    term.Color.Green,
-                    try std.fmt.allocPrint(
-                        self.allocator,
-                        "{u}",
-                        .{lit.value},
-                    ),
-                );
-                try self.writer.plain("')\n");
-            },
-            .float_literal => |lit| {
-                try self.writer.styled(term.Color.Bold, "FloatLiteral");
+            // Basic Literals
+            .comment => |comment| {
+                try self.writer.styled(term.Color.Bold, "Comment");
                 try self.writer.plain("(");
-                try self.writer.styled(
-                    term.Color.Green,
-                    try std.fmt.allocPrint(
-                        self.allocator,
-                        "{d}",
-                        .{lit.value},
-                    ),
-                );
+                try self.writer.styled(term.Color.Green, comment.content);
+                try self.writer.plain(")\n");
+            },
+            .doc_comment => |comment| {
+                try self.writer.styled(term.Color.Bold, "DocComment");
+                try self.writer.plain("(");
+                try self.writer.styled(term.Color.Green, comment.content);
                 try self.writer.plain(")\n");
             },
             .int_literal => |lit| {
@@ -67,20 +54,117 @@ pub const AstPrinter = struct {
                 try self.writer.styled(term.Color.Green, formatted);
                 try self.writer.plain(")\n");
             },
+            .float_literal => |lit| {
+                try self.writer.styled(term.Color.Bold, "FloatLiteral");
+                try self.writer.plain("(");
+                try self.writer.styled(
+                    term.Color.Green,
+                    try std.fmt.allocPrint(
+                        self.allocator,
+                        "{d}",
+                        .{lit.value},
+                    ),
+                );
+                try self.writer.plain(")\n");
+            },
+            .char_literal => |lit| {
+                try self.writer.styled(term.Color.Bold, "CharacterLiteral");
+                try self.writer.plain("('");
+                try self.writer.styled(
+                    term.Color.Green,
+                    try std.fmt.allocPrint(
+                        self.allocator,
+                        "{u}",
+                        .{lit.value},
+                    ),
+                );
+                try self.writer.plain("')\n");
+            },
             .str_literal => |lit| {
                 try self.writer.styled(term.Color.Bold, "StringLiteral");
                 try self.writer.plain("(\"");
                 try self.writer.styled(term.Color.Green, lit.value);
                 try self.writer.plain("\")\n");
             },
-            .list => {
-                try self.writer.styled(term.Color.Bold, "List");
+            .multiline_str_literal => |lit| {
+                try self.writer.styled(term.Color.Bold, "MultilineStringLiteral");
+                try self.writer.plain("(\"\"\"\n");
+                try self.writer.styled(term.Color.Green, lit.value);
+                try self.writer.plain("\n\"\"\")\n");
+            },
+
+            // Identifiers
+            .lower_identifier => |id| {
+                try self.writer.styled(term.Color.Bold, "LowerIdent");
                 try self.writer.plain("(");
-                try self.writer.styled(term.Color.Green, "type");
+                try self.writer.styled(term.Color.Magenta, id.name);
                 try self.writer.plain(")\n");
             },
-            .arithmetic_expr => |expr| {
-                try self.writer.styled(term.Color.Bold, "ArithmeticExpr");
+            .upper_identifier => |id| {
+                try self.writer.styled(term.Color.Bold, "UpperIdent");
+                try self.writer.plain("(");
+                try self.writer.styled(term.Color.Magenta, id.name);
+                try self.writer.plain(")\n");
+            },
+
+            // Basic Data Structures
+            .list => |list| {
+                try self.writer.styled(term.Color.Bold, "List");
+                try self.writer.styled(term.Color.Dim, " {\n");
+
+                self.indent_level += 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "elements: [\n");
+
+                self.indent_level += 1;
+
+                for (list.elements.items) |element| {
+                    try self.printIndent();
+                    try self.printNode(element);
+                }
+
+                self.indent_level -= 1;
+
+                try self.printIndent();
+                try self.writer.plain("]\n");
+
+                self.indent_level -= 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Dim, "}\n");
+            },
+            .tuple => |tuple| {
+                try self.writer.styled(term.Color.Bold, "Tuple");
+                try self.writer.styled(term.Color.Dim, " {\n");
+
+                self.indent_level += 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "elements: [\n");
+
+                self.indent_level += 1;
+
+                for (tuple.elements.items) |element| {
+                    try self.printIndent();
+                    try self.printNode(element);
+                }
+
+                self.indent_level -= 1;
+
+                try self.printIndent();
+                try self.writer.plain("]\n");
+
+                self.indent_level -= 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Dim, "}\n");
+            },
+
+            // Basic Expressions
+            .unary_expr => |expr| {
+                try self.printIndent();
+                try self.writer.styled(term.Color.Bold, "UnaryExpr");
                 try self.writer.styled(term.Color.Dim, " {\n");
 
                 self.indent_level += 1;
@@ -93,20 +177,16 @@ pub const AstPrinter = struct {
                 try self.writer.plain(")\n");
 
                 try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "left: ");
-                try self.printNode(expr.left);
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "right: ");
-                try self.printNode(expr.right);
+                try self.writer.styled(term.Color.Cyan, "operand: ");
+                try self.printNode(expr.operand);
 
                 self.indent_level -= 1;
 
                 try self.printIndent();
                 try self.writer.styled(term.Color.Dim, "}\n");
             },
-            .comparison_expr => |expr| {
-                try self.writer.styled(term.Color.Bold, "ComparisonExpr");
+            .arithmetic_expr => |expr| {
+                try self.writer.styled(term.Color.Bold, "ArithmeticExpr");
                 try self.writer.styled(term.Color.Dim, " {\n");
 
                 self.indent_level += 1;
@@ -158,9 +238,8 @@ pub const AstPrinter = struct {
                 try self.printIndent();
                 try self.writer.styled(term.Color.Dim, "}\n");
             },
-            .unary_expr => |expr| {
-                try self.printIndent();
-                try self.writer.styled(term.Color.Bold, "UnaryExpr");
+            .comparison_expr => |expr| {
+                try self.writer.styled(term.Color.Bold, "ComparisonExpr");
                 try self.writer.styled(term.Color.Dim, " {\n");
 
                 self.indent_level += 1;
@@ -173,106 +252,78 @@ pub const AstPrinter = struct {
                 try self.writer.plain(")\n");
 
                 try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "operand: ");
-                try self.printNode(expr.operand);
+                try self.writer.styled(term.Color.Cyan, "left: ");
+                try self.printNode(expr.left);
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "right: ");
+                try self.printNode(expr.right);
 
                 self.indent_level -= 1;
 
                 try self.printIndent();
                 try self.writer.styled(term.Color.Dim, "}\n");
             },
-            .lower_identifier => |id| {
-                try self.writer.styled(term.Color.Bold, "LowerIdent");
-                try self.writer.plain("(");
-                try self.writer.styled(term.Color.Magenta, id.name);
-                try self.writer.plain(")\n");
+
+            // Pattern Matching
+            .pattern => |pat| {
+                try self.printPattern(&pat);
             },
-            .upper_identifier => |id| {
-                try self.writer.styled(term.Color.Bold, "UpperIdent");
-                try self.writer.plain("(");
-                try self.writer.styled(term.Color.Magenta, id.name);
-                try self.writer.plain(")\n");
-            },
-            .program => |prog| {
-                try self.writer.styled(term.Color.Bold, "Program");
+            .match_expr => |expr| {
+                try self.writer.styled(term.Color.Bold, "MatchExpr");
                 try self.writer.styled(term.Color.Dim, " {\n");
 
                 self.indent_level += 1;
-
-                for (prog.statements.items) |stmt| {
-                    try self.printIndent();
-                    try self.printNode(stmt);
-                }
-
-                self.indent_level -= 1;
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Dim, "}\n");
-            },
-            .comment => |comment| {
-                try self.writer.styled(term.Color.Bold, "Comment");
-                try self.writer.plain("(");
-                try self.writer.styled(term.Color.Green, comment.content);
-                try self.writer.plain(")\n");
-            },
-            .doc_comment => |comment| {
-                try self.writer.styled(term.Color.Bold, "DocComment");
-                try self.writer.plain("(");
-                try self.writer.styled(term.Color.Green, comment.content);
-                try self.writer.plain(")\n");
-            },
-            .function_decl => |decl| {
-                try self.writer.styled(term.Color.Bold, "FunctionDecl");
-                try self.writer.styled(term.Color.Dim, " {\n");
-
-                self.indent_level += 1;
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "name: ");
-                try self.writer.styled(term.Color.Magenta, decl.name);
-                try self.writer.plain("\n");
-
-                if (decl.type_annotation) |type_annot| {
-                    try self.printIndent();
-                    try self.writer.styled(term.Color.Cyan, "type: ");
-                    try self.printNode(type_annot);
-                }
 
                 try self.printIndent();
                 try self.writer.styled(term.Color.Cyan, "value: ");
-                try self.printNode(decl.value);
-
-                self.indent_level -= 1;
+                try self.printNode(expr.value);
 
                 try self.printIndent();
-                try self.writer.styled(term.Color.Dim, "}\n");
-            },
-            .foreign_function_decl => |decl| {
-                try self.writer.styled(term.Color.Bold, "ForeignFunctionDecl");
-                try self.writer.styled(term.Color.Dim, " {\n");
+                try self.writer.styled(term.Color.Cyan, "cases: [\n");
 
                 self.indent_level += 1;
 
-                try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "name: ");
-                try self.writer.styled(term.Color.Magenta, decl.name);
-                try self.writer.plain("\n");
+                for (expr.cases.items) |case| {
+                    try self.printIndent();
+                    try self.writer.styled(term.Color.Bold, "Case");
+                    try self.writer.styled(term.Color.Dim, " {\n");
+
+                    self.indent_level += 1;
+
+                    try self.printIndent();
+                    try self.writer.styled(term.Color.Cyan, "pattern: ");
+                    try self.printPattern(case.pattern);
+
+                    if (case.guard) |guard| {
+                        try self.printIndent();
+                        try self.writer.styled(term.Color.Cyan, "guard: ");
+                        try self.printNode(guard.condition);
+                    }
+
+                    try self.printIndent();
+                    try self.writer.styled(term.Color.Cyan, "expression: ");
+                    try self.printNode(case.expression);
+
+                    self.indent_level -= 1;
+
+                    try self.printIndent();
+                    try self.writer.styled(term.Color.Dim, "}\n");
+                }
+
+                self.indent_level -= 1;
 
                 try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "external_name: ");
-                try self.writer.styled(term.Color.Green, decl.external_name);
-                try self.writer.plain("\n");
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "type: ");
-                try self.printNode(decl.type_annotation);
+                try self.writer.plain("]\n");
 
                 self.indent_level -= 1;
 
                 try self.printIndent();
                 try self.writer.styled(term.Color.Dim, "}\n");
             },
-            .function_type => |type_node| {
+
+            // Functions and Applications
+            .function_type => |ftype| {
                 try self.writer.styled(term.Color.Bold, "FunctionType");
                 try self.writer.styled(term.Color.Dim, " {\n");
 
@@ -283,7 +334,7 @@ pub const AstPrinter = struct {
 
                 self.indent_level += 1;
 
-                for (type_node.param_types.items) |param_type| {
+                for (ftype.param_types.items) |param_type| {
                     try self.printIndent();
                     try self.printNode(param_type);
                 }
@@ -326,6 +377,27 @@ pub const AstPrinter = struct {
                 try self.printIndent();
                 try self.writer.styled(term.Color.Dim, "}\n");
             },
+            .function_application => |expr| {
+                try self.writer.styled(term.Color.Bold, "FunctionApplication");
+                try self.writer.styled(term.Color.Dim, " {\n");
+
+                self.indent_level += 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "function: ");
+                try self.printNode(expr.function);
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "argument: ");
+                try self.printNode(expr.argument);
+
+                self.indent_level -= 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Dim, "}\n");
+            },
+
+            // Advanced Expressions
             .cons_expr => |expr| {
                 try self.writer.styled(term.Color.Bold, "ConsExpr");
                 try self.writer.styled(term.Color.Dim, " {\n");
@@ -339,25 +411,6 @@ pub const AstPrinter = struct {
                 try self.printIndent();
                 try self.writer.styled(term.Color.Cyan, "tail: ");
                 try self.printNode(expr.tail);
-
-                self.indent_level -= 1;
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Dim, "}\n");
-            },
-            .list_concat_expr => |expr| {
-                try self.writer.styled(term.Color.Bold, "ListConcatExpr");
-                try self.writer.styled(term.Color.Dim, " {\n");
-
-                self.indent_level += 1;
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "left: ");
-                try self.printNode(expr.left);
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "right: ");
-                try self.printNode(expr.right);
 
                 self.indent_level -= 1;
 
@@ -383,38 +436,107 @@ pub const AstPrinter = struct {
                 try self.printIndent();
                 try self.writer.styled(term.Color.Dim, "}\n");
             },
-            .type_alias => |decl| {
-                try self.writer.styled(term.Color.Bold, "TypeAlias");
+            .list_concat_expr => |expr| {
+                try self.writer.styled(term.Color.Bold, "ListConcatExpr");
                 try self.writer.styled(term.Color.Dim, " {\n");
 
                 self.indent_level += 1;
 
                 try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "name: ");
-                try self.writer.styled(term.Color.Magenta, decl.name);
-                try self.writer.plain("\n");
+                try self.writer.styled(term.Color.Cyan, "left: ");
+                try self.printNode(expr.left);
 
                 try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "type_params: [");
-
-                for (decl.type_params.items, 0..) |param, i| {
-                    if (i > 0) {
-                        try self.writer.plain(", ");
-                    }
-
-                    try self.writer.styled(term.Color.Magenta, param);
-                }
-
-                try self.writer.plain("]\n");
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "value: ");
-                try self.printNode(decl.value);
+                try self.writer.styled(term.Color.Cyan, "right: ");
+                try self.printNode(expr.right);
 
                 self.indent_level -= 1;
 
                 try self.printIndent();
                 try self.writer.styled(term.Color.Dim, "}\n");
+            },
+            .composition_expr => |expr| {
+                try self.writer.styled(term.Color.Bold, "CompositionExpr");
+                try self.writer.styled(term.Color.Dim, " {\n");
+
+                self.indent_level += 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "operator: ");
+                try self.writer.styled(term.Color.Yellow, @tagName(expr.operator.kind));
+                try self.writer.plain(" (");
+                try self.writer.styled(term.Color.Yellow, expr.operator.lexeme);
+                try self.writer.plain(")\n");
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "first: ");
+                try self.printNode(expr.first);
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "second: ");
+                try self.printNode(expr.second);
+
+                self.indent_level -= 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Dim, "}\n");
+            },
+            .pipe_expr => |expr| {
+                try self.writer.styled(term.Color.Bold, "PipeExpr");
+                try self.writer.styled(term.Color.Dim, " {\n");
+
+                self.indent_level += 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "operator: ");
+                try self.writer.styled(term.Color.Yellow, @tagName(expr.operator.kind));
+                try self.writer.plain(" (");
+                try self.writer.styled(term.Color.Yellow, expr.operator.lexeme);
+                try self.writer.plain(")\n");
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "value: ");
+                try self.printNode(expr.value);
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "func: ");
+                try self.printNode(expr.func);
+
+                self.indent_level -= 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Dim, "}\n");
+            },
+
+            // Control Flow
+            .if_then_else_stmt => |stmt| {
+                try self.writer.styled(term.Color.Bold, "IfThenElse");
+                try self.writer.styled(term.Color.Dim, " {\n");
+
+                self.indent_level += 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "condition: ");
+                try self.printNode(stmt.condition);
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "then: ");
+                try self.printNode(stmt.then_branch);
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "else: ");
+                try self.printNode(stmt.else_branch);
+
+                self.indent_level -= 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Dim, "}\n");
+            },
+
+            // Type System
+            .typed_hole => {
+                try self.writer.styled(term.Color.Bold, "TypedHole");
+                try self.writer.plain("(?)\n");
             },
             .type_application => |app| {
                 try self.writer.styled(term.Color.Bold, "TypeApplication");
@@ -446,7 +568,40 @@ pub const AstPrinter = struct {
                 try self.printIndent();
                 try self.writer.styled(term.Color.Dim, "}\n");
             },
-            .variant_type => |decl| {
+            .type_alias => |alias| {
+                try self.writer.styled(term.Color.Bold, "TypeAlias");
+                try self.writer.styled(term.Color.Dim, " {\n");
+
+                self.indent_level += 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "name: ");
+                try self.writer.styled(term.Color.Magenta, alias.name);
+                try self.writer.plain("\n");
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "type_params: [");
+
+                for (alias.type_params.items, 0..) |param, i| {
+                    if (i > 0) {
+                        try self.writer.plain(", ");
+                    }
+
+                    try self.writer.styled(term.Color.Magenta, param);
+                }
+
+                try self.writer.plain("]\n");
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "value: ");
+                try self.printNode(alias.value);
+
+                self.indent_level -= 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Dim, "}\n");
+            },
+            .variant_type => |vtype| {
                 try self.writer.styled(term.Color.Bold, "VariantType");
                 try self.writer.styled(term.Color.Dim, " {\n");
 
@@ -454,13 +609,13 @@ pub const AstPrinter = struct {
 
                 try self.printIndent();
                 try self.writer.styled(term.Color.Cyan, "name: ");
-                try self.writer.styled(term.Color.Magenta, decl.name);
+                try self.writer.styled(term.Color.Magenta, vtype.name);
                 try self.writer.plain("\n");
 
                 try self.printIndent();
                 try self.writer.styled(term.Color.Cyan, "type_params: [");
 
-                for (decl.type_params.items, 0..) |param, i| {
+                for (vtype.type_params.items, 0..) |param, i| {
                     if (i > 0) {
                         try self.writer.plain(", ");
                     }
@@ -475,7 +630,7 @@ pub const AstPrinter = struct {
 
                 self.indent_level += 1;
 
-                for (decl.constructors.items) |constructor| {
+                for (vtype.constructors.items) |constructor| {
                     try self.printIndent();
                     try self.writer.styled(term.Color.Bold, "Constructor");
                     try self.writer.styled(term.Color.Dim, " {\n");
@@ -518,7 +673,7 @@ pub const AstPrinter = struct {
                 try self.printIndent();
                 try self.writer.styled(term.Color.Dim, "}\n");
             },
-            .record_type => |decl| {
+            .record_type => |rtype| {
                 try self.writer.styled(term.Color.Bold, "RecordType");
                 try self.writer.styled(term.Color.Dim, " {\n");
 
@@ -526,13 +681,13 @@ pub const AstPrinter = struct {
 
                 try self.printIndent();
                 try self.writer.styled(term.Color.Cyan, "name: ");
-                try self.writer.styled(term.Color.Magenta, decl.name);
+                try self.writer.styled(term.Color.Magenta, rtype.name);
                 try self.writer.plain("\n");
 
                 try self.printIndent();
                 try self.writer.styled(term.Color.Cyan, "type_params: [");
 
-                for (decl.type_params.items, 0..) |param, i| {
+                for (rtype.type_params.items, 0..) |param, i| {
                     if (i > 0) {
                         try self.writer.plain(", ");
                     }
@@ -547,7 +702,7 @@ pub const AstPrinter = struct {
 
                 self.indent_level += 1;
 
-                for (decl.fields.items) |field| {
+                for (rtype.fields.items) |field| {
                     try self.printIndent();
                     try self.writer.styled(term.Color.Bold, "Field");
                     try self.writer.styled(term.Color.Dim, " {\n");
@@ -579,38 +734,8 @@ pub const AstPrinter = struct {
                 try self.printIndent();
                 try self.writer.styled(term.Color.Dim, "}\n");
             },
-            .include => |inc| {
-                try self.writer.styled(term.Color.Bold, "Include");
-                try self.writer.styled(term.Color.Dim, " {\n");
 
-                self.indent_level += 1;
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "path: [\n");
-
-                self.indent_level += 1;
-
-                for (inc.path.segments.items, 0..) |segment, i| {
-                    try self.printIndent();
-
-                    if (i > 0) {
-                        try self.writer.plain(".");
-                    }
-
-                    try self.writer.styled(term.Color.Magenta, segment);
-                    try self.writer.plain("\n");
-                }
-
-                self.indent_level -= 1;
-
-                try self.printIndent();
-                try self.writer.plain("]\n");
-
-                self.indent_level -= 1;
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Dim, "}\n");
-            },
+            // Module System
             .module_path => |path| {
                 try self.writer.styled(term.Color.Bold, "ModulePath");
                 try self.writer.styled(term.Color.Dim, " {\n");
@@ -635,23 +760,51 @@ pub const AstPrinter = struct {
                 try self.printIndent();
                 try self.writer.styled(term.Color.Dim, "}\n");
             },
-            .if_then_else_stmt => |stmt| {
-                try self.writer.styled(term.Color.Bold, "IfThenElse");
+            .export_spec => |spec| {
+                try self.writer.styled(term.Color.Bold, "ExportSpec");
                 try self.writer.styled(term.Color.Dim, " {\n");
 
                 self.indent_level += 1;
 
                 try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "condition: ");
-                try self.printNode(stmt.condition);
+                try self.writer.styled(term.Color.Cyan, "exposing_all: ");
+                try self.writer.styled(term.Color.Yellow, if (spec.exposing_all) "true" else "false");
+                try self.writer.plain("\n");
 
-                try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "then: ");
-                try self.printNode(stmt.then_branch);
+                if (spec.items) |items| {
+                    try self.printIndent();
+                    try self.writer.styled(term.Color.Cyan, "items: [\n");
 
-                try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "else: ");
-                try self.printNode(stmt.else_branch);
+                    self.indent_level += 1;
+
+                    for (items.items) |item| {
+                        try self.printIndent();
+                        try self.writer.styled(term.Color.Bold, "ExportItem");
+                        try self.writer.styled(term.Color.Dim, " {\n");
+
+                        self.indent_level += 1;
+
+                        try self.printIndent();
+                        try self.writer.styled(term.Color.Cyan, "name: ");
+                        try self.writer.styled(term.Color.Magenta, item.name);
+                        try self.writer.plain("\n");
+
+                        try self.printIndent();
+                        try self.writer.styled(term.Color.Cyan, "expose_constructors: ");
+                        try self.writer.styled(term.Color.Yellow, if (item.expose_constructors) "true" else "false");
+                        try self.writer.plain("\n");
+
+                        self.indent_level -= 1;
+
+                        try self.printIndent();
+                        try self.writer.styled(term.Color.Dim, "}\n");
+                    }
+
+                    self.indent_level -= 1;
+
+                    try self.printIndent();
+                    try self.writer.plain("]\n");
+                }
 
                 self.indent_level -= 1;
 
@@ -787,51 +940,85 @@ pub const AstPrinter = struct {
                 try self.printIndent();
                 try self.writer.styled(term.Color.Dim, "}\n");
             },
-            .export_spec => |spec| {
-                try self.writer.styled(term.Color.Bold, "ExportSpec");
+            .include => |inc| {
+                try self.writer.styled(term.Color.Bold, "Include");
                 try self.writer.styled(term.Color.Dim, " {\n");
 
                 self.indent_level += 1;
 
                 try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "exposing_all: ");
-                try self.writer.styled(term.Color.Yellow, if (spec.exposing_all) "true" else "false");
-                try self.writer.plain("\n");
+                try self.writer.styled(term.Color.Cyan, "path: [\n");
 
-                if (spec.items) |items| {
+                self.indent_level += 1;
+
+                for (inc.path.segments.items, 0..) |segment, i| {
                     try self.printIndent();
-                    try self.writer.styled(term.Color.Cyan, "items: [\n");
 
-                    self.indent_level += 1;
-
-                    for (items.items) |item| {
-                        try self.printIndent();
-                        try self.writer.styled(term.Color.Bold, "ExportItem");
-                        try self.writer.styled(term.Color.Dim, " {\n");
-
-                        self.indent_level += 1;
-
-                        try self.printIndent();
-                        try self.writer.styled(term.Color.Cyan, "name: ");
-                        try self.writer.styled(term.Color.Magenta, item.name);
-                        try self.writer.plain("\n");
-
-                        try self.printIndent();
-                        try self.writer.styled(term.Color.Cyan, "expose_constructors: ");
-                        try self.writer.styled(term.Color.Yellow, if (item.expose_constructors) "true" else "false");
-                        try self.writer.plain("\n");
-
-                        self.indent_level -= 1;
-
-                        try self.printIndent();
-                        try self.writer.styled(term.Color.Dim, "}\n");
+                    if (i > 0) {
+                        try self.writer.plain(".");
                     }
 
-                    self.indent_level -= 1;
-
-                    try self.printIndent();
-                    try self.writer.plain("]\n");
+                    try self.writer.styled(term.Color.Magenta, segment);
+                    try self.writer.plain("\n");
                 }
+
+                self.indent_level -= 1;
+
+                try self.printIndent();
+                try self.writer.plain("]\n");
+
+                self.indent_level -= 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Dim, "}\n");
+            },
+
+            // Top-Level Declarations
+            .function_decl => |decl| {
+                try self.writer.styled(term.Color.Bold, "FunctionDecl");
+                try self.writer.styled(term.Color.Dim, " {\n");
+
+                self.indent_level += 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "name: ");
+                try self.writer.styled(term.Color.Magenta, decl.name);
+                try self.writer.plain("\n");
+
+                if (decl.type_annotation) |type_annot| {
+                    try self.printIndent();
+                    try self.writer.styled(term.Color.Cyan, "type: ");
+                    try self.printNode(type_annot);
+                }
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "value: ");
+                try self.printNode(decl.value);
+
+                self.indent_level -= 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Dim, "}\n");
+            },
+            .foreign_function_decl => |decl| {
+                try self.writer.styled(term.Color.Bold, "ForeignFunctionDecl");
+                try self.writer.styled(term.Color.Dim, " {\n");
+
+                self.indent_level += 1;
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "name: ");
+                try self.writer.styled(term.Color.Magenta, decl.name);
+                try self.writer.plain("\n");
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "external_name: ");
+                try self.writer.styled(term.Color.Green, decl.external_name);
+                try self.writer.plain("\n");
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "type: ");
+                try self.printNode(decl.type_annotation);
 
                 self.indent_level -= 1;
 
@@ -881,89 +1068,21 @@ pub const AstPrinter = struct {
                 try self.printIndent();
                 try self.writer.styled(term.Color.Dim, "}\n");
             },
-            .match_expr => |expr| {
-                try self.writer.styled(term.Color.Bold, "MatchExpr");
+            .program => |prog| {
+                try self.writer.styled(term.Color.Bold, "Program");
                 try self.writer.styled(term.Color.Dim, " {\n");
 
                 self.indent_level += 1;
 
-                try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "value: ");
-                try self.printNode(expr.value);
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "cases: [\n");
-
-                self.indent_level += 1;
-
-                for (expr.cases.items) |case| {
+                for (prog.statements.items) |stmt| {
                     try self.printIndent();
-                    try self.writer.styled(term.Color.Bold, "Case");
-                    try self.writer.styled(term.Color.Dim, " {\n");
-
-                    self.indent_level += 1;
-
-                    try self.printIndent();
-                    try self.writer.styled(term.Color.Cyan, "pattern: ");
-                    try self.printPattern(case.pattern);
-
-                    if (case.guard) |guard| {
-                        try self.printIndent();
-                        try self.writer.styled(term.Color.Cyan, "guard: ");
-                        try self.printNode(guard.condition);
-                    }
-
-                    try self.printIndent();
-                    try self.writer.styled(term.Color.Cyan, "expression: ");
-                    try self.printNode(case.expression);
-
-                    self.indent_level -= 1;
-
-                    try self.printIndent();
-                    try self.writer.styled(term.Color.Dim, "}\n");
+                    try self.printNode(stmt);
                 }
 
                 self.indent_level -= 1;
 
                 try self.printIndent();
-                try self.writer.plain("]\n");
-
-                self.indent_level -= 1;
-
-                try self.printIndent();
                 try self.writer.styled(term.Color.Dim, "}\n");
-            },
-            .pipe_expr => |expr| {
-                try self.writer.styled(term.Color.Bold, "PipeExpr");
-                try self.writer.styled(term.Color.Dim, " {\n");
-
-                self.indent_level += 1;
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "operator: ");
-                try self.writer.styled(term.Color.Yellow, @tagName(expr.operator.kind));
-                try self.writer.plain(" (");
-                try self.writer.styled(term.Color.Yellow, expr.operator.lexeme);
-                try self.writer.plain(")\n");
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "value: ");
-                try self.printNode(expr.value);
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "func: ");
-                try self.printNode(expr.func);
-
-                self.indent_level -= 1;
-
-                try self.printIndent();
-                try self.writer.styled(term.Color.Dim, "}\n");
-            },
-            else => {
-                try self.writer.styled(term.Color.Bold, "Node");
-                try self.writer.plain("(");
-                try self.writer.styled(term.Color.Red, @tagName(node.*));
-                try self.writer.plain(")\n");
             },
         }
     }
