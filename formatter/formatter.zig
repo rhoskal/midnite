@@ -534,10 +534,6 @@ pub const Formatter = struct {
                     var sorted = try sortExportItems(items.allocator, items);
                     defer sorted.deinit();
 
-                    if (sorted.items.len == 0) {
-                        return error.InvalidEmptyExport;
-                    }
-
                     if (sorted.items.len <= 2) {
                         try self.write("(");
                         for (sorted.items, 0..) |item, i| {
@@ -577,8 +573,6 @@ pub const Formatter = struct {
                         try self.writeIndent();
                         try self.write(")");
                     }
-                } else {
-                    return error.MissingExportItems;
                 }
             },
             .import_spec => |spec| {
