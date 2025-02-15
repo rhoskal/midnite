@@ -95,6 +95,12 @@ pub const StrLiteralNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn deinit(self: *StrLiteralNode, allocator: std.mem.Allocator) void {
+        allocator.free(self.value);
+
+        allocator.destroy(self);
+    }
 };
 
 /// Represents a multiline string literal value.
@@ -110,6 +116,12 @@ pub const MultilineStrLiteralNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn deinit(self: *MultilineStrLiteralNode, allocator: std.mem.Allocator) void {
+        allocator.free(self.value);
+
+        allocator.destroy(self);
+    }
 };
 
 //==========================================================================
@@ -841,13 +853,13 @@ pub const ProgramNode = struct {
 
 pub const Node = union(enum) {
     // Basic Literals
+    comment: *CommentNode,
+    doc_comment: *DocCommentNode,
     int_literal: IntLiteralNode,
     float_literal: FloatLiteralNode,
     char_literal: CharLiteralNode,
-    str_literal: StrLiteralNode,
-    multiline_str_literal: MultilineStrLiteralNode,
-    comment: *CommentNode,
-    doc_comment: *DocCommentNode,
+    str_literal: *StrLiteralNode,
+    multiline_str_literal: *MultilineStrLiteralNode,
 
     // Identifiers
     lower_identifier: LowerIdentifierNode,
@@ -910,23 +922,13 @@ pub const Node = union(enum) {
     pub fn deinit(self: *Node, allocator: std.mem.Allocator) void {
         switch (self.*) {
             // Basic Literals
-            .int_literal => {
-                // do nothing
-            },
-            .float_literal => {
-                // do nothing
-            },
-            .char_literal => {
-                // do nothing
-            },
-            .str_literal => |lit| {
-                allocator.free(lit.value);
-            },
-            .multiline_str_literal => |lit| {
-                allocator.free(lit.value);
-            },
             .comment => |comment| comment.deinit(allocator),
             .doc_comment => |comment| comment.deinit(allocator),
+            .int_literal => {}, // do nothing
+            .float_literal => {}, // do nothing
+            .char_literal => {}, // do nothing
+            .str_literal => |lit| lit.deinit(allocator),
+            .multiline_str_literal => |lit| lit.deinit(allocator),
 
             // Identifiers
             .lower_identifier => {
@@ -1383,15 +1385,15 @@ test "[IntLiteralNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const literal = try allocator.create(Node);
-    defer {
-        literal.deinit(allocator);
-        allocator.destroy(literal);
-    }
-
     const value = 42;
 
-    literal.* = .{
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
         .int_literal = .{
             .value = value,
             .token = lexer.Token{
@@ -1408,10 +1410,10 @@ test "[IntLiteralNode]" {
 
     // Assertions
     // Verify the node is an integer literal
-    try testing.expect(literal.* == .int_literal);
+    try testing.expect(node.* == .int_literal);
 
     // Verify the content
-    try testing.expect(literal.int_literal.value == value);
+    try testing.expect(node.int_literal.value == value);
 }
 
 test "[FloatLiteralNode]" {
@@ -1423,15 +1425,15 @@ test "[FloatLiteralNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const literal = try allocator.create(Node);
-    defer {
-        literal.deinit(allocator);
-        allocator.destroy(literal);
-    }
-
     const value = 42.0;
 
-    literal.* = .{
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
         .float_literal = .{
             .value = value,
             .token = lexer.Token{
@@ -1448,10 +1450,10 @@ test "[FloatLiteralNode]" {
 
     // Assertions
     // Verify the node is a float literal
-    try testing.expect(literal.* == .float_literal);
+    try testing.expect(node.* == .float_literal);
 
     // Verify the content
-    try testing.expect(literal.float_literal.value == value);
+    try testing.expect(node.float_literal.value == value);
 }
 
 test "[CharLiteralNode]" {
@@ -1463,15 +1465,15 @@ test "[CharLiteralNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const literal = try allocator.create(Node);
-    defer {
-        literal.deinit(allocator);
-        allocator.destroy(literal);
-    }
-
     const value = 'a';
 
-    literal.* = .{
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{
         .char_literal = .{
             .value = value,
             .token = lexer.Token{
@@ -1488,10 +1490,10 @@ test "[CharLiteralNode]" {
 
     // Assertions
     // Verify the node is a character literal
-    try testing.expect(literal.* == .char_literal);
+    try testing.expect(node.* == .char_literal);
 
     // Verify the content
-    try testing.expect(literal.char_literal.value == value);
+    try testing.expect(node.char_literal.value == value);
 }
 
 test "[StrLiteralNode]" {
@@ -1503,35 +1505,36 @@ test "[StrLiteralNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const literal = try allocator.create(Node);
-    defer {
-        literal.deinit(allocator);
-        allocator.destroy(literal);
-    }
-
     const value = "foo";
 
-    literal.* = .{
-        .str_literal = .{
-            .value = try allocator.dupe(u8, value),
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .String },
-                .lexeme = "\"",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 2 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
+    const literal_node = try allocator.create(StrLiteralNode);
+    literal_node.* = .{
+        .value = try allocator.dupe(u8, value),
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .literal = .String },
+            .lexeme = "\"",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 2 },
+                .src = .{ .line = 1, .col = 1 },
             },
         },
     };
 
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .str_literal = literal_node };
+
     // Assertions
     // Verify the node is a string literal
-    try testing.expect(literal.* == .str_literal);
+    try testing.expect(node.* == .str_literal);
 
     // Verify the content
-    try testing.expectEqualStrings(value, literal.str_literal.value);
+    try testing.expectEqualStrings(value, node.str_literal.value);
 }
 
 test "[MultilineStrLiteralNode]" {
@@ -1546,39 +1549,39 @@ test "[MultilineStrLiteralNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const literal = try allocator.create(Node);
-    defer {
-        literal.deinit(allocator);
-        allocator.destroy(literal);
-    }
-
     const value =
         \\first line
         \\second line
         \\third line
     ;
-
-    literal.* = .{
-        .str_literal = .{
-            .value = try allocator.dupe(u8, value),
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .String },
-                .lexeme = "\"\"\"",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 38 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
+    const literal_node = try allocator.create(MultilineStrLiteralNode);
+    literal_node.* = .{
+        .value = try allocator.dupe(u8, value),
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .literal = .String },
+            .lexeme = "\"\"\"",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 38 },
+                .src = .{ .line = 1, .col = 1 },
             },
         },
     };
 
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .multiline_str_literal = literal_node };
+
     // Assertions
     // Verify the node is a string literal
-    try testing.expect(literal.* == .str_literal);
+    try testing.expect(node.* == .multiline_str_literal);
 
     // Verify the content
-    try testing.expectEqualStrings(value, literal.str_literal.value);
+    try testing.expectEqualStrings(value, node.multiline_str_literal.value);
 }
 
 test "[LowerIdentifierNode]" {
