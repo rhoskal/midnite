@@ -135,6 +135,12 @@ pub const LowerIdentifierNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn deinit(self: *LowerIdentifierNode, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+
+        allocator.destroy(self);
+    }
 };
 
 /// Represents an uppercase identifier reference (type names, type constructors, etc).
@@ -144,6 +150,12 @@ pub const UpperIdentifierNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn deinit(self: *UpperIdentifierNode, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+
+        allocator.destroy(self);
+    }
 };
 
 //==========================================================================
@@ -862,8 +874,8 @@ pub const Node = union(enum) {
     multiline_str_literal: *MultilineStrLiteralNode,
 
     // Identifiers
-    lower_identifier: LowerIdentifierNode,
-    upper_identifier: UpperIdentifierNode,
+    lower_identifier: *LowerIdentifierNode,
+    upper_identifier: *UpperIdentifierNode,
 
     // Basic Data Structures
     list: ListNode,
@@ -931,12 +943,8 @@ pub const Node = union(enum) {
             .multiline_str_literal => |lit| lit.deinit(allocator),
 
             // Identifiers
-            .lower_identifier => {
-                // do nothing
-            },
-            .upper_identifier => {
-                // do nothing
-            },
+            .lower_identifier => |ident| ident.deinit(allocator),
+            .upper_identifier => |ident| ident.deinit(allocator),
 
             // Basic Data Structures
             .list => |*list| {
@@ -1585,7 +1593,7 @@ test "[MultilineStrLiteralNode]" {
 }
 
 test "[LowerIdentifierNode]" {
-    // Test input: myVariable
+    // Test input: my_variable
 
     // Setup
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -1593,39 +1601,42 @@ test "[LowerIdentifierNode]" {
     const allocator = gpa.allocator();
 
     // Action
+    const name = "my_variable";
+
+    const ident_node = try allocator.create(LowerIdentifierNode);
+    ident_node.* = .{
+        .name = try allocator.dupe(u8, name),
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .identifier = .Lower },
+            .lexeme = name,
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 10 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
     const node = try allocator.create(Node);
     defer {
         node.deinit(allocator);
         allocator.destroy(node);
     }
 
-    node.* = .{
-        .lower_identifier = .{
-            .name = "myVariable",
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .identifier = .Lower },
-                .lexeme = "myVariable",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 10 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
-            },
-        },
-    };
+    node.* = .{ .lower_identifier = ident_node };
 
     // Assertions
     // Verify the node is a lower identifier
     try testing.expect(node.* == .lower_identifier);
 
     // Verify the name of the identifier
-    try testing.expectEqualStrings("myVariable", node.lower_identifier.name);
+    try testing.expectEqualStrings(name, node.lower_identifier.name);
 
     // Verify the token kind is a lower identifier
     try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, node.lower_identifier.token.kind);
 
     // Verify the lexeme matches the name
-    try testing.expectEqualStrings("myVariable", node.lower_identifier.token.lexeme);
+    try testing.expectEqualStrings(name, node.lower_identifier.token.lexeme);
 }
 
 test "[UpperIdentifierNode]" {
@@ -1637,39 +1648,42 @@ test "[UpperIdentifierNode]" {
     const allocator = gpa.allocator();
 
     // Action
+    const name = "TypeName";
+
+    const ident_node = try allocator.create(UpperIdentifierNode);
+    ident_node.* = .{
+        .name = try allocator.dupe(u8, name),
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .identifier = .Upper },
+            .lexeme = name,
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 8 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
     const node = try allocator.create(Node);
     defer {
         node.deinit(allocator);
         allocator.destroy(node);
     }
 
-    node.* = .{
-        .upper_identifier = .{
-            .name = "TypeName",
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .identifier = .Upper },
-                .lexeme = "TypeName",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 8 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
-            },
-        },
-    };
+    node.* = .{ .upper_identifier = ident_node };
 
     // Assertions
     // Verify the node is an upper identifier
     try testing.expect(node.* == .upper_identifier);
 
     // Verify the name of the identifier
-    try testing.expectEqualStrings("TypeName", node.upper_identifier.name);
+    try testing.expectEqualStrings(name, node.upper_identifier.name);
 
     // Verify the token kind is an upper identifier
     try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, node.upper_identifier.token.kind);
 
     // Verify the lexeme matches the name
-    try testing.expectEqualStrings("TypeName", node.upper_identifier.token.lexeme);
+    try testing.expectEqualStrings(name, node.upper_identifier.token.lexeme);
 }
 
 test "[ListNode]" {
