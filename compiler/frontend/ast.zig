@@ -16,6 +16,12 @@ pub const CommentNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn deinit(self: *CommentNode, allocator: std.mem.Allocator) void {
+        allocator.free(self.content);
+
+        allocator.destroy(self);
+    }
 };
 
 /// Represents a documentation comment that will be processed as markdown.
@@ -28,6 +34,12 @@ pub const DocCommentNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn deinit(self: *DocCommentNode, allocator: std.mem.Allocator) void {
+        allocator.free(self.content);
+
+        allocator.destroy(self);
+    }
 };
 
 /// Represents a literal integer value.
@@ -829,13 +841,13 @@ pub const ProgramNode = struct {
 
 pub const Node = union(enum) {
     // Basic Literals
-    comment: CommentNode,
-    doc_comment: DocCommentNode,
     int_literal: IntLiteralNode,
     float_literal: FloatLiteralNode,
     char_literal: CharLiteralNode,
     str_literal: StrLiteralNode,
     multiline_str_literal: MultilineStrLiteralNode,
+    comment: *CommentNode,
+    doc_comment: *DocCommentNode,
 
     // Identifiers
     lower_identifier: LowerIdentifierNode,
@@ -898,12 +910,6 @@ pub const Node = union(enum) {
     pub fn deinit(self: *Node, allocator: std.mem.Allocator) void {
         switch (self.*) {
             // Basic Literals
-            .comment => |comment| {
-                allocator.free(comment.content);
-            },
-            .doc_comment => |comment| {
-                allocator.free(comment.content);
-            },
             .int_literal => {
                 // do nothing
             },
@@ -919,6 +925,8 @@ pub const Node = union(enum) {
             .multiline_str_literal => |lit| {
                 allocator.free(lit.value);
             },
+            .comment => |comment| comment.deinit(allocator),
+            .doc_comment => |comment| comment.deinit(allocator),
 
             // Identifiers
             .lower_identifier => {
@@ -1293,35 +1301,36 @@ test "[CommentNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const regular_comment = try allocator.create(Node);
-    defer {
-        regular_comment.deinit(allocator);
-        allocator.destroy(regular_comment);
-    }
-
     const content = "This is a comment";
 
-    regular_comment.* = .{
-        .comment = .{
-            .content = try allocator.dupe(u8, content),
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .comment = .Regular },
-                .lexeme = "#",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 18 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
+    const comment_node = try allocator.create(CommentNode);
+    comment_node.* = .{
+        .content = try allocator.dupe(u8, content),
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .comment = .Regular },
+            .lexeme = "#",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 18 },
+                .src = .{ .line = 1, .col = 1 },
             },
         },
     };
 
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .comment = comment_node };
+
     // Assertions
     // Verify the node is a regular comment
-    try testing.expect(regular_comment.* == .comment);
+    try testing.expect(node.* == .comment);
 
     // Verify the content
-    try testing.expectEqualStrings(content, regular_comment.comment.content);
+    try testing.expectEqualStrings(content, node.comment.content);
 }
 
 test "[DocCommentNode]" {
@@ -1333,35 +1342,36 @@ test "[DocCommentNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const doc_comment = try allocator.create(Node);
-    defer {
-        doc_comment.deinit(allocator);
-        allocator.destroy(doc_comment);
-    }
-
     const content = "This is a doc comment";
 
-    doc_comment.* = .{
-        .doc_comment = .{
-            .content = try allocator.dupe(u8, content),
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .comment = .Doc },
-                .lexeme = "##",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 23 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
+    const comment_node = try allocator.create(DocCommentNode);
+    comment_node.* = .{
+        .content = try allocator.dupe(u8, content),
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .comment = .Doc },
+            .lexeme = "##",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 23 },
+                .src = .{ .line = 1, .col = 1 },
             },
         },
     };
 
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .doc_comment = comment_node };
+
     // Assertions
     // Verify the node is a doc comment
-    try testing.expect(doc_comment.* == .doc_comment);
+    try testing.expect(node.* == .doc_comment);
 
     // Verify the content
-    try testing.expectEqualStrings(content, doc_comment.doc_comment.content);
+    try testing.expectEqualStrings(content, node.doc_comment.content);
 }
 
 test "[IntLiteralNode]" {
