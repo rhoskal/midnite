@@ -17,7 +17,11 @@ pub const CommentNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, content: []const u8, token: lexer.Token) !*CommentNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        content: []const u8,
+        token: lexer.Token,
+    ) !*CommentNode {
         const node = try allocator.create(CommentNode);
 
         node.* = .{
@@ -46,7 +50,11 @@ pub const DocCommentNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, content: []const u8, token: lexer.Token) !*DocCommentNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        content: []const u8,
+        token: lexer.Token,
+    ) !*DocCommentNode {
         const node = try allocator.create(DocCommentNode);
 
         node.* = .{
@@ -139,7 +147,11 @@ pub const StrLiteralNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, value: []const u8, token: lexer.Token) !*StrLiteralNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        value: []const u8,
+        token: lexer.Token,
+    ) !*StrLiteralNode {
         const node = try allocator.create(StrLiteralNode);
 
         node.* = .{
@@ -171,7 +183,11 @@ pub const MultilineStrLiteralNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, value: []const u8, token: lexer.Token) !*MultilineStrLiteralNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        value: []const u8,
+        token: lexer.Token,
+    ) !*MultilineStrLiteralNode {
         const node = try allocator.create(MultilineStrLiteralNode);
 
         node.* = .{
@@ -201,7 +217,11 @@ pub const LowerIdentifierNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, name: []const u8, token: lexer.Token) !*LowerIdentifierNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        name: []const u8,
+        token: lexer.Token,
+    ) !*LowerIdentifierNode {
         const node = try allocator.create(LowerIdentifierNode);
 
         node.* = .{
@@ -227,7 +247,11 @@ pub const UpperIdentifierNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, name: []const u8, token: lexer.Token) !*UpperIdentifierNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        name: []const u8,
+        token: lexer.Token,
+    ) !*UpperIdentifierNode {
         const node = try allocator.create(UpperIdentifierNode);
 
         node.* = .{
@@ -262,7 +286,11 @@ pub const ListNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, elements: std.ArrayList(*Node), token: lexer.Token) !*ListNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        elements: std.ArrayList(*Node),
+        token: lexer.Token,
+    ) !*ListNode {
         const node = try allocator.create(ListNode);
 
         node.* = .{
@@ -299,7 +327,11 @@ pub const TupleNode = struct {
     /// The token representing the start of this tuple.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, elements: std.ArrayList(*Node), token: lexer.Token) !*TupleNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        elements: std.ArrayList(*Node),
+        token: lexer.Token,
+    ) !*TupleNode {
         const node = try allocator.create(TupleNode);
 
         node.* = .{
@@ -337,7 +369,11 @@ pub const UnaryExprNode = struct {
     /// The token representing the operator.
     operator: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, operand: *Node, operator: lexer.Token) !*UnaryExprNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        operand: *Node,
+        operator: lexer.Token,
+    ) !*UnaryExprNode {
         const node = try allocator.create(UnaryExprNode);
 
         node.* = .{
@@ -366,7 +402,12 @@ pub const BinaryOp = struct {
     /// The token representing the operator.
     operator: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, left: *Node, right: *Node, operator: lexer.Token) !*BinaryOp {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        left: *Node,
+        right: *Node,
+        operator: lexer.Token,
+    ) !*BinaryOp {
         const node = try allocator.create(BinaryOp);
 
         node.* = .{
@@ -438,7 +479,11 @@ pub const PatternNode = union(enum) {
         /// The token representing the start of the list pattern
         token: lexer.Token,
 
-        pub fn init(allocator: std.mem.Allocator, elements: std.ArrayList(*PatternNode), token: lexer.Token) !*PatternNode.list {
+        pub fn init(
+            allocator: std.mem.Allocator,
+            elements: std.ArrayList(*PatternNode),
+            token: lexer.Token,
+        ) !*PatternNode.list {
             const pattern = try allocator.create(PatternNode.list);
 
             pattern.* = .{
@@ -467,7 +512,11 @@ pub const PatternNode = union(enum) {
         /// The token representing the variable.
         token: lexer.Token,
 
-        pub fn init(allocator: std.mem.Allocator, name: []const u8, token: lexer.Token) !*PatternNode.variable {
+        pub fn init(
+            allocator: std.mem.Allocator,
+            name: []const u8,
+            token: lexer.Token,
+        ) !*PatternNode.variable {
             const pattern = try allocator.create(PatternNode.variable);
 
             pattern.* = .{
@@ -494,7 +543,12 @@ pub const PatternNode = union(enum) {
         /// The token representing the constructor.
         token: lexer.Token,
 
-        pub fn init(allocator: std.mem.Allocator, name: []const u8, args: std.ArrayList(*PatternNode), token: lexer.Token) !*PatternNode.constructor {
+        pub fn init(
+            allocator: std.mem.Allocator,
+            name: []const u8,
+            args: std.ArrayList(*PatternNode),
+            token: lexer.Token,
+        ) !*PatternNode.constructor {
             const pattern = try allocator.create(PatternNode.constructor);
 
             pattern.* = .{
@@ -533,7 +587,12 @@ pub const PatternNode = union(enum) {
         /// The token representing the cons pattern.
         token: lexer.Token,
 
-        pub fn init(allocator: std.mem.Allocator, head: *PatternNode, tail: *PatternNode, token: lexer.Token) !*PatternNode.cons {
+        pub fn init(
+            allocator: std.mem.Allocator,
+            head: *PatternNode,
+            tail: *PatternNode,
+            token: lexer.Token,
+        ) !*PatternNode.cons {
             const pattern = try allocator.create(PatternNode.cons);
 
             pattern.* = .{
@@ -570,7 +629,11 @@ pub const GuardNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, condition: *Node, token: lexer.Token) !*GuardNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        condition: *Node,
+        token: lexer.Token,
+    ) !*GuardNode {
         const node = try allocator.create(GuardNode);
 
         node.* = .{
@@ -608,7 +671,13 @@ pub const MatchCase = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, pattern: *PatternNode, expression: *Node, guard: ?*GuardNode, token: lexer.Token) !*MatchCase {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        pattern: *PatternNode,
+        expression: *Node,
+        guard: ?*GuardNode,
+        token: lexer.Token,
+    ) !*MatchCase {
         const case = try allocator.create(MatchCase);
 
         case.* = .{
@@ -654,7 +723,12 @@ pub const MatchExprNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, value: *Node, cases: std.ArrayList(MatchCase), token: lexer.Token) !*MatchExprNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        value: *Node,
+        cases: std.ArrayList(MatchCase),
+        token: lexer.Token,
+    ) !*MatchExprNode {
         const node = try allocator.create(MatchExprNode);
 
         node.* = .{
@@ -696,7 +770,11 @@ pub const FunctionTypeNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, param_types: std.ArrayList(*Node), token: lexer.Token) !*FunctionTypeNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        param_types: std.ArrayList(*Node),
+        token: lexer.Token,
+    ) !*FunctionTypeNode {
         const node = try allocator.create(FunctionTypeNode);
 
         node.* = .{
@@ -733,7 +811,12 @@ pub const LambdaExprNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, params: std.ArrayList([]const u8), body: *Node, token: lexer.Token) !*LambdaExprNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        params: std.ArrayList([]const u8),
+        body: *Node,
+        token: lexer.Token,
+    ) !*LambdaExprNode {
         const node = try allocator.create(LambdaExprNode);
 
         node.* = .{
@@ -774,7 +857,12 @@ pub const FuncApplicationNode = struct {
     /// The token representing the start of this application (usually the function's token).
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, function: *Node, argument: *Node, token: lexer.Token) !*FuncApplicationNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        function: *Node,
+        argument: *Node,
+        token: lexer.Token,
+    ) !*FuncApplicationNode {
         const node = try allocator.create(FuncApplicationNode);
 
         node.* = .{
@@ -817,7 +905,12 @@ pub const ConsExprNode = struct {
     /// The token representing the cons operator.
     operator: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, head: *Node, tail: *Node, operator: lexer.Token) !*ConsExprNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        head: *Node,
+        tail: *Node,
+        operator: lexer.Token,
+    ) !*ConsExprNode {
         const node = try allocator.create(ConsExprNode);
 
         node.* = .{
@@ -870,7 +963,12 @@ pub const CompositionExprNode = struct {
     /// The token representing the composition operator.
     operator: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, first: *Node, second: *Node, operator: lexer.Token) !*CompositionExprNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        first: *Node,
+        second: *Node,
+        operator: lexer.Token,
+    ) !*CompositionExprNode {
         const node = try allocator.create(CompositionExprNode);
 
         node.* = .{
@@ -909,7 +1007,12 @@ pub const PipeExprNode = struct {
     /// The token representing the pipe operator.
     operator: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, value: *Node, func: *Node, operator: lexer.Token) !*PipeExprNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        value: *Node,
+        func: *Node,
+        operator: lexer.Token,
+    ) !*PipeExprNode {
         const node = try allocator.create(PipeExprNode);
 
         node.* = .{
@@ -954,7 +1057,12 @@ pub const IfThenElseStmtNode = struct {
     /// The AST node representing the expression to evaluate if condition is false.
     else_branch: *Node,
 
-    pub fn init(allocator: std.mem.Allocator, condition: *Node, then_branch: *Node, else_branch: *Node) !*IfThenElseStmtNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        condition: *Node,
+        then_branch: *Node,
+        else_branch: *Node,
+    ) !*IfThenElseStmtNode {
         const node = try allocator.create(IfThenElseStmtNode);
 
         node.* = .{
@@ -1014,7 +1122,12 @@ pub const TypeApplicationNode = struct {
     /// The token representing the type application.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, base: *Node, args: std.ArrayList(*Node), token: lexer.Token) !*TypeApplicationNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        base: *Node,
+        args: std.ArrayList(*Node),
+        token: lexer.Token,
+    ) !*TypeApplicationNode {
         const node = try allocator.create(TypeApplicationNode);
 
         node.* = .{
@@ -1063,7 +1176,13 @@ pub const TypeAliasNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, name: []const u8, type_params: std.ArrayList([]const u8), value: *Node, token: lexer.Token) !*TypeAliasNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        name: []const u8,
+        type_params: std.ArrayList([]const u8),
+        value: *Node,
+        token: lexer.Token,
+    ) !*TypeAliasNode {
         const node = try allocator.create(TypeAliasNode);
 
         node.* = .{
@@ -1110,7 +1229,12 @@ pub const VariantConstructorNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, name: []const u8, params: std.ArrayList(*Node), token: lexer.Token) !*VariantConstructorNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        name: []const u8,
+        params: std.ArrayList(*Node),
+        token: lexer.Token,
+    ) !*VariantConstructorNode {
         const node = try allocator.create(VariantConstructorNode);
 
         node.* = .{
@@ -1158,7 +1282,13 @@ pub const VariantTypeNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, name: []const u8, type_params: std.ArrayList([]const u8), constructors: std.ArrayList(VariantConstructorNode), token: lexer.Token) !*VariantTypeNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        name: []const u8,
+        type_params: std.ArrayList([]const u8),
+        constructors: std.ArrayList(VariantConstructorNode),
+        token: lexer.Token,
+    ) !*VariantTypeNode {
         const node = try allocator.create(VariantTypeNode);
 
         node.* = .{
@@ -1201,7 +1331,12 @@ pub const RecordFieldNode = struct {
     /// The token representing this field declaration.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, name: []const u8, type_node: *Node, token: lexer.Token) !*RecordFieldNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        name: []const u8,
+        type_node: *Node,
+        token: lexer.Token,
+    ) !*RecordFieldNode {
         const node = try allocator.create(RecordFieldNode);
 
         node.* = .{
@@ -1241,7 +1376,13 @@ pub const RecordTypeNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(allocator: std.mem.Allocator, name: []const u8, type_params: std.ArrayList([]const u8), fields: std.ArrayList(RecordFieldNode), token: lexer.Token) !*RecordTypeNode {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        name: []const u8,
+        type_params: std.ArrayList([]const u8),
+        fields: std.ArrayList(RecordFieldNode),
+        token: lexer.Token,
+    ) !*RecordTypeNode {
         const node = try allocator.create(RecordTypeNode);
 
         node.* = .{
@@ -1290,6 +1431,31 @@ pub const ModulePathNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(
+        allocator: std.mem.Allocator,
+        segments: std.ArrayList([]const u8),
+        token: lexer.Token,
+    ) !*ModulePathNode {
+        const node = try allocator.create(ModulePathNode);
+
+        node.* = .{
+            .segments = segments,
+            .token = token,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *ModulePathNode, allocator: std.mem.Allocator) void {
+        for (self.segments.items) |segment| {
+            allocator.free(segment);
+        }
+
+        self.segments.deinit();
+
+        allocator.destroy(self);
+    }
 };
 
 pub const ExportItem = struct {
@@ -1301,6 +1467,29 @@ pub const ExportItem = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(
+        allocator: std.mem.Allocator,
+        name: []const u8,
+        expose_constructors: bool,
+        token: lexer.Token,
+    ) !*ExportItem {
+        const item = try allocator.create(ExportItem);
+
+        item.* = .{
+            .name = try allocator.dupe(u8, name),
+            .expose_constructors = expose_constructors,
+            .token = token,
+        };
+
+        return item;
+    }
+
+    pub fn deinit(self: *ExportItem, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+
+        allocator.destroy(self);
+    }
 };
 
 /// Represents a method of exposing items from a module.
@@ -1318,6 +1507,35 @@ pub const ExportSpecNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(
+        allocator: std.mem.Allocator,
+        exposing_all: bool,
+        items: ?std.ArrayList(ExportItem),
+        token: lexer.Token,
+    ) !*ExportSpecNode {
+        const node = try allocator.create(ExportSpecNode);
+
+        node.* = .{
+            .exposing_all = exposing_all,
+            .items = items,
+            .token = token,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *ExportSpecNode, allocator: std.mem.Allocator) void {
+        if (self.items) |*items| {
+            for (items.items) |*item| {
+                item.deinit(allocator);
+            }
+
+            items.deinit();
+        }
+
+        allocator.destroy(self);
+    }
 };
 
 /// Items that can be imported from a module, potentially with aliases.
@@ -1361,6 +1579,66 @@ pub const ImportItem = union(enum) {
         /// Optional alias to use in the importing module.
         alias: ?[]const u8,
     },
+
+    pub fn init(allocator: std.mem.Allocator, kind: enum { Function, Operator, Type }, args: struct {
+        name: []const u8,
+        alias: ?[]const u8 = null,
+        expose_constructors: bool = false,
+    }) !*ImportItem {
+        const item = try allocator.create(ImportItem);
+
+        item.* = switch (kind) {
+            .Function => .{
+                .function = .{
+                    .name = try allocator.dupe(u8, args.name),
+                    .alias = if (args.alias) |a| try allocator.dupe(u8, a) else null,
+                },
+            },
+            .Operator => .{
+                .operator = .{
+                    .symbol = try allocator.dupe(u8, args.name),
+                    .alias = if (args.alias) |a| try allocator.dupe(u8, a) else null,
+                },
+            },
+            .Type => .{
+                .type = .{
+                    .name = try allocator.dupe(u8, args.name),
+                    .expose_constructors = args.expose_constructors,
+                    .alias = if (args.alias) |a| try allocator.dupe(u8, a) else null,
+                },
+            },
+        };
+
+        return item;
+    }
+
+    pub fn deinit(self: *ImportItem, allocator: std.mem.Allocator) void {
+        switch (self.*) {
+            .function => |*f| {
+                allocator.free(f.name);
+
+                if (f.alias) |alias| {
+                    allocator.free(alias);
+                }
+            },
+            .operator => |*op| {
+                allocator.free(op.symbol);
+
+                if (op.alias) |alias| {
+                    allocator.free(alias);
+                }
+            },
+            .type => |*t| {
+                allocator.free(t.name);
+
+                if (t.alias) |alias| {
+                    allocator.free(alias);
+                }
+            },
+        }
+
+        allocator.destroy(self);
+    }
 };
 
 /// The kind of import being performed.
@@ -1415,6 +1693,49 @@ pub const ImportSpecNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(
+        allocator: std.mem.Allocator,
+        path: ModulePathNode,
+        kind: ImportKind,
+        alias: ?[]const u8,
+        items: ?std.ArrayList(ImportItem),
+        token: lexer.Token,
+    ) !*ImportSpecNode {
+        const node = try allocator.create(ImportSpecNode);
+
+        node.* = .{
+            .path = path,
+            .kind = kind,
+            .alias = if (alias) |a| try allocator.dupe(u8, a) else null,
+            .items = items,
+            .token = token,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *ImportSpecNode, allocator: std.mem.Allocator) void {
+        for (self.path.segments.items) |segment| {
+            allocator.free(segment);
+        }
+
+        self.path.segments.deinit();
+
+        if (self.alias) |alias| {
+            allocator.free(alias);
+        }
+
+        if (self.items) |*items| {
+            for (items.items) |*item| {
+                item.deinit(allocator);
+            }
+
+            items.deinit();
+        }
+
+        allocator.destroy(self);
+    }
 };
 
 /// Represents a module include declaration that imports and re-exports
@@ -1430,6 +1751,31 @@ pub const IncludeNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(
+        allocator: std.mem.Allocator,
+        path: ModulePathNode,
+        token: lexer.Token,
+    ) !*IncludeNode {
+        const node = try allocator.create(IncludeNode);
+
+        node.* = .{
+            .path = path,
+            .token = token,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *IncludeNode, allocator: std.mem.Allocator) void {
+        for (self.path.segments.items) |segment| {
+            allocator.free(segment);
+        }
+
+        self.path.segments.deinit();
+
+        allocator.destroy(self);
+    }
 };
 
 //==========================================================================
@@ -1456,6 +1802,39 @@ pub const FunctionDeclNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(
+        allocator: std.mem.Allocator,
+        name: []const u8,
+        type_annotation: ?*Node,
+        value: *Node,
+        token: lexer.Token,
+    ) !*FunctionDeclNode {
+        const node = try allocator.create(FunctionDeclNode);
+
+        node.* = .{
+            .name = try allocator.dupe(u8, name),
+            .type_annotation = type_annotation,
+            .value = value,
+            .token = token,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *FunctionDeclNode, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+
+        if (self.type_annotation) |type_annotation| {
+            type_annotation.deinit(allocator);
+            allocator.destroy(type_annotation);
+        }
+
+        self.value.deinit(allocator);
+        allocator.destroy(self.value);
+
+        allocator.destroy(self);
+    }
 };
 
 /// A declaration that links a function to external code, specifying both
@@ -1476,6 +1855,36 @@ pub const ForeignFunctionDeclNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(
+        allocator: std.mem.Allocator,
+        name: []const u8,
+        type_annotation: *Node,
+        external_name: []const u8,
+        token: lexer.Token,
+    ) !*ForeignFunctionDeclNode {
+        const node = try allocator.create(ForeignFunctionDeclNode);
+
+        node.* = .{
+            .name = try allocator.dupe(u8, name),
+            .type_annotation = type_annotation,
+            .external_name = try allocator.dupe(u8, external_name),
+            .token = token,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *ForeignFunctionDeclNode, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+
+        self.type_annotation.deinit(allocator);
+        allocator.destroy(self.type_annotation);
+
+        allocator.free(self.external_name);
+
+        allocator.destroy(self);
+    }
 };
 
 /// Represents a module declaration with its name, exports, and contents.
@@ -1498,6 +1907,50 @@ pub const ModuleDeclNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(
+        allocator: std.mem.Allocator,
+        path: ModulePathNode,
+        exports: ExportSpecNode,
+        declarations: std.ArrayList(*Node),
+        token: lexer.Token,
+    ) !*ModuleDeclNode {
+        const node = try allocator.create(ModuleDeclNode);
+
+        node.* = .{
+            .path = path,
+            .exports = exports,
+            .declarations = declarations,
+            .token = token,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *ModuleDeclNode, allocator: std.mem.Allocator) void {
+        for (self.path.segments.items) |segment| {
+            allocator.free(segment);
+        }
+
+        self.path.segments.deinit();
+
+        if (self.exports.items) |*items| {
+            for (items.items) |*item| {
+                item.deinit(allocator);
+            }
+
+            items.deinit();
+        }
+
+        for (self.declarations.items) |declaration| {
+            declaration.deinit(allocator);
+            allocator.destroy(declaration);
+        }
+
+        self.declarations.deinit();
+
+        allocator.destroy(self);
+    }
 };
 
 /// The root AST node containing a sequence of top-level declarations like
@@ -1508,6 +1961,32 @@ pub const ProgramNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(
+        allocator: std.mem.Allocator,
+        statements: std.ArrayList(*Node),
+        token: lexer.Token,
+    ) !*ProgramNode {
+        const node = try allocator.create(ProgramNode);
+
+        node.* = .{
+            .statements = statements,
+            .token = token,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *ProgramNode, allocator: std.mem.Allocator) void {
+        for (self.statements.items) |statement| {
+            statement.deinit(allocator);
+            allocator.destroy(statement);
+        }
+
+        self.statements.deinit();
+
+        allocator.destroy(self);
+    }
 };
 
 //==========================================================================
@@ -1565,16 +2044,16 @@ pub const Node = union(enum) {
     record_type: *RecordTypeNode,
 
     // Module System
-    module_path: ModulePathNode,
-    export_spec: ExportSpecNode,
-    import_spec: ImportSpecNode,
-    include: IncludeNode,
+    module_path: *ModulePathNode,
+    export_spec: *ExportSpecNode,
+    import_spec: *ImportSpecNode,
+    include: *IncludeNode,
 
     // Top-Level Declarations
-    function_decl: FunctionDeclNode,
-    foreign_function_decl: ForeignFunctionDeclNode,
-    module_decl: ModuleDeclNode,
-    program: ProgramNode,
+    function_decl: *FunctionDeclNode,
+    foreign_function_decl: *ForeignFunctionDeclNode,
+    module_decl: *ModuleDeclNode,
+    program: *ProgramNode,
 
     /// Cleans up resources associated with this node.
     ///
@@ -1648,113 +2127,16 @@ pub const Node = union(enum) {
             .record_type => |rtype| rtype.deinit(allocator),
 
             // Module System
-            .module_path => |*path| {
-                for (path.segments.items) |segment| {
-                    allocator.free(segment);
-                }
-
-                path.segments.deinit();
-            },
-            .export_spec => |*spec| {
-                if (spec.items) |*items| {
-                    for (items.items) |item| {
-                        allocator.free(item.name);
-                    }
-
-                    items.deinit();
-                }
-            },
-            .import_spec => |*spec| {
-                for (spec.path.segments.items) |segment| {
-                    allocator.free(segment);
-                }
-
-                spec.path.segments.deinit();
-
-                if (spec.alias) |alias| {
-                    allocator.free(alias);
-                }
-
-                if (spec.items) |*items| {
-                    for (items.items) |item| {
-                        switch (item) {
-                            .function => |f| {
-                                allocator.free(f.name);
-
-                                if (f.alias) |alias| {
-                                    allocator.free(alias);
-                                }
-                            },
-                            .operator => |op| {
-                                allocator.free(op.symbol);
-
-                                if (op.alias) |alias| {
-                                    allocator.free(alias);
-                                }
-                            },
-                            .type => |t| {
-                                allocator.free(t.name);
-
-                                if (t.alias) |alias| {
-                                    allocator.free(alias);
-                                }
-                            },
-                        }
-                    }
-
-                    items.deinit();
-                }
-            },
-            .include => |*inc| {
-                for (inc.path.segments.items) |segment| {
-                    allocator.free(segment);
-                }
-
-                inc.path.segments.deinit();
-            },
+            .module_path => |path| path.deinit(allocator),
+            .export_spec => |spec| spec.deinit(allocator),
+            .import_spec => |spec| spec.deinit(allocator),
+            .include => |inc| inc.deinit(allocator),
 
             // Top-Level Declarations
-            .function_decl => |*decl| {
-                if (decl.type_annotation) |type_annotation| {
-                    type_annotation.deinit(allocator);
-                    allocator.destroy(type_annotation);
-                }
-
-                decl.value.deinit(allocator);
-                allocator.destroy(decl.value);
-            },
-            .foreign_function_decl => |*decl| {
-                decl.type_annotation.deinit(allocator);
-                allocator.destroy(decl.type_annotation);
-                allocator.free(decl.external_name);
-            },
-            .module_decl => |*decl| {
-                for (decl.path.segments.items) |segment| {
-                    allocator.free(segment);
-                }
-
-                decl.path.segments.deinit();
-
-                if (decl.exports.items) |*items| {
-                    items.deinit();
-                }
-
-                for (decl.declarations.items) |declaration| {
-                    declaration.deinit(allocator);
-                    allocator.destroy(declaration);
-                }
-
-                decl.declarations.deinit();
-            },
-            .program => |*prog| {
-                for (prog.statements.items) |stmt| {
-                    stmt.deinit(allocator);
-                    allocator.destroy(stmt);
-                }
-
-                prog.statements.deinit();
-                allocator.destroy(self);
-            },
+            .function_decl => |decl| decl.deinit(allocator),
+            .foreign_function_decl => |decl| decl.deinit(allocator),
+            .module_decl => |decl| decl.deinit(allocator),
+            .program => |prog| prog.deinit(allocator),
         }
     }
 };
