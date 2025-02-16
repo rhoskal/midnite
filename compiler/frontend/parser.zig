@@ -248,10 +248,7 @@ pub const Parser = struct {
             return error.InvalidIntLiteral;
         };
 
-        return ast.IntLiteralNode{
-            .value = value,
-            .token = token,
-        };
+        return ast.IntLiteralNode.init(value, token);
     }
 
     /// Parses a floating-point literal value into a structured node.
@@ -264,10 +261,30 @@ pub const Parser = struct {
             return error.InvalidFloatLiteral;
         };
 
-        return ast.FloatLiteralNode{
-            .value = value,
-            .token = token,
-        };
+        return ast.FloatLiteralNode.init(value, token);
+    }
+
+    /// Parses a character literal into its Unicode codepoint value.
+    /// Handles standard characters ('a'), escape sequences ('\n', '\t', etc.),
+    /// and Unicode escape sequences ('\u{0061}').
+    fn parseCharLiteral(self: *Parser) ParserError!ast.CharLiteralNode {
+        const token = try self.expect(lexer.TokenKind{ .literal = .Char });
+
+        // Lexeme includes the quotes, so it's at least 3 chars: 'x'
+        std.debug.assert(token.lexeme.len >= 3);
+
+        const unquoted = token.lexeme[1 .. token.lexeme.len - 1];
+
+        var value: u21 = undefined;
+        if (unquoted[0] == '\\') {
+            value = try parseCharEscapeSequence(unquoted);
+        } else {
+            value = std.unicode.utf8Decode(unquoted) catch {
+                return error.InvalidCharLiteral;
+            };
+        }
+
+        return ast.CharLiteralNode.init(value, token);
     }
 
     /// Parses a string literal into a structured node.
@@ -298,36 +315,7 @@ pub const Parser = struct {
             }
         }
 
-        return ast.StrLiteralNode{
-            .value = try self.allocator.dupe(u8, result.items),
-            .token = token,
-        };
-    }
-
-    /// Parses a character literal into its Unicode codepoint value.
-    /// Handles standard characters ('a'), escape sequences ('\n', '\t', etc.),
-    /// and Unicode escape sequences ('\u{0061}').
-    fn parseCharLiteral(self: *Parser) ParserError!ast.CharLiteralNode {
-        const token = try self.expect(lexer.TokenKind{ .literal = .Char });
-
-        // Lexeme includes the quotes, so it's at least 3 chars: 'x'
-        std.debug.assert(token.lexeme.len >= 3);
-
-        const unquoted = token.lexeme[1 .. token.lexeme.len - 1];
-
-        var value: u21 = undefined;
-        if (unquoted[0] == '\\') {
-            value = try parseCharEscapeSequence(unquoted);
-        } else {
-            value = std.unicode.utf8Decode(unquoted) catch {
-                return error.InvalidCharLiteral;
-            };
-        }
-
-        return ast.CharLiteralNode{
-            .value = value,
-            .token = token,
-        };
+        return ast.StrLiteralNode.init(self.allocator, result.items, token);
     }
 
     const EscapeSequence = struct {
@@ -1763,22 +1751,24 @@ pub const Parser = struct {
     fn parseComment(self: *Parser) ParserError!*ast.Node {
         const token = try self.expect(lexer.TokenKind{ .comment = .Regular });
 
+        // Content starts after '# ' prefix
+        var i: usize = 1;
+        while (i < token.lexeme.len and std.ascii.isWhitespace(token.lexeme[i])) {
+            i += 1;
+        }
+        const trimmed = std.mem.trimRight(u8, token.lexeme[i..], &std.ascii.whitespace);
+
+        const comment_node = try ast.CommentNode.init(
+            self.allocator,
+            trimmed,
+            token,
+        );
+        errdefer self.allocator.destroy(comment_node);
+
         const node = try self.allocator.create(ast.Node);
         errdefer self.allocator.destroy(node);
 
-        // Content starts after '# ' prefix
-        var content_start: usize = 1;
-        while (content_start < token.lexeme.len and std.ascii.isWhitespace(token.lexeme[content_start])) {
-            content_start += 1;
-        }
-        const trimmed = std.mem.trimRight(u8, token.lexeme[content_start..], &std.ascii.whitespace);
-
-        node.* = .{
-            .comment = .{
-                .content = trimmed,
-                .token = token,
-            },
-        };
+        node.* = .{ .comment = comment_node };
 
         return node;
     }
@@ -1787,22 +1777,24 @@ pub const Parser = struct {
     fn parseDocComment(self: *Parser) ParserError!*ast.Node {
         const token = try self.expect(lexer.TokenKind{ .comment = .Doc });
 
+        // Content starts after '## ' prefix
+        var i: usize = 2;
+        while (i < token.lexeme.len and std.ascii.isWhitespace(token.lexeme[i])) {
+            i += 1;
+        }
+        const trimmed = std.mem.trimRight(u8, token.lexeme[i..], &std.ascii.whitespace);
+
+        const comment_node = try ast.DocCommentNode.init(
+            self.allocator,
+            trimmed,
+            token,
+        );
+        errdefer self.allocator.destroy(comment_node);
+
         const node = try self.allocator.create(ast.Node);
         errdefer self.allocator.destroy(node);
 
-        // Content starts after '## ' prefix
-        var content_start: usize = 2;
-        while (content_start < token.lexeme.len and std.ascii.isWhitespace(token.lexeme[content_start])) {
-            content_start += 1;
-        }
-        const trimmed = std.mem.trimRight(u8, token.lexeme[content_start..], &std.ascii.whitespace);
-
-        node.* = .{
-            .doc_comment = .{
-                .content = trimmed,
-                .token = token,
-            },
-        };
+        node.* = .{ .doc_comment = comment_node };
 
         return node;
     }
@@ -1820,6 +1812,7 @@ test "[comment]" {
 
     const source = "# This is a regular comment";
     const expected_content = "This is a regular comment";
+
     var l = lexer.Lexer.init(source, TEST_FILE);
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
@@ -1832,11 +1825,12 @@ test "[comment]" {
     }
 
     // Assertions
-    // Check the node type is correctly identified as a comment
+    // Verify the node is a regular comment
     try testing.expect(node.* == .comment);
 
-    // Validate the comment token and its properties
     const comment = node.comment;
+
+    // Validate the comment token and its properties
     try testing.expectEqual(lexer.TokenKind{ .comment = .Regular }, comment.token.kind);
 
     // Ensure the content of the comment matches the source
@@ -1851,6 +1845,7 @@ test "[doc_comment]" {
 
     const source = "## This is a doc comment";
     const expected_content = "This is a doc comment";
+
     var l = lexer.Lexer.init(source, TEST_FILE);
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
@@ -1863,11 +1858,12 @@ test "[doc_comment]" {
     }
 
     // Assertions
-    // Check the node type is correctly identified as a doc comment
+    // Verify the node is a doc comment
     try testing.expect(node.* == .doc_comment);
 
-    // Validate the comment token and its properties
     const comment = node.doc_comment;
+
+    // Validate the comment token and its properties
     try testing.expectEqual(lexer.TokenKind{ .comment = .Doc }, comment.token.kind);
 
     // Ensure the content of the comment matches the source
@@ -1907,17 +1903,17 @@ test "[int_literal]" {
         defer parser.deinit();
 
         // Action
-        const lit = try parser.parseIntLiteral();
+        const literal = try parser.parseIntLiteral();
 
         // Assertions
         // Validate the literal token and its properties
-        try testing.expectEqual(lexer.TokenKind{ .literal = .Int }, lit.token.kind);
+        try testing.expectEqual(lexer.TokenKind{ .literal = .Int }, literal.token.kind);
 
         // Ensure the lexeme matches the source string
-        try testing.expectEqualStrings(case.source, lit.token.lexeme);
+        try testing.expectEqualStrings(case.source, literal.token.lexeme);
 
         // Verify the parsed integer value matches the expected value
-        try testing.expectEqual(case.expected, lit.value);
+        try testing.expectEqual(case.expected, literal.value);
     }
 }
 
@@ -1946,17 +1942,69 @@ test "[float_literal]" {
         defer parser.deinit();
 
         // Action
-        const lit = try parser.parseFloatLiteral();
+        const literal = try parser.parseFloatLiteral();
+
+        // Assertions
+
+        // Validate the literal token and its properties
+        try testing.expectEqual(lexer.TokenKind{ .literal = .Float }, literal.token.kind);
+
+        // Ensure the lexeme matches the source string
+        try testing.expectEqualStrings(case.source, literal.token.lexeme);
+
+        // Verify the parsed float value matches the expected value
+        try testing.expectEqual(case.expected, literal.value);
+    }
+}
+
+test "[char_literal]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    const TestCase = struct {
+        source: []const u8,
+        expected: u21,
+    };
+
+    const cases = [_]TestCase{
+        // Regular characters
+        .{ .source = "'a'", .expected = 'a' },
+        .{ .source = "'Z'", .expected = 'Z' },
+        .{ .source = "'0'", .expected = '0' },
+        .{ .source = "'!'", .expected = '!' },
+
+        // Escape sequences
+        .{ .source = "'\\n'", .expected = '\n' },
+        .{ .source = "'\\r'", .expected = '\r' },
+        .{ .source = "'\\t'", .expected = '\t' },
+        .{ .source = "'\\\\'", .expected = '\\' },
+        .{ .source = "'\\''", .expected = '\'' },
+
+        // Unicode escape sequences
+        .{ .source = "'\\u{0061}'", .expected = 0x0061 }, // 'a'
+        .{ .source = "'\\u{1F600}'", .expected = 0x1F600 }, // 😀
+        .{ .source = "'😀'", .expected = 0x1F600 },
+    };
+
+    for (cases) |case| {
+        var l = lexer.Lexer.init(case.source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const literal = try parser.parseCharLiteral();
 
         // Assertions
         // Validate the literal token and its properties
-        try testing.expectEqual(lexer.TokenKind{ .literal = .Float }, lit.token.kind);
+        try testing.expectEqual(lexer.TokenKind{ .literal = .Char }, literal.token.kind);
 
         // Ensure the lexeme matches the source string
-        try testing.expectEqualStrings(case.source, lit.token.lexeme);
+        try testing.expectEqualStrings(case.source, literal.token.lexeme);
 
-        // Verify the parsed float value matches the expected value
-        try testing.expectEqual(case.expected, lit.value);
+        // Verify the parsed char value matches the expected value
+        try testing.expectEqual(case.expected, literal.value);
     }
 }
 
@@ -2035,57 +2083,6 @@ test "[str_literal]" {
 
         // Verify the parsed string value matches the expected value
         try testing.expectEqualStrings(case.expected, lit.value);
-    }
-}
-
-test "[char_literal]" {
-    // Setup
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-
-    const TestCase = struct {
-        source: []const u8,
-        expected: u21,
-    };
-
-    const cases = [_]TestCase{
-        // Regular characters
-        .{ .source = "'a'", .expected = 'a' },
-        .{ .source = "'Z'", .expected = 'Z' },
-        .{ .source = "'0'", .expected = '0' },
-        .{ .source = "'!'", .expected = '!' },
-
-        // Escape sequences
-        .{ .source = "'\\n'", .expected = '\n' },
-        .{ .source = "'\\r'", .expected = '\r' },
-        .{ .source = "'\\t'", .expected = '\t' },
-        .{ .source = "'\\\\'", .expected = '\\' },
-        .{ .source = "'\\''", .expected = '\'' },
-
-        // Unicode escape sequences
-        .{ .source = "'\\u{0061}'", .expected = 0x0061 }, // 'a'
-        .{ .source = "'\\u{1F600}'", .expected = 0x1F600 }, // 😀
-        .{ .source = "'😀'", .expected = 0x1F600 },
-    };
-
-    for (cases) |case| {
-        var l = lexer.Lexer.init(case.source, TEST_FILE);
-        var parser = try Parser.init(allocator, &l);
-        defer parser.deinit();
-
-        // Action
-        const lit = try parser.parseCharLiteral();
-
-        // Assertions
-        // Validate the literal token and its properties
-        try testing.expectEqual(lexer.TokenKind{ .literal = .Char }, lit.token.kind);
-
-        // Ensure the lexeme matches the source string
-        try testing.expectEqualStrings(case.source, lit.token.lexeme);
-
-        // Verify the parsed char value matches the expected value
-        try testing.expectEqual(case.expected, lit.value);
     }
 }
 

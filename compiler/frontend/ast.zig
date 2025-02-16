@@ -17,6 +17,17 @@ pub const CommentNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
+    pub fn init(allocator: std.mem.Allocator, content: []const u8, token: lexer.Token) !*CommentNode {
+        const node = try allocator.create(CommentNode);
+
+        node.* = .{
+            .content = try allocator.dupe(u8, content),
+            .token = token,
+        };
+
+        return node;
+    }
+
     pub fn deinit(self: *CommentNode, allocator: std.mem.Allocator) void {
         allocator.free(self.content);
 
@@ -34,6 +45,17 @@ pub const DocCommentNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(allocator: std.mem.Allocator, content: []const u8, token: lexer.Token) !*DocCommentNode {
+        const node = try allocator.create(DocCommentNode);
+
+        node.* = .{
+            .content = try allocator.dupe(u8, content),
+            .token = token,
+        };
+
+        return node;
+    }
 
     pub fn deinit(self: *DocCommentNode, allocator: std.mem.Allocator) void {
         allocator.free(self.content);
@@ -53,6 +75,13 @@ pub const IntLiteralNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(value: i64, token: lexer.Token) IntLiteralNode {
+        return .{
+            .value = value,
+            .token = token,
+        };
+    }
 };
 
 /// Represents a literal floating-point value.
@@ -67,6 +96,13 @@ pub const FloatLiteralNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(value: f64, token: lexer.Token) FloatLiteralNode {
+        return .{
+            .value = value,
+            .token = token,
+        };
+    }
 };
 
 /// Represents a char literal value.
@@ -82,6 +118,13 @@ pub const CharLiteralNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(value: u21, token: lexer.Token) CharLiteralNode {
+        return .{
+            .value = value,
+            .token = token,
+        };
+    }
 };
 
 /// Represents a string literal value.
@@ -95,6 +138,17 @@ pub const StrLiteralNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(allocator: std.mem.Allocator, value: []const u8, token: lexer.Token) !*StrLiteralNode {
+        const node = try allocator.create(StrLiteralNode);
+
+        node.* = .{
+            .value = try allocator.dupe(u8, value),
+            .token = token,
+        };
+
+        return node;
+    }
 
     pub fn deinit(self: *StrLiteralNode, allocator: std.mem.Allocator) void {
         allocator.free(self.value);
@@ -117,6 +171,17 @@ pub const MultilineStrLiteralNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
+    pub fn init(allocator: std.mem.Allocator, value: []const u8, token: lexer.Token) !*MultilineStrLiteralNode {
+        const node = try allocator.create(MultilineStrLiteralNode);
+
+        node.* = .{
+            .value = try allocator.dupe(u8, value),
+            .token = token,
+        };
+
+        return node;
+    }
+
     pub fn deinit(self: *MultilineStrLiteralNode, allocator: std.mem.Allocator) void {
         allocator.free(self.value);
 
@@ -136,6 +201,17 @@ pub const LowerIdentifierNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
+    pub fn init(allocator: std.mem.Allocator, name: []const u8, token: lexer.Token) !*LowerIdentifierNode {
+        const node = try allocator.create(LowerIdentifierNode);
+
+        node.* = .{
+            .name = try allocator.dupe(u8, name),
+            .token = token,
+        };
+
+        return node;
+    }
+
     pub fn deinit(self: *LowerIdentifierNode, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
 
@@ -150,6 +226,17 @@ pub const UpperIdentifierNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(allocator: std.mem.Allocator, name: []const u8, token: lexer.Token) !*UpperIdentifierNode {
+        const node = try allocator.create(UpperIdentifierNode);
+
+        node.* = .{
+            .name = try allocator.dupe(u8, name),
+            .token = token,
+        };
+
+        return node;
+    }
 
     pub fn deinit(self: *UpperIdentifierNode, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
@@ -1317,13 +1404,13 @@ test "[CommentNode]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // Action
     const content = "This is a comment";
 
-    const comment_node = try allocator.create(CommentNode);
-    comment_node.* = .{
-        .content = try allocator.dupe(u8, content),
-        .token = lexer.Token{
+    // Action
+    const comment_node = try CommentNode.init(
+        allocator,
+        content,
+        lexer.Token{
             .kind = lexer.TokenKind{ .comment = .Regular },
             .lexeme = "#",
             .loc = .{
@@ -1332,7 +1419,7 @@ test "[CommentNode]" {
                 .src = .{ .line = 1, .col = 1 },
             },
         },
-    };
+    );
 
     const node = try allocator.create(Node);
     defer {
@@ -1348,6 +1435,9 @@ test "[CommentNode]" {
 
     const comment = node.comment;
 
+    // Validate the comment token and its properties
+    try testing.expectEqual(lexer.TokenKind{ .comment = .Regular }, comment.token.kind);
+
     // Verify the content
     try testing.expectEqualStrings(content, comment.content);
 }
@@ -1360,13 +1450,13 @@ test "[DocCommentNode]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // Action
     const content = "This is a doc comment";
 
-    const comment_node = try allocator.create(DocCommentNode);
-    comment_node.* = .{
-        .content = try allocator.dupe(u8, content),
-        .token = lexer.Token{
+    // Action
+    const comment_node = try DocCommentNode.init(
+        allocator,
+        content,
+        lexer.Token{
             .kind = lexer.TokenKind{ .comment = .Doc },
             .lexeme = "##",
             .loc = .{
@@ -1375,7 +1465,7 @@ test "[DocCommentNode]" {
                 .src = .{ .line = 1, .col = 1 },
             },
         },
-    };
+    );
 
     const node = try allocator.create(Node);
     defer {
@@ -1391,6 +1481,9 @@ test "[DocCommentNode]" {
 
     const comment = node.doc_comment;
 
+    // Validate the comment token and its properties
+    try testing.expectEqual(lexer.TokenKind{ .comment = .Doc }, comment.token.kind);
+
     // Verify the content
     try testing.expectEqualStrings(content, comment.content);
 }
@@ -1403,8 +1496,21 @@ test "[IntLiteralNode]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // Action
     const value = 42;
+
+    // Action
+    const int_node = IntLiteralNode.init(
+        value,
+        lexer.Token{
+            .kind = lexer.TokenKind{ .literal = .Int },
+            .lexeme = "42",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 2 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    );
 
     const node = try allocator.create(Node);
     defer {
@@ -1412,29 +1518,19 @@ test "[IntLiteralNode]" {
         allocator.destroy(node);
     }
 
-    node.* = .{
-        .int_literal = .{
-            .value = value,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .Int },
-                .lexeme = "42",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 2 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
-            },
-        },
-    };
+    node.* = .{ .int_literal = int_node };
 
     // Assertions
     // Verify the node is an integer literal
     try testing.expect(node.* == .int_literal);
 
-    const int_literal = node.int_literal;
+    const literal = node.int_literal;
+
+    // Validate the literal token and its properties
+    try testing.expectEqual(lexer.TokenKind{ .literal = .Int }, literal.token.kind);
 
     // Verify the content
-    try testing.expect(int_literal.value == value);
+    try testing.expectEqual(value, literal.value);
 }
 
 test "[FloatLiteralNode]" {
@@ -1445,8 +1541,21 @@ test "[FloatLiteralNode]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // Action
     const value = 42.0;
+
+    // Action
+    const float_node = FloatLiteralNode.init(
+        value,
+        lexer.Token{
+            .kind = lexer.TokenKind{ .literal = .Float },
+            .lexeme = "42.0",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 3 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    );
 
     const node = try allocator.create(Node);
     defer {
@@ -1454,29 +1563,19 @@ test "[FloatLiteralNode]" {
         allocator.destroy(node);
     }
 
-    node.* = .{
-        .float_literal = .{
-            .value = value,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .Float },
-                .lexeme = "42.0",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 3 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
-            },
-        },
-    };
+    node.* = .{ .float_literal = float_node };
 
     // Assertions
     // Verify the node is a float literal
     try testing.expect(node.* == .float_literal);
 
-    const float_literal = node.float_literal;
+    const literal = node.float_literal;
+
+    // Validate the literal token and its properties
+    try testing.expectEqual(lexer.TokenKind{ .literal = .Float }, literal.token.kind);
 
     // Verify the content
-    try testing.expect(float_literal.value == value);
+    try testing.expectEqual(value, literal.value);
 }
 
 test "[CharLiteralNode]" {
@@ -1487,8 +1586,21 @@ test "[CharLiteralNode]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // Action
     const value = 'a';
+
+    // Action
+    const char_node = CharLiteralNode.init(
+        value,
+        lexer.Token{
+            .kind = lexer.TokenKind{ .literal = .Char },
+            .lexeme = "\'",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 2 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    );
 
     const node = try allocator.create(Node);
     defer {
@@ -1496,29 +1608,19 @@ test "[CharLiteralNode]" {
         allocator.destroy(node);
     }
 
-    node.* = .{
-        .char_literal = .{
-            .value = value,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .Char },
-                .lexeme = "\'",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 2 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
-            },
-        },
-    };
+    node.* = .{ .char_literal = char_node };
 
     // Assertions
     // Verify the node is a character literal
     try testing.expect(node.* == .char_literal);
 
-    const char_literal = node.char_literal;
+    const literal = node.char_literal;
+
+    // Validate the literal token and its properties
+    try testing.expectEqual(lexer.TokenKind{ .literal = .Char }, literal.token.kind);
 
     // Verify the content
-    try testing.expect(char_literal.value == value);
+    try testing.expectEqual(value, literal.value);
 }
 
 test "[StrLiteralNode]" {
@@ -1529,13 +1631,13 @@ test "[StrLiteralNode]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // Action
     const value = "foo";
 
-    const literal_node = try allocator.create(StrLiteralNode);
-    literal_node.* = .{
-        .value = try allocator.dupe(u8, value),
-        .token = lexer.Token{
+    // Action
+    const literal_node = try StrLiteralNode.init(
+        allocator,
+        value,
+        lexer.Token{
             .kind = lexer.TokenKind{ .literal = .String },
             .lexeme = "\"",
             .loc = .{
@@ -1544,7 +1646,7 @@ test "[StrLiteralNode]" {
                 .src = .{ .line = 1, .col = 1 },
             },
         },
-    };
+    );
 
     const node = try allocator.create(Node);
     defer {
@@ -1558,10 +1660,13 @@ test "[StrLiteralNode]" {
     // Verify the node is a string literal
     try testing.expect(node.* == .str_literal);
 
-    const str_literal = node.str_literal;
+    const literal = node.str_literal;
+
+    // Validate the comment token and its properties
+    try testing.expectEqual(lexer.TokenKind{ .literal = .String }, literal.token.kind);
 
     // Verify the content
-    try testing.expectEqualStrings(value, str_literal.value);
+    try testing.expectEqualStrings(value, literal.value);
 }
 
 test "[MultilineStrLiteralNode]" {
@@ -1575,17 +1680,18 @@ test "[MultilineStrLiteralNode]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // Action
     const value =
         \\first line
         \\second line
         \\third line
     ;
-    const literal_node = try allocator.create(MultilineStrLiteralNode);
-    literal_node.* = .{
-        .value = try allocator.dupe(u8, value),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .literal = .String },
+
+    // Action
+    const literal_node = try MultilineStrLiteralNode.init(
+        allocator,
+        value,
+        lexer.Token{
+            .kind = lexer.TokenKind{ .literal = .MultilineString },
             .lexeme = "\"\"\"",
             .loc = .{
                 .filename = TEST_FILE,
@@ -1593,7 +1699,7 @@ test "[MultilineStrLiteralNode]" {
                 .src = .{ .line = 1, .col = 1 },
             },
         },
-    };
+    );
 
     const node = try allocator.create(Node);
     defer {
@@ -1607,10 +1713,13 @@ test "[MultilineStrLiteralNode]" {
     // Verify the node is a string literal
     try testing.expect(node.* == .multiline_str_literal);
 
-    const multiline_str_literal = node.multiline_str_literal;
+    const literal = node.multiline_str_literal;
+
+    // Validate the comment token and its properties
+    try testing.expectEqual(lexer.TokenKind{ .literal = .MultilineString }, literal.token.kind);
 
     // Verify the content
-    try testing.expectEqualStrings(value, multiline_str_literal.value);
+    try testing.expectEqualStrings(value, literal.value);
 }
 
 test "[LowerIdentifierNode]" {
@@ -1621,13 +1730,13 @@ test "[LowerIdentifierNode]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // Action
     const name = "my_variable";
 
-    const ident_node = try allocator.create(LowerIdentifierNode);
-    ident_node.* = .{
-        .name = try allocator.dupe(u8, name),
-        .token = lexer.Token{
+    // Action
+    const ident_node = try LowerIdentifierNode.init(
+        allocator,
+        name,
+        lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Lower },
             .lexeme = name,
             .loc = .{
@@ -1636,7 +1745,7 @@ test "[LowerIdentifierNode]" {
                 .src = .{ .line = 1, .col = 1 },
             },
         },
-    };
+    );
 
     const node = try allocator.create(Node);
     defer {
@@ -1650,16 +1759,16 @@ test "[LowerIdentifierNode]" {
     // Verify the node is a lower identifier
     try testing.expect(node.* == .lower_identifier);
 
-    const lower_identifier = node.lower_identifier;
+    const identifier = node.lower_identifier;
 
     // Verify the name of the identifier
-    try testing.expectEqualStrings(name, lower_identifier.name);
+    try testing.expectEqualStrings(name, identifier.name);
 
     // Verify the token kind is a lower identifier
-    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, lower_identifier.token.kind);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, identifier.token.kind);
 
     // Verify the lexeme matches the name
-    try testing.expectEqualStrings(name, lower_identifier.token.lexeme);
+    try testing.expectEqualStrings(name, identifier.token.lexeme);
 }
 
 test "[UpperIdentifierNode]" {
@@ -1670,13 +1779,13 @@ test "[UpperIdentifierNode]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // Action
     const name = "TypeName";
 
-    const ident_node = try allocator.create(UpperIdentifierNode);
-    ident_node.* = .{
-        .name = try allocator.dupe(u8, name),
-        .token = lexer.Token{
+    // Action
+    const ident_node = try UpperIdentifierNode.init(
+        allocator,
+        name,
+        lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Upper },
             .lexeme = name,
             .loc = .{
@@ -1685,7 +1794,7 @@ test "[UpperIdentifierNode]" {
                 .src = .{ .line = 1, .col = 1 },
             },
         },
-    };
+    );
 
     const node = try allocator.create(Node);
     defer {
@@ -1699,16 +1808,16 @@ test "[UpperIdentifierNode]" {
     // Verify the node is an upper identifier
     try testing.expect(node.* == .upper_identifier);
 
-    const upper_identifier = node.upper_identifier;
+    const identifier = node.upper_identifier;
 
     // Verify the name of the identifier
-    try testing.expectEqualStrings(name, upper_identifier.name);
+    try testing.expectEqualStrings(name, identifier.name);
 
     // Verify the token kind is an upper identifier
-    try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, upper_identifier.token.kind);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, identifier.token.kind);
 
     // Verify the lexeme matches the name
-    try testing.expectEqualStrings(name, upper_identifier.token.lexeme);
+    try testing.expectEqualStrings(name, identifier.token.lexeme);
 }
 
 test "[ListNode]" {
@@ -1934,6 +2043,9 @@ test "[UnaryExprNode]" {
     node.* = .{ .unary_expr = unary_node };
 
     // Assertions
+    // Verify the node is a unary expression
+    try testing.expect(node.* == .unary_expr);
+
     const expr = node.unary_expr;
 
     // Verify the operator in the unary expression is an integer subtraction operator (-)
@@ -2906,38 +3018,44 @@ test "[FunctionTypeNode]" {
     try param_types.append(int_type2);
     try param_types.append(int_type3);
 
-    const func_type = try allocator.create(Node);
-    defer {
-        func_type.deinit(allocator);
-        allocator.destroy(func_type);
-    }
-
-    func_type.* = .{
-        .function_type = .{
-            .param_types = param_types,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .delimiter = .Colon },
-                .lexeme = ":",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 1 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
+    const ftype_node = try allocator.create(FunctionTypeNode);
+    ftype_node.* = .{
+        .param_types = param_types,
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .delimiter = .Colon },
+            .lexeme = ":",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
             },
         },
     };
 
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .function_type = ftype_node };
+
     // Assertions
+    // Verify the node is a function type
+    try testing.expect(node.* == .function_type);
+
+    const ftype = node.function_type;
+
     // Check the delimiter in the function type is a colon (:)
-    try testing.expectEqual(lexer.TokenKind{ .delimiter = .Colon }, func_type.function_type.token.kind);
+    try testing.expectEqual(lexer.TokenKind{ .delimiter = .Colon }, ftype.token.kind);
 
     // Verify the lexeme
-    try testing.expectEqualStrings(":", func_type.function_type.token.lexeme);
+    try testing.expectEqualStrings(":", ftype.token.lexeme);
 
     // Check the function type has exactly three parameter types
-    try testing.expectEqual(@as(usize, 3), func_type.function_type.param_types.items.len);
+    try testing.expectEqual(@as(usize, 3), ftype.param_types.items.len);
 
-    for (func_type.function_type.param_types.items) |type_node| {
+    for (ftype.param_types.items) |type_node| {
         // Verify the parameter type is an upper-case identifier
         try testing.expect(type_node.* == .upper_identifier);
 
@@ -2952,15 +3070,15 @@ test "[FunctionTypeNode]" {
     }
 
     // Test specific positions of each Int
-    const first_int = func_type.function_type.param_types.items[0];
+    const first_int = ftype.param_types.items[0];
     try testing.expectEqual(@as(usize, 2), first_int.upper_identifier.token.loc.span.start);
     try testing.expectEqual(@as(usize, 3), first_int.upper_identifier.token.loc.src.col);
 
-    const second_int = func_type.function_type.param_types.items[1];
+    const second_int = ftype.param_types.items[1];
     try testing.expectEqual(@as(usize, 9), second_int.upper_identifier.token.loc.span.start);
     try testing.expectEqual(@as(usize, 10), second_int.upper_identifier.token.loc.src.col);
 
-    const third_int = func_type.function_type.param_types.items[2];
+    const third_int = ftype.param_types.items[2];
     try testing.expectEqual(@as(usize, 16), third_int.upper_identifier.token.loc.span.start);
     try testing.expectEqual(@as(usize, 17), third_int.upper_identifier.token.loc.src.col);
 }
