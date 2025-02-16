@@ -493,17 +493,6 @@ pub const PatternNode = union(enum) {
 
             return pattern;
         }
-
-        pub fn deinit(self: *PatternNode.list, allocator: std.mem.Allocator) void {
-            for (self.elements.items) |element| {
-                element.deinit(allocator);
-                allocator.destroy(element);
-            }
-
-            self.elements.deinit();
-
-            allocator.destroy(self);
-        }
     },
     variable: struct {
         /// The name of the variable to bind.
@@ -525,12 +514,6 @@ pub const PatternNode = union(enum) {
             };
 
             return pattern;
-        }
-
-        pub fn deinit(self: *PatternNode.variable, allocator: std.mem.Allocator) void {
-            allocator.free(self.name);
-
-            allocator.destroy(self);
         }
     },
     constructor: struct {
@@ -558,19 +541,6 @@ pub const PatternNode = union(enum) {
             };
 
             return pattern;
-        }
-
-        pub fn deinit(self: *PatternNode.constructor, allocator: std.mem.Allocator) void {
-            allocator.free(self.name);
-
-            for (self.args.items) |arg| {
-                arg.deinit(allocator);
-                allocator.destroy(arg);
-            }
-
-            self.args.deinit();
-
-            allocator.destroy(self);
         }
     },
     empty_list: struct {
@@ -603,17 +573,52 @@ pub const PatternNode = union(enum) {
 
             return pattern;
         }
-
-        pub fn deinit(self: *PatternNode.cons, allocator: std.mem.Allocator) void {
-            self.head.deinit(allocator);
-            allocator.destroy(self.head);
-
-            self.tail.deinit(allocator);
-            allocator.destroy(self.tail);
-
-            allocator.destroy(self);
-        }
     },
+
+    pub fn deinit(self: *PatternNode, allocator: std.mem.Allocator) void {
+        switch (self.*) {
+            .wildcard,
+            .int_literal,
+            .float_literal,
+            .char_literal,
+            .empty_list,
+            => {},
+            .string_literal => |*lit| {
+                lit.deinit(allocator);
+                allocator.destroy(lit);
+            },
+            .list => |list| {
+                for (list.elements.items) |element| {
+                    element.deinit(allocator);
+                    allocator.destroy(element);
+                }
+
+                list.elements.deinit();
+            },
+            .variable => |variable| {
+                allocator.free(variable.name);
+            },
+            .constructor => |constructor| {
+                allocator.free(constructor.name);
+
+                for (constructor.args.items) |arg| {
+                    arg.deinit(allocator);
+                    allocator.destroy(arg);
+                }
+
+                constructor.args.deinit();
+            },
+            .cons => |cons| {
+                cons.head.deinit(allocator);
+                allocator.destroy(cons.head);
+
+                cons.tail.deinit(allocator);
+                allocator.destroy(cons.tail);
+            },
+        }
+
+        allocator.destroy(self);
+    }
 };
 
 /// Represents a guard condition in a match case that must evaluate
@@ -2066,9 +2071,9 @@ pub const Node = union(enum) {
             // Basic Literals
             .comment => |comment| comment.deinit(allocator),
             .doc_comment => |comment| comment.deinit(allocator),
-            .int_literal => {}, // do nothing
-            .float_literal => {}, // do nothing
-            .char_literal => {}, // do nothing
+            .int_literal => {}, // no allocation
+            .float_literal => {}, // no allocation
+            .char_literal => {}, // no allocation
             .str_literal => |lit| lit.deinit(allocator),
             .multiline_str_literal => |lit| lit.deinit(allocator),
 
@@ -2087,21 +2092,7 @@ pub const Node = union(enum) {
             .comparison_expr => |expr| expr.deinit(allocator),
 
             // Pattern Matching
-            .pattern => |pat| {
-                switch (pat.*) {
-                    .wildcard,
-                    .int_literal,
-                    .float_literal,
-                    .char_literal,
-                    .empty_list,
-                    => {}, // do nothing
-                    .string_literal => |lit| lit.deinit(allocator),
-                    .list => |list| list.deinit(allocator),
-                    .variable => |v| v.deinit(allocator),
-                    .constructor => |con| con.deinit(allocator),
-                    .cons => |cons| cons.deinit(allocator),
-                }
-            },
+            .pattern => |pat| pat.deinit(allocator),
             .match_expr => |expr| expr.deinit(allocator),
 
             // Functions and Applications
@@ -2120,7 +2111,7 @@ pub const Node = union(enum) {
             .if_then_else_stmt => |stmt| stmt.deinit(allocator),
 
             // Type System
-            .typed_hole => {}, // do nothing
+            .typed_hole => {}, // no allocation
             .type_application => |app| app.deinit(allocator),
             .type_alias => |alias| alias.deinit(allocator),
             .variant_type => |vtype| vtype.deinit(allocator),
