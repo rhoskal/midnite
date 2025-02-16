@@ -227,6 +227,13 @@ pub const UnaryExprNode = struct {
 
     /// The token representing the operator.
     operator: lexer.Token,
+
+    pub fn deinit(self: *UnaryExprNode, allocator: std.mem.Allocator) void {
+        self.operand.deinit(allocator);
+        allocator.destroy(self.operand);
+
+        allocator.destroy(self);
+    }
 };
 
 pub const BinaryOp = struct {
@@ -238,6 +245,16 @@ pub const BinaryOp = struct {
 
     /// The token representing the operator.
     operator: lexer.Token,
+
+    pub fn deinit(self: *BinaryOp, allocator: std.mem.Allocator) void {
+        self.left.deinit(allocator);
+        allocator.destroy(self.left);
+
+        self.right.deinit(allocator);
+        allocator.destroy(self.right);
+
+        allocator.destroy(self);
+    }
 };
 
 /// A binary operation node representing arithmetic operations.
@@ -904,10 +921,10 @@ pub const Node = union(enum) {
     tuple: *TupleNode,
 
     // Basic Expressions
-    unary_expr: UnaryExprNode,
-    arithmetic_expr: ArithmeticExprNode,
-    logical_expr: LogicalExprNode,
-    comparison_expr: ComparisonExprNode,
+    unary_expr: *UnaryExprNode,
+    arithmetic_expr: *ArithmeticExprNode,
+    logical_expr: *LogicalExprNode,
+    comparison_expr: *ComparisonExprNode,
 
     // Pattern Matching
     pattern: PatternNode,
@@ -973,28 +990,10 @@ pub const Node = union(enum) {
             .tuple => |tuple| tuple.deinit(allocator),
 
             // Basic Expressions
-            .unary_expr => |*expr| {
-                expr.operand.deinit(allocator);
-                allocator.destroy(expr.operand);
-            },
-            .arithmetic_expr => |*expr| {
-                expr.left.deinit(allocator);
-                expr.right.deinit(allocator);
-                allocator.destroy(expr.left);
-                allocator.destroy(expr.right);
-            },
-            .logical_expr => |*expr| {
-                expr.left.deinit(allocator);
-                expr.right.deinit(allocator);
-                allocator.destroy(expr.left);
-                allocator.destroy(expr.right);
-            },
-            .comparison_expr => |*expr| {
-                expr.left.deinit(allocator);
-                expr.right.deinit(allocator);
-                allocator.destroy(expr.left);
-                allocator.destroy(expr.right);
-            },
+            .unary_expr => |expr| expr.deinit(allocator),
+            .arithmetic_expr => |expr| expr.deinit(allocator),
+            .logical_expr => |expr| expr.deinit(allocator),
+            .comparison_expr => |expr| expr.deinit(allocator),
 
             // Pattern Matching
             .pattern => |*pat| {
@@ -1347,8 +1346,10 @@ test "[CommentNode]" {
     // Verify the node is a regular comment
     try testing.expect(node.* == .comment);
 
+    const comment = node.comment;
+
     // Verify the content
-    try testing.expectEqualStrings(content, node.comment.content);
+    try testing.expectEqualStrings(content, comment.content);
 }
 
 test "[DocCommentNode]" {
@@ -1388,8 +1389,10 @@ test "[DocCommentNode]" {
     // Verify the node is a doc comment
     try testing.expect(node.* == .doc_comment);
 
+    const comment = node.doc_comment;
+
     // Verify the content
-    try testing.expectEqualStrings(content, node.doc_comment.content);
+    try testing.expectEqualStrings(content, comment.content);
 }
 
 test "[IntLiteralNode]" {
@@ -1428,8 +1431,10 @@ test "[IntLiteralNode]" {
     // Verify the node is an integer literal
     try testing.expect(node.* == .int_literal);
 
+    const int_literal = node.int_literal;
+
     // Verify the content
-    try testing.expect(node.int_literal.value == value);
+    try testing.expect(int_literal.value == value);
 }
 
 test "[FloatLiteralNode]" {
@@ -1468,8 +1473,10 @@ test "[FloatLiteralNode]" {
     // Verify the node is a float literal
     try testing.expect(node.* == .float_literal);
 
+    const float_literal = node.float_literal;
+
     // Verify the content
-    try testing.expect(node.float_literal.value == value);
+    try testing.expect(float_literal.value == value);
 }
 
 test "[CharLiteralNode]" {
@@ -1508,8 +1515,10 @@ test "[CharLiteralNode]" {
     // Verify the node is a character literal
     try testing.expect(node.* == .char_literal);
 
+    const char_literal = node.char_literal;
+
     // Verify the content
-    try testing.expect(node.char_literal.value == value);
+    try testing.expect(char_literal.value == value);
 }
 
 test "[StrLiteralNode]" {
@@ -1549,8 +1558,10 @@ test "[StrLiteralNode]" {
     // Verify the node is a string literal
     try testing.expect(node.* == .str_literal);
 
+    const str_literal = node.str_literal;
+
     // Verify the content
-    try testing.expectEqualStrings(value, node.str_literal.value);
+    try testing.expectEqualStrings(value, str_literal.value);
 }
 
 test "[MultilineStrLiteralNode]" {
@@ -1596,8 +1607,10 @@ test "[MultilineStrLiteralNode]" {
     // Verify the node is a string literal
     try testing.expect(node.* == .multiline_str_literal);
 
+    const multiline_str_literal = node.multiline_str_literal;
+
     // Verify the content
-    try testing.expectEqualStrings(value, node.multiline_str_literal.value);
+    try testing.expectEqualStrings(value, multiline_str_literal.value);
 }
 
 test "[LowerIdentifierNode]" {
@@ -1637,14 +1650,16 @@ test "[LowerIdentifierNode]" {
     // Verify the node is a lower identifier
     try testing.expect(node.* == .lower_identifier);
 
+    const lower_identifier = node.lower_identifier;
+
     // Verify the name of the identifier
-    try testing.expectEqualStrings(name, node.lower_identifier.name);
+    try testing.expectEqualStrings(name, lower_identifier.name);
 
     // Verify the token kind is a lower identifier
-    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, node.lower_identifier.token.kind);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, lower_identifier.token.kind);
 
     // Verify the lexeme matches the name
-    try testing.expectEqualStrings(name, node.lower_identifier.token.lexeme);
+    try testing.expectEqualStrings(name, lower_identifier.token.lexeme);
 }
 
 test "[UpperIdentifierNode]" {
@@ -1684,14 +1699,16 @@ test "[UpperIdentifierNode]" {
     // Verify the node is an upper identifier
     try testing.expect(node.* == .upper_identifier);
 
+    const upper_identifier = node.upper_identifier;
+
     // Verify the name of the identifier
-    try testing.expectEqualStrings(name, node.upper_identifier.name);
+    try testing.expectEqualStrings(name, upper_identifier.name);
 
     // Verify the token kind is an upper identifier
-    try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, node.upper_identifier.token.kind);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, upper_identifier.token.kind);
 
     // Verify the lexeme matches the name
-    try testing.expectEqualStrings(name, node.upper_identifier.token.lexeme);
+    try testing.expectEqualStrings(name, upper_identifier.token.lexeme);
 }
 
 test "[ListNode]" {
@@ -1894,29 +1911,30 @@ test "[UnaryExprNode]" {
         },
     };
 
-    const unary = try allocator.create(Node);
-    defer {
-        unary.deinit(allocator);
-        allocator.destroy(unary);
-    }
-
-    unary.* = .{
-        .unary_expr = .{
-            .operand = operand,
-            .operator = lexer.Token{
-                .kind = lexer.TokenKind{ .operator = .IntSub },
-                .lexeme = "-",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 1 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
+    const unary_node = try allocator.create(UnaryExprNode);
+    unary_node.* = .{
+        .operand = operand,
+        .operator = lexer.Token{
+            .kind = lexer.TokenKind{ .operator = .IntSub },
+            .lexeme = "-",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
             },
         },
     };
 
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .unary_expr = unary_node };
+
     // Assertions
-    const expr = unary.unary_expr;
+    const expr = node.unary_expr;
 
     // Verify the operator in the unary expression is an integer subtraction operator (-)
     try testing.expectEqual(lexer.TokenKind{ .operator = .IntSub }, expr.operator.kind);
@@ -1929,85 +1947,6 @@ test "[UnaryExprNode]" {
 
     // Check the value of the integer literal operand
     try testing.expect(expr.operand.int_literal.value == 42);
-}
-
-test "[BinaryExprNode]" {
-    // Test input: 42 + 24
-
-    // Setup
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-
-    // Action
-    const left = try allocator.create(Node);
-    left.* = .{
-        .int_literal = .{
-            .value = 42,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .Int },
-                .lexeme = "42",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 2 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
-            },
-        },
-    };
-
-    const right = try allocator.create(Node);
-    right.* = .{
-        .int_literal = .{
-            .value = 24,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .Int },
-                .lexeme = "24",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 6, .end = 8 },
-                    .src = .{ .line = 1, .col = 7 },
-                },
-            },
-        },
-    };
-
-    const binary = try allocator.create(Node);
-    defer {
-        binary.deinit(allocator);
-        allocator.destroy(binary);
-    }
-
-    binary.* = .{
-        .arithmetic_expr = .{
-            .left = left,
-            .right = right,
-            .operator = lexer.Token{
-                .kind = lexer.TokenKind{ .operator = .IntAdd },
-                .lexeme = "+",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 3, .end = 3 },
-                    .src = .{ .line = 1, .col = 4 },
-                },
-            },
-        },
-    };
-
-    // Assertions
-    // Verify the node is an arithmetic expression
-    try testing.expect(binary.* == .arithmetic_expr);
-
-    const expr = binary.arithmetic_expr;
-
-    // Verify the operator in the expression is an integer addition operator (+)
-    try testing.expectEqual(lexer.TokenKind{ .operator = .IntAdd }, expr.operator.kind);
-
-    // Check the left operand of the binary expression
-    try testing.expect(expr.left.int_literal.value == 42);
-
-    // Check the right operand of the binary expression
-    try testing.expect(expr.right.int_literal.value == 24);
 }
 
 test "[ArithmeticExprNode]" {
@@ -2051,27 +1990,28 @@ test "[ArithmeticExprNode]" {
         },
     };
 
+    const arithmetic_node = try allocator.create(ArithmeticExprNode);
+    arithmetic_node.* = .{
+        .left = left,
+        .right = right,
+        .operator = .{
+            .kind = .{ .operator = .IntMul },
+            .lexeme = "*",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 2, .end = 3 },
+                .src = .{ .line = 1, .col = 3 },
+            },
+        },
+    };
+
     const node = try allocator.create(Node);
     defer {
         node.deinit(allocator);
         allocator.destroy(node);
     }
 
-    node.* = .{
-        .arithmetic_expr = .{
-            .left = left,
-            .right = right,
-            .operator = .{
-                .kind = .{ .operator = .IntMul },
-                .lexeme = "*",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 2, .end = 3 },
-                    .src = .{ .line = 1, .col = 3 },
-                },
-            },
-        },
-    };
+    node.* = .{ .arithmetic_expr = arithmetic_node };
 
     // Assertions
     // Verify the node is an arithmetic expression
@@ -2100,34 +2040,52 @@ test "[LogicalExprNode]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const left = try allocator.create(Node);
-    left.* = .{
-        .lower_identifier = .{
-            .name = "a",
-            .token = .{
-                .kind = .{ .identifier = .Lower },
-                .lexeme = "a",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 1 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
+    // Action
+    const a_node = try allocator.create(LowerIdentifierNode);
+    a_node.* = .{
+        .name = try allocator.dupe(u8, "a"),
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "a",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
             },
         },
     };
 
+    const b_node = try allocator.create(LowerIdentifierNode);
+    b_node.* = .{
+        .name = try allocator.dupe(u8, "b"),
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "b",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 5, .end = 6 },
+                .src = .{ .line = 1, .col = 6 },
+            },
+        },
+    };
+
+    const left = try allocator.create(Node);
+    left.* = .{ .lower_identifier = a_node };
+
     const right = try allocator.create(Node);
-    right.* = .{
-        .lower_identifier = .{
-            .name = "b",
-            .token = .{
-                .kind = .{ .identifier = .Lower },
-                .lexeme = "b",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 5, .end = 6 },
-                    .src = .{ .line = 1, .col = 6 },
-                },
+    right.* = .{ .lower_identifier = b_node };
+
+    const logical_node = try allocator.create(LogicalExprNode);
+    logical_node.* = .{
+        .left = left,
+        .right = right,
+        .operator = .{
+            .kind = .{ .operator = .LogicalAnd },
+            .lexeme = "&&",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 2, .end = 4 },
+                .src = .{ .line = 1, .col = 3 },
             },
         },
     };
@@ -2138,21 +2096,7 @@ test "[LogicalExprNode]" {
         allocator.destroy(node);
     }
 
-    node.* = .{
-        .logical_expr = .{
-            .left = left,
-            .right = right,
-            .operator = .{
-                .kind = .{ .operator = .LogicalAnd },
-                .lexeme = "&&",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 2, .end = 4 },
-                    .src = .{ .line = 1, .col = 3 },
-                },
-            },
-        },
-    };
+    node.* = .{ .logical_expr = logical_node };
 
     // Assertions
     // Verify the node is a logical expression
@@ -2182,34 +2126,51 @@ test "[ComparisonExprNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const left = try allocator.create(Node);
-    left.* = .{
-        .lower_identifier = .{
-            .name = "x",
-            .token = .{
-                .kind = .{ .identifier = .Lower },
-                .lexeme = "x",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 1 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
+    const x_node = try allocator.create(LowerIdentifierNode);
+    x_node.* = .{
+        .name = try allocator.dupe(u8, "x"),
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "x",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
             },
         },
     };
 
+    const y_node = try allocator.create(LowerIdentifierNode);
+    y_node.* = .{
+        .name = try allocator.dupe(u8, "y"),
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "y",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 5, .end = 6 },
+                .src = .{ .line = 1, .col = 6 },
+            },
+        },
+    };
+
+    const left = try allocator.create(Node);
+    left.* = .{ .lower_identifier = x_node };
+
     const right = try allocator.create(Node);
-    right.* = .{
-        .lower_identifier = .{
-            .name = "y",
-            .token = .{
-                .kind = .{ .identifier = .Lower },
-                .lexeme = "y",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 5, .end = 6 },
-                    .src = .{ .line = 1, .col = 6 },
-                },
+    right.* = .{ .lower_identifier = y_node };
+
+    const comparison_node = try allocator.create(ComparisonExprNode);
+    comparison_node.* = .{
+        .left = left,
+        .right = right,
+        .operator = .{
+            .kind = .{ .operator = .LessThanEqual },
+            .lexeme = "<=",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 2, .end = 4 },
+                .src = .{ .line = 1, .col = 3 },
             },
         },
     };
@@ -2220,21 +2181,7 @@ test "[ComparisonExprNode]" {
         allocator.destroy(node);
     }
 
-    node.* = .{
-        .comparison_expr = .{
-            .left = left,
-            .right = right,
-            .operator = .{
-                .kind = .{ .operator = .LessThanEqual },
-                .lexeme = "<=",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 2, .end = 4 },
-                    .src = .{ .line = 1, .col = 3 },
-                },
-            },
-        },
-    };
+    node.* = .{ .comparison_expr = comparison_node };
 
     // Assertions
     // Verify the node is a comparison expression
