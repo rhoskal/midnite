@@ -437,6 +437,28 @@ pub const PatternNode = union(enum) {
 
         /// The token representing the start of the list pattern
         token: lexer.Token,
+
+        pub fn init(allocator: std.mem.Allocator, elements: std.ArrayList(*PatternNode), token: lexer.Token) !*PatternNode.list {
+            const pattern = try allocator.create(PatternNode.list);
+
+            pattern.* = .{
+                .elements = elements,
+                .token = token,
+            };
+
+            return pattern;
+        }
+
+        pub fn deinit(self: *PatternNode.list, allocator: std.mem.Allocator) void {
+            for (self.elements.items) |element| {
+                element.deinit(allocator);
+                allocator.destroy(element);
+            }
+
+            self.elements.deinit();
+
+            allocator.destroy(self);
+        }
     },
     variable: struct {
         /// The name of the variable to bind.
@@ -444,6 +466,23 @@ pub const PatternNode = union(enum) {
 
         /// The token representing the variable.
         token: lexer.Token,
+
+        pub fn init(allocator: std.mem.Allocator, name: []const u8, token: lexer.Token) !*PatternNode.variable {
+            const pattern = try allocator.create(PatternNode.variable);
+
+            pattern.* = .{
+                .name = try allocator.dupe(u8, name),
+                .token = token,
+            };
+
+            return pattern;
+        }
+
+        pub fn deinit(self: *PatternNode.variable, allocator: std.mem.Allocator) void {
+            allocator.free(self.name);
+
+            allocator.destroy(self);
+        }
     },
     constructor: struct {
         /// The name of the constructor.
@@ -454,6 +493,31 @@ pub const PatternNode = union(enum) {
 
         /// The token representing the constructor.
         token: lexer.Token,
+
+        pub fn init(allocator: std.mem.Allocator, name: []const u8, args: std.ArrayList(*PatternNode), token: lexer.Token) !*PatternNode.constructor {
+            const pattern = try allocator.create(PatternNode.constructor);
+
+            pattern.* = .{
+                .name = try allocator.dupe(u8, name),
+                .args = args,
+                .token = token,
+            };
+
+            return pattern;
+        }
+
+        pub fn deinit(self: *PatternNode.constructor, allocator: std.mem.Allocator) void {
+            allocator.free(self.name);
+
+            for (self.args.items) |arg| {
+                arg.deinit(allocator);
+                allocator.destroy(arg);
+            }
+
+            self.args.deinit();
+
+            allocator.destroy(self);
+        }
     },
     empty_list: struct {
         /// The token representing the empty list pattern.
@@ -468,6 +532,28 @@ pub const PatternNode = union(enum) {
 
         /// The token representing the cons pattern.
         token: lexer.Token,
+
+        pub fn init(allocator: std.mem.Allocator, head: *PatternNode, tail: *PatternNode, token: lexer.Token) !*PatternNode.cons {
+            const pattern = try allocator.create(PatternNode.cons);
+
+            pattern.* = .{
+                .head = head,
+                .tail = tail,
+                .token = token,
+            };
+
+            return pattern;
+        }
+
+        pub fn deinit(self: *PatternNode.cons, allocator: std.mem.Allocator) void {
+            self.head.deinit(allocator);
+            allocator.destroy(self.head);
+
+            self.tail.deinit(allocator);
+            allocator.destroy(self.tail);
+
+            allocator.destroy(self);
+        }
     },
 };
 
@@ -483,6 +569,24 @@ pub const GuardNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(allocator: std.mem.Allocator, condition: *Node, token: lexer.Token) !*GuardNode {
+        const node = try allocator.create(GuardNode);
+
+        node.* = .{
+            .condition = condition,
+            .token = token,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *GuardNode, allocator: std.mem.Allocator) void {
+        self.condition.deinit(allocator);
+        allocator.destroy(self.condition);
+
+        allocator.destroy(self);
+    }
 };
 
 /// A single pattern matching case with an optional guard condition.
@@ -503,6 +607,34 @@ pub const MatchCase = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(allocator: std.mem.Allocator, pattern: *PatternNode, expression: *Node, guard: ?*GuardNode, token: lexer.Token) !*MatchCase {
+        const case = try allocator.create(MatchCase);
+
+        case.* = .{
+            .pattern = pattern,
+            .expression = expression,
+            .guard = guard,
+            .token = token,
+        };
+
+        return case;
+    }
+
+    pub fn deinit(self: *MatchCase, allocator: std.mem.Allocator) void {
+        self.pattern.deinit(allocator);
+        allocator.destroy(self.pattern);
+
+        self.expression.deinit(allocator);
+        allocator.destroy(self.expression);
+
+        if (self.guard) |guard| {
+            guard.deinit(allocator);
+            allocator.destroy(guard);
+        }
+
+        allocator.destroy(self);
+    }
 };
 
 /// Represents a complete match expression that tests a value against multiple patterns.
@@ -521,6 +653,32 @@ pub const MatchExprNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(allocator: std.mem.Allocator, value: *Node, cases: std.ArrayList(MatchCase), token: lexer.Token) !*MatchExprNode {
+        const node = try allocator.create(MatchExprNode);
+
+        node.* = .{
+            .value = value,
+            .cases = cases,
+            .token = token,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *MatchExprNode, allocator: std.mem.Allocator) void {
+        self.value.deinit(allocator);
+        allocator.destroy(self.value);
+
+        for (self.cases.items) |*case| {
+            case.deinit(allocator);
+            allocator.destroy(case);
+        }
+
+        self.cases.deinit();
+
+        allocator.destroy(self);
+    }
 };
 
 //==========================================================================
@@ -658,6 +816,28 @@ pub const ConsExprNode = struct {
 
     /// The token representing the cons operator.
     operator: lexer.Token,
+
+    pub fn init(allocator: std.mem.Allocator, head: *Node, tail: *Node, operator: lexer.Token) !*ConsExprNode {
+        const node = try allocator.create(ConsExprNode);
+
+        node.* = .{
+            .head = head,
+            .tail = tail,
+            .operator = operator,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *ConsExprNode, allocator: std.mem.Allocator) void {
+        self.head.deinit(allocator);
+        allocator.destroy(self.head);
+
+        self.tail.deinit(allocator);
+        allocator.destroy(self.tail);
+
+        allocator.destroy(self);
+    }
 };
 
 /// Represents a binary operation that concatenates two strings.
@@ -689,6 +869,28 @@ pub const CompositionExprNode = struct {
 
     /// The token representing the composition operator.
     operator: lexer.Token,
+
+    pub fn init(allocator: std.mem.Allocator, first: *Node, second: *Node, operator: lexer.Token) !*CompositionExprNode {
+        const node = try allocator.create(CompositionExprNode);
+
+        node.* = .{
+            .first = first,
+            .second = second,
+            .operator = operator,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *CompositionExprNode, allocator: std.mem.Allocator) void {
+        self.first.deinit(allocator);
+        allocator.destroy(self.first);
+
+        self.second.deinit(allocator);
+        allocator.destroy(self.second);
+
+        allocator.destroy(self);
+    }
 };
 
 /// Represents a binary operation that passes a value through a pipeline
@@ -706,6 +908,28 @@ pub const PipeExprNode = struct {
 
     /// The token representing the pipe operator.
     operator: lexer.Token,
+
+    pub fn init(allocator: std.mem.Allocator, value: *Node, func: *Node, operator: lexer.Token) !*PipeExprNode {
+        const node = try allocator.create(PipeExprNode);
+
+        node.* = .{
+            .value = value,
+            .func = func,
+            .operator = operator,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *PipeExprNode, allocator: std.mem.Allocator) void {
+        self.value.deinit(allocator);
+        allocator.destroy(self.value);
+
+        self.func.deinit(allocator);
+        allocator.destroy(self.func);
+
+        allocator.destroy(self);
+    }
 };
 
 //==========================================================================
@@ -729,6 +953,31 @@ pub const IfThenElseStmtNode = struct {
 
     /// The AST node representing the expression to evaluate if condition is false.
     else_branch: *Node,
+
+    pub fn init(allocator: std.mem.Allocator, condition: *Node, then_branch: *Node, else_branch: *Node) !*IfThenElseStmtNode {
+        const node = try allocator.create(IfThenElseStmtNode);
+
+        node.* = .{
+            .condition = condition,
+            .then_branch = then_branch,
+            .else_branch = else_branch,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *IfThenElseStmtNode, allocator: std.mem.Allocator) void {
+        self.condition.deinit(allocator);
+        allocator.destroy(self.condition);
+
+        self.then_branch.deinit(allocator);
+        allocator.destroy(self.then_branch);
+
+        self.else_branch.deinit(allocator);
+        allocator.destroy(self.else_branch);
+
+        allocator.destroy(self);
+    }
 };
 
 //==========================================================================
@@ -764,6 +1013,32 @@ pub const TypeApplicationNode = struct {
 
     /// The token representing the type application.
     token: lexer.Token,
+
+    pub fn init(allocator: std.mem.Allocator, base: *Node, args: std.ArrayList(*Node), token: lexer.Token) !*TypeApplicationNode {
+        const node = try allocator.create(TypeApplicationNode);
+
+        node.* = .{
+            .base = base,
+            .args = args,
+            .token = token,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *TypeApplicationNode, allocator: std.mem.Allocator) void {
+        self.base.deinit(allocator);
+        allocator.destroy(self.base);
+
+        for (self.args.items) |arg| {
+            arg.deinit(allocator);
+            allocator.destroy(arg);
+        }
+
+        self.args.deinit();
+
+        allocator.destroy(self);
+    }
 };
 
 /// Represents a type alias declaration that creates a new name for an existing type.
@@ -787,6 +1062,34 @@ pub const TypeAliasNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(allocator: std.mem.Allocator, name: []const u8, type_params: std.ArrayList([]const u8), value: *Node, token: lexer.Token) !*TypeAliasNode {
+        const node = try allocator.create(TypeAliasNode);
+
+        node.* = .{
+            .name = try allocator.dupe(u8, name),
+            .type_params = type_params,
+            .value = value,
+            .token = token,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *TypeAliasNode, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+
+        for (self.type_params.items) |param| {
+            allocator.free(param);
+        }
+
+        self.type_params.deinit();
+
+        self.value.deinit(allocator);
+        allocator.destroy(self.value);
+
+        allocator.destroy(self);
+    }
 };
 
 /// Represents a constructor for a variant type with an optional list of type parameters.
@@ -806,6 +1109,31 @@ pub const VariantConstructorNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(allocator: std.mem.Allocator, name: []const u8, params: std.ArrayList(*Node), token: lexer.Token) !*VariantConstructorNode {
+        const node = try allocator.create(VariantConstructorNode);
+
+        node.* = .{
+            .name = try allocator.dupe(u8, name),
+            .params = params,
+            .token = token,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *VariantConstructorNode, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+
+        for (self.params.items) |param| {
+            param.deinit(allocator);
+            allocator.destroy(param);
+        }
+
+        self.params.deinit();
+
+        allocator.destroy(self);
+    }
 };
 
 /// Represents a variant type declaration with a list of constructors.
@@ -829,6 +1157,37 @@ pub const VariantTypeNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(allocator: std.mem.Allocator, name: []const u8, type_params: std.ArrayList([]const u8), constructors: std.ArrayList(VariantConstructorNode), token: lexer.Token) !*VariantTypeNode {
+        const node = try allocator.create(VariantTypeNode);
+
+        node.* = .{
+            .name = try allocator.dupe(u8, name),
+            .type_params = type_params,
+            .constructors = constructors,
+            .token = token,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *VariantTypeNode, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+
+        for (self.type_params.items) |param| {
+            allocator.free(param);
+        }
+
+        self.type_params.deinit();
+
+        for (self.constructors.items) |*constructor| {
+            constructor.deinit(allocator);
+        }
+
+        self.constructors.deinit();
+
+        allocator.destroy(self);
+    }
 };
 
 /// Represents a field in a record type with a name and type.
@@ -841,6 +1200,27 @@ pub const RecordFieldNode = struct {
 
     /// The token representing this field declaration.
     token: lexer.Token,
+
+    pub fn init(allocator: std.mem.Allocator, name: []const u8, type_node: *Node, token: lexer.Token) !*RecordFieldNode {
+        const node = try allocator.create(RecordFieldNode);
+
+        node.* = .{
+            .name = try allocator.dupe(u8, name),
+            .type = type_node,
+            .token = token,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *RecordFieldNode, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+
+        self.type.deinit(allocator);
+        allocator.destroy(self.type);
+
+        allocator.destroy(self);
+    }
 };
 
 /// Represents a record type declaration with named fields and types.
@@ -860,6 +1240,37 @@ pub const RecordTypeNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub fn init(allocator: std.mem.Allocator, name: []const u8, type_params: std.ArrayList([]const u8), fields: std.ArrayList(RecordFieldNode), token: lexer.Token) !*RecordTypeNode {
+        const node = try allocator.create(RecordTypeNode);
+
+        node.* = .{
+            .name = try allocator.dupe(u8, name),
+            .type_params = type_params,
+            .fields = fields,
+            .token = token,
+        };
+
+        return node;
+    }
+
+    pub fn deinit(self: *RecordTypeNode, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+
+        for (self.type_params.items) |param| {
+            allocator.free(param);
+        }
+
+        self.type_params.deinit();
+
+        for (self.fields.items) |*field| {
+            field.deinit(allocator);
+        }
+
+        self.fields.deinit();
+
+        allocator.destroy(self);
+    }
 };
 
 //==========================================================================
@@ -1128,8 +1539,8 @@ pub const Node = union(enum) {
     comparison_expr: *ComparisonExprNode,
 
     // Pattern Matching
-    pattern: PatternNode,
-    match_expr: MatchExprNode,
+    pattern: *PatternNode,
+    match_expr: *MatchExprNode,
 
     // Functions and Applications
     function_type: *FunctionTypeNode,
@@ -1137,21 +1548,21 @@ pub const Node = union(enum) {
     function_application: *FuncApplicationNode,
 
     // Advanced Expressions
-    cons_expr: ConsExprNode,
-    str_concat_expr: StrConcatExprNode,
-    list_concat_expr: ListConcatExprNode,
-    composition_expr: CompositionExprNode,
-    pipe_expr: PipeExprNode,
+    cons_expr: *ConsExprNode,
+    str_concat_expr: *StrConcatExprNode,
+    list_concat_expr: *ListConcatExprNode,
+    composition_expr: *CompositionExprNode,
+    pipe_expr: *PipeExprNode,
 
     // Control Flow
-    if_then_else_stmt: IfThenElseStmtNode,
+    if_then_else_stmt: *IfThenElseStmtNode,
 
     // Type System
     typed_hole: TypedHoleNode,
-    type_application: TypeApplicationNode,
-    type_alias: TypeAliasNode,
-    variant_type: VariantTypeNode,
-    record_type: RecordTypeNode,
+    type_application: *TypeApplicationNode,
+    type_alias: *TypeAliasNode,
+    variant_type: *VariantTypeNode,
+    record_type: *RecordTypeNode,
 
     // Module System
     module_path: ModulePathNode,
@@ -1197,30 +1608,22 @@ pub const Node = union(enum) {
             .comparison_expr => |expr| expr.deinit(allocator),
 
             // Pattern Matching
-            .pattern => |*pat| {
-                deinitPattern(allocator, pat);
-            },
-            .match_expr => |*expr| {
-                expr.value.deinit(allocator);
-                allocator.destroy(expr.value);
-
-                for (expr.cases.items) |*case| {
-                    deinitPattern(allocator, case.pattern);
-
-                    allocator.destroy(case.pattern);
-
-                    case.expression.deinit(allocator);
-                    allocator.destroy(case.expression);
-
-                    if (case.guard) |guard| {
-                        guard.condition.deinit(allocator);
-                        allocator.destroy(guard.condition);
-                        allocator.destroy(guard);
-                    }
+            .pattern => |pat| {
+                switch (pat.*) {
+                    .wildcard,
+                    .int_literal,
+                    .float_literal,
+                    .char_literal,
+                    .empty_list,
+                    => {}, // do nothing
+                    .string_literal => |lit| lit.deinit(allocator),
+                    .list => |list| list.deinit(allocator),
+                    .variable => |v| v.deinit(allocator),
+                    .constructor => |con| con.deinit(allocator),
+                    .cons => |cons| cons.deinit(allocator),
                 }
-
-                expr.cases.deinit();
             },
+            .match_expr => |expr| expr.deinit(allocator),
 
             // Functions and Applications
             .function_type => |ftype| ftype.deinit(allocator),
@@ -1228,111 +1631,21 @@ pub const Node = union(enum) {
             .function_application => |expr| expr.deinit(allocator),
 
             // Advanced Expressions
-            .cons_expr => |*expr| {
-                expr.head.deinit(allocator);
-                expr.tail.deinit(allocator);
-                allocator.destroy(expr.head);
-                allocator.destroy(expr.tail);
-            },
-            .str_concat_expr => |*expr| {
-                expr.left.deinit(allocator);
-                expr.right.deinit(allocator);
-                allocator.destroy(expr.left);
-                allocator.destroy(expr.right);
-            },
-            .list_concat_expr => |*expr| {
-                expr.left.deinit(allocator);
-                expr.right.deinit(allocator);
-                allocator.destroy(expr.left);
-                allocator.destroy(expr.right);
-            },
-            .composition_expr => |*expr| {
-                expr.first.deinit(allocator);
-                expr.second.deinit(allocator);
-                allocator.destroy(expr.first);
-                allocator.destroy(expr.second);
-            },
-            .pipe_expr => |*expr| {
-                expr.value.deinit(allocator);
-                expr.func.deinit(allocator);
-                allocator.destroy(expr.value);
-                allocator.destroy(expr.func);
-            },
+            .cons_expr => |expr| expr.deinit(allocator),
+            .str_concat_expr => |expr| expr.deinit(allocator),
+            .list_concat_expr => |expr| expr.deinit(allocator),
+            .composition_expr => |expr| expr.deinit(allocator),
+            .pipe_expr => |expr| expr.deinit(allocator),
 
             // Control Flow
-            .if_then_else_stmt => |*stmt| {
-                stmt.condition.deinit(allocator);
-                stmt.else_branch.deinit(allocator);
-                stmt.then_branch.deinit(allocator);
-                allocator.destroy(stmt.condition);
-                allocator.destroy(stmt.else_branch);
-                allocator.destroy(stmt.then_branch);
-            },
+            .if_then_else_stmt => |stmt| stmt.deinit(allocator),
 
             // Type System
-            .typed_hole => {
-                // do nothing
-            },
-            .type_application => |*app| {
-                app.base.deinit(allocator);
-                allocator.destroy(app.base);
-
-                for (app.args.items) |arg| {
-                    arg.deinit(allocator);
-                    allocator.destroy(arg);
-                }
-
-                app.args.deinit();
-            },
-            .type_alias => |*alias| {
-                allocator.free(alias.name);
-
-                for (alias.type_params.items) |param| {
-                    allocator.free(param);
-                }
-
-                alias.type_params.deinit();
-
-                alias.value.deinit(allocator);
-                allocator.destroy(alias.value);
-            },
-            .variant_type => |*vtype| {
-                allocator.free(vtype.name);
-
-                for (vtype.type_params.items) |param| {
-                    allocator.free(param);
-                }
-
-                vtype.type_params.deinit();
-
-                for (vtype.constructors.items) |*constructor| {
-                    for (constructor.params.items) |param| {
-                        param.deinit(allocator);
-                        allocator.destroy(param);
-                    }
-
-                    constructor.params.deinit();
-                }
-
-                vtype.constructors.deinit();
-            },
-            .record_type => |*rtype| {
-                allocator.free(rtype.name);
-
-                for (rtype.type_params.items) |param| {
-                    allocator.free(param);
-                }
-
-                rtype.type_params.deinit();
-
-                for (rtype.fields.items) |field| {
-                    allocator.free(field.name);
-                    field.type.deinit(allocator);
-                    allocator.destroy(field.type);
-                }
-
-                rtype.fields.deinit();
-            },
+            .typed_hole => {}, // do nothing
+            .type_application => |app| app.deinit(allocator),
+            .type_alias => |alias| alias.deinit(allocator),
+            .variant_type => |vtype| vtype.deinit(allocator),
+            .record_type => |rtype| rtype.deinit(allocator),
 
             // Module System
             .module_path => |*path| {
@@ -1441,45 +1754,6 @@ pub const Node = union(enum) {
 
                 prog.statements.deinit();
                 allocator.destroy(self);
-            },
-        }
-    }
-
-    fn deinitPattern(allocator: std.mem.Allocator, pattern: *PatternNode) void {
-        switch (pattern.*) {
-            .wildcard,
-            .int_literal,
-            .float_literal,
-            .char_literal,
-            .empty_list,
-            .variable,
-            => {
-                // do nothing
-            },
-            .string_literal => |lit| {
-                allocator.free(lit.value);
-            },
-            .constructor => |*con| {
-                for (con.args.items) |arg| {
-                    deinitPattern(allocator, arg);
-                    allocator.destroy(arg);
-                }
-
-                con.args.deinit();
-            },
-            .cons => |*cons| {
-                deinitPattern(allocator, cons.head);
-                deinitPattern(allocator, cons.tail);
-                allocator.destroy(cons.head);
-                allocator.destroy(cons.tail);
-            },
-            .list => |*list| {
-                for (list.elements.items) |element| {
-                    deinitPattern(allocator, element);
-                    allocator.destroy(element);
-                }
-
-                list.elements.deinit();
             },
         }
     }
@@ -2423,21 +2697,19 @@ test "[MatchExprNode]" {
         // Test input: match opt on | Some x => x | None => 0
 
         // Action
-        const value = try allocator.create(Node);
-        value.* = .{
-            .upper_identifier = .{
-                .name = "Some",
-                .token = .{
-                    .kind = .{ .identifier = .Upper },
-                    .lexeme = "Some",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 0, .end = 4 },
-                        .src = .{ .line = 1, .col = 1 },
-                    },
+        const value_node = try UpperIdentifierNode.init(
+            allocator,
+            "Some",
+            lexer.Token{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "Some",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
                 },
             },
-        };
+        );
 
         // Create patterns
         var cases = std.ArrayList(MatchCase).init(allocator);
@@ -2568,7 +2840,7 @@ test "[MatchExprNode]" {
 
         node.* = .{
             .match_expr = .{
-                .value = value,
+                .value = value_node,
                 .cases = cases,
                 .token = .{
                     .kind = .{ .keyword = .Match },
@@ -3440,65 +3712,69 @@ test "[ConsExprNode]" {
     try elements.append(two);
     try elements.append(three);
 
-    const tail = try allocator.create(Node);
-    tail.* = .{
-        .list = .{
-            .elements = elements,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
-                .lexeme = "[",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 5, .end = 6 },
-                    .src = .{ .line = 1, .col = 6 },
-                },
+    const tail_node = try ListNode.init(
+        allocator,
+        elements,
+        lexer.Token{
+            .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
+            .lexeme = "[",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 5, .end = 6 },
+                .src = .{ .line = 1, .col = 6 },
             },
         },
-    };
+    );
 
-    const cons = try allocator.create(Node);
+    const tail = try allocator.create(Node);
+    tail.* = .{ .list = tail_node };
+
+    const cons_node = ConsExprNode.init(
+        allocator,
+        head,
+        tail,
+        lexer.Token{
+            .kind = lexer.TokenKind{ .operator = .Cons },
+            .lexeme = "::",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 2, .end = 3 },
+                .src = .{ .line = 1, .col = 3 },
+            },
+        },
+    );
+
+    const node = try allocator.create(Node);
     defer {
-        cons.deinit(allocator);
-        allocator.destroy(cons);
+        node.deinit(allocator);
+        allocator.destroy(node);
     }
 
-    cons.* = .{
-        .cons_expr = .{
-            .head = head,
-            .tail = tail,
-            .operator = lexer.Token{
-                .kind = lexer.TokenKind{ .operator = .Cons },
-                .lexeme = "::",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 2, .end = 3 },
-                    .src = .{ .line = 1, .col = 3 },
-                },
-            },
-        },
-    };
+    node.* = .{ .cons_expr = cons_node };
 
     // Assertions
     // Verify the expression is a cons expression (::)
-    try testing.expect(cons.* == .cons_expr);
+    try testing.expect(node.* == .cons_expr);
+
+    const cons = node.cons_expr;
 
     // Verify the operator in the cons expression is a cons operator (::)
-    try testing.expectEqual(lexer.TokenKind{ .operator = .Cons }, cons.cons_expr.operator.kind);
+    try testing.expectEqual(lexer.TokenKind{ .operator = .Cons }, cons.operator.kind);
 
     // Verify the lexeme of the cons operator is "::"
-    try testing.expectEqualStrings("::", cons.cons_expr.operator.lexeme);
+    try testing.expectEqualStrings("::", cons.operator.lexeme);
 
     // Verify the head of the cons expression is an integer literal with the value 1
-    try testing.expect(cons.cons_expr.head.* == .int_literal);
-    try testing.expectEqual(@as(i64, 1), cons.cons_expr.head.int_literal.value);
+    try testing.expect(cons.head.* == .int_literal);
+    try testing.expectEqual(@as(i64, 1), cons.head.int_literal.value);
 
     // Verify the tail of the cons expression is a list
-    try testing.expect(cons.cons_expr.tail.* == .list);
+    try testing.expect(cons.tail.* == .list);
 
     // Verify the list in the tail has exactly 2 elements
-    try testing.expectEqual(@as(usize, 2), cons.cons_expr.tail.list.elements.items.len);
+    try testing.expectEqual(@as(usize, 2), cons.tail.list.elements.items.len);
 
-    const list_elements = cons.cons_expr.tail.list.elements.items;
+    const list_elements = cons.tail.list.elements.items;
 
     // Verify the first element in the list is an integer literal with the value 2
     try testing.expect(list_elements[0].* == .int_literal);
