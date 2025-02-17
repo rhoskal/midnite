@@ -847,14 +847,23 @@ pub const LambdaExprNode = struct {
 
     pub const InitParams = struct {
         parameters: std.ArrayList([]const u8),
+        body: *Node,
         token: lexer.Token,
     };
 
     pub fn init(allocator: std.mem.Allocator, params: InitParams) !*LambdaExprNode {
         const node = try allocator.create(LambdaExprNode);
 
+        var param_list = std.ArrayList([]const u8).init(allocator);
+        errdefer param_list.deinit();
+
+        for (params.parameters.items) |param| {
+            const duped = try allocator.dupe(u8, param);
+            try param_list.append(duped);
+        }
+
         node.* = .{
-            .parameters = params.parameters,
+            .parameters = param_list,
             .body = params.body,
             .token = params.token,
         };
@@ -863,11 +872,11 @@ pub const LambdaExprNode = struct {
     }
 
     pub fn deinit(self: *LambdaExprNode, allocator: std.mem.Allocator) void {
-        for (self.params.items) |param| {
+        for (self.parameters.items) |param| {
             allocator.free(param);
         }
 
-        self.params.deinit();
+        self.parameters.deinit();
 
         self.body.deinit(allocator);
         allocator.destroy(self.body);
@@ -1406,8 +1415,8 @@ pub const RecordFieldNode = struct {
     pub fn deinit(self: *RecordFieldNode, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
 
-        self.type.deinit(allocator);
-        allocator.destroy(self.type);
+        self.field_type.deinit(allocator);
+        allocator.destroy(self.field_type);
 
         allocator.destroy(self);
     }
@@ -2653,8 +2662,6 @@ test "[ListNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    var elements = std.ArrayList(*Node).init(allocator);
-
     const elem1 = try allocator.create(Node);
     elem1.* = .{
         .int_literal = IntLiteralNode.init(.{
@@ -2687,6 +2694,7 @@ test "[ListNode]" {
         }),
     };
 
+    var elements = std.ArrayList(*Node).init(allocator);
     try elements.append(elem1);
     try elements.append(elem2);
 
@@ -2739,8 +2747,6 @@ test "[TupleNode]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var elements = std.ArrayList(*Node).init(allocator);
-
     const first = try allocator.create(Node);
     first.* = .{
         .int_literal = IntLiteralNode.init(.{
@@ -2773,6 +2779,7 @@ test "[TupleNode]" {
         }),
     };
 
+    var elements = std.ArrayList(*Node).init(allocator);
     try elements.append(first);
     try elements.append(second);
 
@@ -3137,4 +3144,931 @@ test "[ComparisonExprNode]" {
     // Test right operand
     try testing.expect(expr.right.* == .lower_identifier);
     try testing.expectEqualStrings("y", expr.right.lower_identifier.name);
+}
+
+test "[FunctionTypeNode]" {
+    // Test input: : Int -> Int -> Int
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    const int_type1 = try allocator.create(Node);
+    int_type1.* = .{
+        .upper_identifier = try UpperIdentifierNode.init(allocator, .{
+            .name = "Int",
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .identifier = .Upper },
+                .lexeme = "Int",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 2, .end = 5 },
+                    .src = .{ .line = 1, .col = 3 },
+                },
+            },
+        }),
+    };
+
+    const int_type2 = try allocator.create(Node);
+    int_type2.* = .{
+        .upper_identifier = try UpperIdentifierNode.init(allocator, .{
+            .name = "Int",
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .identifier = .Upper },
+                .lexeme = "Int",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 9, .end = 12 },
+                    .src = .{ .line = 1, .col = 10 },
+                },
+            },
+        }),
+    };
+
+    const int_type3 = try allocator.create(Node);
+    int_type3.* = .{
+        .upper_identifier = try UpperIdentifierNode.init(allocator, .{
+            .name = "Int",
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .identifier = .Upper },
+                .lexeme = "Int",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 16, .end = 19 },
+                    .src = .{ .line = 1, .col = 17 },
+                },
+            },
+        }),
+    };
+
+    var param_types = std.ArrayList(*Node).init(allocator);
+    try param_types.append(int_type1);
+    try param_types.append(int_type2);
+    try param_types.append(int_type3);
+
+    const params = FunctionTypeNode.InitParams{
+        .param_types = param_types,
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .delimiter = .Colon },
+            .lexeme = ":",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const ftype_node = try FunctionTypeNode.init(allocator, params);
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .function_type = ftype_node };
+
+    // Assertions
+    // Verify the node is a function type
+    try testing.expect(node.* == .function_type);
+
+    const ftype = node.function_type;
+
+    // Check the delimiter in the function type is a colon (:)
+    try testing.expectEqual(lexer.TokenKind{ .delimiter = .Colon }, ftype.token.kind);
+
+    // Verify the lexeme
+    try testing.expectEqualStrings(":", ftype.token.lexeme);
+
+    // Check the function type has exactly three parameter types
+    try testing.expectEqual(@as(usize, 3), ftype.param_types.items.len);
+
+    for (ftype.param_types.items) |type_node| {
+        // Verify the parameter type is an upper-case identifier
+        try testing.expect(type_node.* == .upper_identifier);
+
+        // Ensure the token kind of the parameter type is an upper-case identifier
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, type_node.upper_identifier.token.kind);
+
+        // Check the name of the parameter type
+        try testing.expectEqualStrings("Int", type_node.upper_identifier.name);
+
+        // Check the lexeme for the parameter type
+        try testing.expectEqualStrings("Int", type_node.upper_identifier.token.lexeme);
+    }
+
+    // Test specific positions of each Int
+    const first_int = ftype.param_types.items[0];
+    try testing.expectEqual(@as(usize, 2), first_int.upper_identifier.token.loc.span.start);
+    try testing.expectEqual(@as(usize, 3), first_int.upper_identifier.token.loc.src.col);
+
+    const second_int = ftype.param_types.items[1];
+    try testing.expectEqual(@as(usize, 9), second_int.upper_identifier.token.loc.span.start);
+    try testing.expectEqual(@as(usize, 10), second_int.upper_identifier.token.loc.src.col);
+
+    const third_int = ftype.param_types.items[2];
+    try testing.expectEqual(@as(usize, 16), third_int.upper_identifier.token.loc.span.start);
+    try testing.expectEqual(@as(usize, 17), third_int.upper_identifier.token.loc.src.col);
+}
+
+test "[LambdaExprNode]" {
+    // Test input: \x y => x + y
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    var parameters = std.ArrayList([]const u8).init(allocator);
+    try parameters.append("x");
+    try parameters.append("y");
+
+    const left = try allocator.create(Node);
+    left.* = .{
+        .lower_identifier = try LowerIdentifierNode.init(allocator, .{
+            .name = "x",
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .identifier = .Lower },
+                .lexeme = "x",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 7, .end = 8 },
+                    .src = .{ .line = 1, .col = 8 },
+                },
+            },
+        }),
+    };
+
+    const right = try allocator.create(Node);
+    right.* = .{
+        .lower_identifier = try LowerIdentifierNode.init(allocator, .{
+            .name = "y",
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .identifier = .Lower },
+                .lexeme = "y",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 10, .end = 11 },
+                    .src = .{ .line = 1, .col = 11 },
+                },
+            },
+        }),
+    };
+
+    const body = try allocator.create(Node);
+    body.* = .{
+        .arithmetic_expr = try ArithmeticExprNode.init(allocator, .{
+            .left = left,
+            .right = right,
+            .operator = lexer.Token{
+                .kind = lexer.TokenKind{ .operator = .IntAdd },
+                .lexeme = "+",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 8, .end = 9 },
+                    .src = .{ .line = 1, .col = 9 },
+                },
+            },
+        }),
+    };
+
+    const params = LambdaExprNode.InitParams{
+        .parameters = parameters,
+        .body = body,
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .operator = .Lambda },
+            .lexeme = "\\",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const lambda_node = try LambdaExprNode.init(allocator, params);
+    parameters.deinit();
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .lambda_expr = lambda_node };
+
+    // Assertions
+    // Verify the node is a lambda expression
+    try testing.expect(node.* == .lambda_expr);
+
+    const expr = node.lambda_expr;
+
+    // Verify that the lambda expression has exactly two parameters
+    try testing.expectEqual(@as(usize, 2), expr.parameters.items.len);
+
+    // Ensure the first parameter is named "x"
+    try testing.expectEqualStrings("x", expr.parameters.items[0]);
+
+    // Ensure the second parameter is named "y"
+    try testing.expectEqualStrings("y", expr.parameters.items[1]);
+
+    // Verify the token kind matches
+    try testing.expectEqual(lexer.TokenKind{ .operator = .Lambda }, expr.token.kind);
+
+    // Verify the token lexeme matches
+    try testing.expectEqualStrings("\\", expr.token.lexeme);
+
+    const lambda_body = expr.body.arithmetic_expr;
+
+    // Verify the operator in the arithmetic expression is an integer addition operator (+)
+    try testing.expectEqual(lexer.TokenKind{ .operator = .IntAdd }, lambda_body.operator.kind);
+
+    // Ensure the lexeme for the addition operator is "+"
+    try testing.expectEqualStrings("+", lambda_body.operator.lexeme);
+
+    // Check the left operand is a lower-case identifier
+    try testing.expect(lambda_body.left.* == .lower_identifier);
+
+    // Verify the name of the left identifier is "x"
+    try testing.expectEqualStrings("x", lambda_body.left.lower_identifier.name);
+
+    // Ensure the token kind of the left identifier is a lower-case identifier
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, lambda_body.left.lower_identifier.token.kind);
+}
+
+test "[FuncApplicationNode]" {
+    // Test input: not True
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    const func = try allocator.create(Node);
+    func.* = .{
+        .lower_identifier = try LowerIdentifierNode.init(allocator, .{
+            .name = "not",
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .identifier = .Lower },
+                .lexeme = "not",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 3 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        }),
+    };
+
+    const arg = try allocator.create(Node);
+    arg.* = .{
+        .upper_identifier = try UpperIdentifierNode.init(allocator, .{
+            .name = "True",
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .identifier = .Upper },
+                .lexeme = "True",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 4, .end = 8 },
+                    .src = .{ .line = 1, .col = 5 },
+                },
+            },
+        }),
+    };
+
+    const params = FuncApplicationNode.InitParams{
+        .function = func,
+        .argument = arg,
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .identifier = .Lower },
+            .lexeme = "not",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 3 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const func_app = try FuncApplicationNode.init(allocator, params);
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .function_application = func_app };
+
+    // Assertions
+    const app = node.function_application;
+
+    // Verify that the function is a lower identifier named "not"
+    try testing.expect(app.function.* == .lower_identifier);
+    try testing.expectEqualStrings("not", app.function.lower_identifier.name);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, app.function.lower_identifier.token.kind);
+    try testing.expectEqualStrings("not", app.function.lower_identifier.token.lexeme);
+
+    // Verify that the argument is an upper identifier named "True"
+    try testing.expect(app.argument.* == .upper_identifier);
+    try testing.expectEqualStrings("True", app.argument.upper_identifier.name);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, app.argument.upper_identifier.token.kind);
+    try testing.expectEqualStrings("True", app.argument.upper_identifier.token.lexeme);
+
+    // Verify the function application token matches the function's token
+    try testing.expectEqual(app.token.kind, app.function.lower_identifier.token.kind);
+    try testing.expectEqualStrings(app.token.lexeme, app.function.lower_identifier.token.lexeme);
+}
+
+test "[ConsExprNode]" {
+    // Test input: 1 :: [2, 3]
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    const one = try allocator.create(Node);
+    one.* = .{
+        .int_literal = IntLiteralNode.init(.{
+            .value = 1,
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .literal = .Int },
+                .lexeme = "1",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        }),
+    };
+
+    const two = try allocator.create(Node);
+    two.* = .{
+        .int_literal = IntLiteralNode.init(.{
+            .value = 2,
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .literal = .Int },
+                .lexeme = "2",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 6, .end = 7 },
+                    .src = .{ .line = 1, .col = 7 },
+                },
+            },
+        }),
+    };
+
+    const three = try allocator.create(Node);
+    three.* = .{
+        .int_literal = IntLiteralNode.init(.{
+            .value = 3,
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .literal = .Int },
+                .lexeme = "3",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 9, .end = 10 },
+                    .src = .{ .line = 1, .col = 10 },
+                },
+            },
+        }),
+    };
+
+    var elements = std.ArrayList(*Node).init(allocator);
+    try elements.append(two);
+    try elements.append(three);
+
+    const tail = try allocator.create(Node);
+    tail.* = .{
+        .list = try ListNode.init(allocator, .{
+            .elements = elements,
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
+                .lexeme = "[",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 5, .end = 6 },
+                    .src = .{ .line = 1, .col = 6 },
+                },
+            },
+        }),
+    };
+
+    const params = ConsExprNode.InitParams{
+        .head = one,
+        .tail = tail,
+        .operator = lexer.Token{
+            .kind = lexer.TokenKind{ .operator = .Cons },
+            .lexeme = "::",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 2, .end = 3 },
+                .src = .{ .line = 1, .col = 3 },
+            },
+        },
+    };
+
+    const cons_node = try ConsExprNode.init(allocator, params);
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .cons_expr = cons_node };
+
+    // Assertions
+    // Verify the expression is a cons expression (::)
+    try testing.expect(node.* == .cons_expr);
+
+    const cons = node.cons_expr;
+
+    // Verify the operator in the cons expression is a cons operator (::)
+    try testing.expectEqual(lexer.TokenKind{ .operator = .Cons }, cons.operator.kind);
+
+    // Verify the lexeme of the cons operator is "::"
+    try testing.expectEqualStrings("::", cons.operator.lexeme);
+
+    // Verify the head of the cons expression is an integer literal with the value 1
+    try testing.expect(cons.head.* == .int_literal);
+    try testing.expectEqual(@as(i64, 1), cons.head.int_literal.value);
+
+    // Verify the tail of the cons expression is a list
+    try testing.expect(cons.tail.* == .list);
+
+    // Verify the list in the tail has exactly 2 elements
+    try testing.expectEqual(@as(usize, 2), cons.tail.list.elements.items.len);
+
+    const list_elements = cons.tail.list.elements.items;
+
+    // Verify the first element in the list is an integer literal with the value 2
+    try testing.expect(list_elements[0].* == .int_literal);
+    try testing.expectEqual(@as(i64, 2), list_elements[0].int_literal.value);
+
+    // Verify the second element in the list is an integer literal with the value 3
+    try testing.expect(list_elements[1].* == .int_literal);
+    try testing.expectEqual(@as(i64, 3), list_elements[1].int_literal.value);
+}
+
+test "[StrConcatExprNode]" {
+    // Test input: "Hello" <> "World"
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    const left = try allocator.create(Node);
+    left.* = .{
+        .str_literal = try StrLiteralNode.init(allocator, .{
+            .value = "Hello",
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .literal = .String },
+                .lexeme = "\"Hello\"",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 7 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        }),
+    };
+
+    const right = try allocator.create(Node);
+    right.* = .{
+        .str_literal = try StrLiteralNode.init(allocator, .{
+            .value = "World",
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .literal = .String },
+                .lexeme = "\"World\"",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 11, .end = 18 },
+                    .src = .{ .line = 1, .col = 12 },
+                },
+            },
+        }),
+    };
+
+    const params = StrConcatExprNode.InitParams{
+        .left = left,
+        .right = right,
+        .operator = lexer.Token{
+            .kind = lexer.TokenKind{ .operator = .StrConcat },
+            .lexeme = "<>",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 8, .end = 10 },
+                .src = .{ .line = 1, .col = 9 },
+            },
+        },
+    };
+
+    const concat_node = try StrConcatExprNode.init(allocator, params);
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .str_concat_expr = concat_node };
+
+    // Assertions
+    // Verify the expression is a string concat expression (<>)
+    try testing.expect(node.* == .str_concat_expr);
+
+    const concat = node.str_concat_expr;
+
+    // Verify the operator in the string concatenation expression is a string concatenation operator (<>)
+    try testing.expectEqual(lexer.TokenKind{ .operator = .StrConcat }, concat.operator.kind);
+
+    // Verify the lexeme of the string concatenation operator is "<>"
+    try testing.expectEqualStrings("<>", concat.operator.lexeme);
+
+    // Verify the left operand of the string concatenation is a string literal
+    try testing.expectEqualStrings("Hello", concat.left.str_literal.value);
+
+    // Verify the right operand of the string concatenation is a string literal
+    try testing.expectEqualStrings("World", concat.right.str_literal.value);
+}
+
+test "[ListConcatExprNode]" {
+    // Test input: [1, 2] ++ [3, 4]
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    const left_elem1 = try allocator.create(Node);
+    left_elem1.* = .{
+        .int_literal = IntLiteralNode.init(.{
+            .value = 1,
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .literal = .Int },
+                .lexeme = "1",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 1, .end = 2 },
+                    .src = .{ .line = 1, .col = 2 },
+                },
+            },
+        }),
+    };
+
+    const left_elem2 = try allocator.create(Node);
+    left_elem2.* = .{
+        .int_literal = IntLiteralNode.init(.{
+            .value = 2,
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .literal = .Int },
+                .lexeme = "2",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 4, .end = 5 },
+                    .src = .{ .line = 1, .col = 5 },
+                },
+            },
+        }),
+    };
+
+    var left_elements = std.ArrayList(*Node).init(allocator);
+    try left_elements.append(left_elem1);
+    try left_elements.append(left_elem2);
+
+    const left = try allocator.create(Node);
+    left.* = .{
+        .list = try ListNode.init(allocator, .{
+            .elements = left_elements,
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
+                .lexeme = "[",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        }),
+    };
+
+    const right_elem1 = try allocator.create(Node);
+    right_elem1.* = .{
+        .int_literal = IntLiteralNode.init(.{
+            .value = 3,
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .literal = .Int },
+                .lexeme = "3",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 11, .end = 12 },
+                    .src = .{ .line = 1, .col = 12 },
+                },
+            },
+        }),
+    };
+
+    const right_elem2 = try allocator.create(Node);
+    right_elem2.* = .{
+        .int_literal = IntLiteralNode.init(.{
+            .value = 4,
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .literal = .Int },
+                .lexeme = "4",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 14, .end = 15 },
+                    .src = .{ .line = 1, .col = 15 },
+                },
+            },
+        }),
+    };
+
+    var right_elements = std.ArrayList(*Node).init(allocator);
+    try right_elements.append(right_elem1);
+    try right_elements.append(right_elem2);
+
+    const right = try allocator.create(Node);
+    right.* = .{
+        .list = try ListNode.init(allocator, .{
+            .elements = right_elements,
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
+                .lexeme = "[",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 10, .end = 11 },
+                    .src = .{ .line = 1, .col = 11 },
+                },
+            },
+        }),
+    };
+
+    const params = ListConcatExprNode.InitParams{
+        .left = left,
+        .right = right,
+        .operator = lexer.Token{
+            .kind = lexer.TokenKind{ .operator = .ListConcat },
+            .lexeme = "++",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 7, .end = 9 },
+                .src = .{ .line = 1, .col = 8 },
+            },
+        },
+    };
+
+    const concat_node = try ListConcatExprNode.init(allocator, params);
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .list_concat_expr = concat_node };
+
+    // Assertions
+    // Verify the expression is a list concat expression (++)
+    try testing.expect(node.* == .list_concat_expr);
+
+    const expr = node.list_concat_expr;
+
+    // Verify the operator in the expression is a list concatenation operator (++)
+    try testing.expectEqual(lexer.TokenKind{ .operator = .ListConcat }, expr.operator.kind);
+
+    // Verify the lexeme of the list concatenation operator is "++"
+    try testing.expectEqualStrings("++", expr.operator.lexeme);
+
+    // Verify the left operand of the list concatenation is a list
+    try testing.expect(expr.left.* == .list);
+
+    // Verify the left list has exactly 2 elements
+    try testing.expectEqual(@as(usize, 2), expr.left.list.elements.items.len);
+
+    // Verify the first element of the left list is an integer literal with the value 1
+    try testing.expect(expr.left.list.elements.items[0].* == .int_literal);
+    try testing.expectEqual(@as(i64, 1), expr.left.list.elements.items[0].int_literal.value);
+
+    // Verify the second element of the left list is an integer literal with the value 2
+    try testing.expect(expr.left.list.elements.items[1].* == .int_literal);
+    try testing.expectEqual(@as(i64, 2), expr.left.list.elements.items[1].int_literal.value);
+
+    // Verify the right operand of the list concatenation is a list
+    try testing.expect(expr.right.* == .list);
+
+    // Verify the right list has exactly 2 elements
+    try testing.expectEqual(@as(usize, 2), expr.right.list.elements.items.len);
+
+    // Verify the first element of the right list is an integer literal with the value 3
+    try testing.expect(expr.right.list.elements.items[0].* == .int_literal);
+    try testing.expectEqual(@as(i64, 3), expr.right.list.elements.items[0].int_literal.value);
+
+    // Verify the second element of the right list is an integer literal with the value 4
+    try testing.expect(expr.right.list.elements.items[1].* == .int_literal);
+    try testing.expectEqual(@as(i64, 4), expr.right.list.elements.items[1].int_literal.value);
+}
+
+test "[CompositionExprNode]" {
+    // Test input: f >> g (compose right)
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    const f = try allocator.create(Node);
+    f.* = .{
+        .lower_identifier = try LowerIdentifierNode.init(allocator, .{
+            .name = "f",
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .identifier = .Lower },
+                .lexeme = "f",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        }),
+    };
+
+    const g = try allocator.create(Node);
+    g.* = .{
+        .lower_identifier = try LowerIdentifierNode.init(allocator, .{
+            .name = "g",
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .identifier = .Lower },
+                .lexeme = "g",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 5, .end = 6 },
+                    .src = .{ .line = 1, .col = 6 },
+                },
+            },
+        }),
+    };
+
+    const params = CompositionExprNode.InitParams{
+        .first = f,
+        .second = g,
+        .operator = lexer.Token{
+            .kind = lexer.TokenKind{ .operator = .ComposeRight },
+            .lexeme = ">>",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 2, .end = 4 },
+                .src = .{ .line = 1, .col = 3 },
+            },
+        },
+    };
+
+    const compose_node = try CompositionExprNode.init(allocator, params);
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .composition_expr = compose_node };
+
+    // Assertions
+    // Verify the expression is a composition expression
+    try testing.expect(node.* == .composition_expr);
+
+    const expr = node.composition_expr;
+
+    // Verify the operator in the composition expression is a compose-right operator (>>)
+    try testing.expectEqual(lexer.TokenKind{ .operator = .ComposeRight }, expr.operator.kind);
+
+    // Verify the lexeme of the compose-right operator
+    try testing.expectEqualStrings(">>", expr.operator.lexeme);
+
+    // Verify the first function in the composition is a lower identifier
+    try testing.expect(expr.first.* == .lower_identifier);
+
+    // Verify the token kind of the first function is a lower identifier
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.first.lower_identifier.token.kind);
+
+    // Verify the name of the first function is "f"
+    try testing.expectEqualStrings("f", expr.first.lower_identifier.name);
+
+    // Verify the second function in the composition is a lower identifier
+    try testing.expect(expr.second.* == .lower_identifier);
+
+    // Verify the token kind of the second function is a lower identifier
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.second.lower_identifier.token.kind);
+
+    // Verify the name of the second function is "g"
+    try testing.expectEqualStrings("g", expr.second.lower_identifier.name);
+}
+
+test "[PipeExprNode]" {
+    // Test input: x |> f (pipe right)
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    const value = try allocator.create(Node);
+    value.* = .{
+        .lower_identifier = try LowerIdentifierNode.init(allocator, .{
+            .name = "x",
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .identifier = .Lower },
+                .lexeme = "x",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        }),
+    };
+
+    const func = try allocator.create(Node);
+    func.* = .{
+        .lower_identifier = try LowerIdentifierNode.init(allocator, .{
+            .name = "f",
+            .token = lexer.Token{
+                .kind = lexer.TokenKind{ .identifier = .Lower },
+                .lexeme = "f",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 5, .end = 6 },
+                    .src = .{ .line = 1, .col = 6 },
+                },
+            },
+        }),
+    };
+
+    const params = PipeExprNode.InitParams{
+        .value = value,
+        .func = func,
+        .operator = lexer.Token{
+            .kind = lexer.TokenKind{ .operator = .PipeRight },
+            .lexeme = "|>",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 2, .end = 4 },
+                .src = .{ .line = 1, .col = 3 },
+            },
+        },
+    };
+
+    const pipe_node = try PipeExprNode.init(allocator, params);
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .pipe_expr = pipe_node };
+
+    // Assertions
+    // Verify the expression is a pipe expression
+    try testing.expect(node.* == .pipe_expr);
+
+    const expr = node.pipe_expr;
+
+    // Verify the operator in the expression is a pipe-right operator (|>)
+    try testing.expectEqual(lexer.TokenKind{ .operator = .PipeRight }, expr.operator.kind);
+
+    // Verify the lexeme of the pipe-right operator
+    try testing.expectEqualStrings("|>", expr.operator.lexeme);
+
+    // Verify the value being piped is a lower identifier
+    try testing.expect(expr.value.* == .lower_identifier);
+
+    // Verify the token kind of the value being piped is a lower identifier
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.value.lower_identifier.token.kind);
+
+    // Verify the name of the value being piped is "x"
+    try testing.expectEqualStrings("x", expr.value.lower_identifier.name);
+
+    // Verify the function being applied is a lower identifier
+    try testing.expect(expr.func.* == .lower_identifier);
+
+    // Verify the token kind of the function being applied is a lower identifier
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.func.lower_identifier.token.kind);
+
+    // Verify the name of the function being applied is "f".
+    try testing.expectEqualStrings("f", expr.func.lower_identifier.name);
 }
