@@ -219,23 +219,27 @@ pub const Parser = struct {
     //==========================================================================
 
     /// Parses a lower-case identifier into a structured node.
-    fn parseLowerIdentifier(self: *Parser) ParserError!ast.LowerIdentifierNode {
+    fn parseLowerIdentifier(self: *Parser) ParserError!*ast.LowerIdentifierNode {
         const token = try self.expect(lexer.TokenKind{ .identifier = .Lower });
 
-        return ast.LowerIdentifierNode{
+        const params = ast.LowerIdentifierNode.InitParams{
             .name = token.lexeme,
             .token = token,
         };
+
+        return ast.LowerIdentifierNode.init(self.allocator, params);
     }
 
     /// Parses a upper-case identifier into a structured node.
-    fn parseUpperIdentifier(self: *Parser) ParserError!ast.UpperIdentifierNode {
+    fn parseUpperIdentifier(self: *Parser) ParserError!*ast.UpperIdentifierNode {
         const token = try self.expect(lexer.TokenKind{ .identifier = .Upper });
 
-        return ast.UpperIdentifierNode{
+        const params = ast.UpperIdentifierNode.InitParams{
             .name = token.lexeme,
             .token = token,
         };
+
+        return ast.UpperIdentifierNode.init(self.allocator, params);
     }
 
     /// Parses an integer literal value into a structured node.
@@ -248,7 +252,12 @@ pub const Parser = struct {
             return error.InvalidIntLiteral;
         };
 
-        return ast.IntLiteralNode.init(value, token);
+        const params = ast.IntLiteralNode.InitParams{
+            .value = value,
+            .token = token,
+        };
+
+        return ast.IntLiteralNode.init(params);
     }
 
     /// Parses a floating-point literal value into a structured node.
@@ -261,7 +270,12 @@ pub const Parser = struct {
             return error.InvalidFloatLiteral;
         };
 
-        return ast.FloatLiteralNode.init(value, token);
+        const params = ast.FloatLiteralNode.InitParams{
+            .value = value,
+            .token = token,
+        };
+
+        return ast.FloatLiteralNode.init(params);
     }
 
     /// Parses a character literal into its Unicode codepoint value.
@@ -284,11 +298,16 @@ pub const Parser = struct {
             };
         }
 
-        return ast.CharLiteralNode.init(value, token);
+        const params = ast.CharLiteralNode.InitParams{
+            .value = value,
+            .token = token,
+        };
+
+        return ast.CharLiteralNode.init(params);
     }
 
     /// Parses a string literal into a structured node.
-    fn parseStrLiteral(self: *Parser) ParserError!ast.StrLiteralNode {
+    fn parseStrLiteral(self: *Parser) ParserError!*ast.StrLiteralNode {
         const token = try self.expect(lexer.TokenKind{ .literal = .String });
 
         // Strip quotes
@@ -315,7 +334,12 @@ pub const Parser = struct {
             }
         }
 
-        return ast.StrLiteralNode.init(self.allocator, result.items, token);
+        const params = ast.StrLiteralNode.InitParams{
+            .value = result.items,
+            .token = token,
+        };
+
+        return ast.StrLiteralNode.init(self.allocator, params);
     }
 
     const EscapeSequence = struct {
@@ -1403,22 +1427,6 @@ pub const Parser = struct {
     fn parseList(self: *Parser) ParserError!*ast.Node {
         const start_token = try self.expect(lexer.TokenKind{ .delimiter = .LeftBracket });
 
-        // Handle empty list case
-        if (try self.match(lexer.TokenKind{ .delimiter = .RightBracket })) {
-            const node = try self.allocator.create(ast.Node);
-            errdefer self.allocator.destroy(node);
-
-            node.* = .{
-                .list = .{
-                    .elements = std.ArrayList(*ast.Node).init(self.allocator),
-                    .token = start_token,
-                },
-            };
-
-            return node;
-        }
-
-        // Parse first element (required)
         var elements = std.ArrayList(*ast.Node).init(self.allocator);
         errdefer {
             for (elements.items) |element| {
@@ -1429,6 +1437,25 @@ pub const Parser = struct {
             elements.deinit();
         }
 
+        // Handle empty list case
+        if (try self.match(lexer.TokenKind{ .delimiter = .RightBracket })) {
+            const params = ast.ListNode.InitParams{
+                .elements = elements,
+                .token = start_token,
+            };
+
+            const empty_list = try ast.ListNode.init(self.allocator, params);
+            // errdefer self.allocator.destroy(empty_list);
+
+            const node = try self.allocator.create(ast.Node);
+            errdefer self.allocator.destroy(node);
+
+            node.* = .{ .list = empty_list };
+
+            return node;
+        }
+
+        // Parse first element (required)
         const first_element = try self.parseExpression();
         try elements.append(first_element);
 
@@ -1439,15 +1466,18 @@ pub const Parser = struct {
 
         _ = try self.expect(lexer.TokenKind{ .delimiter = .RightBracket });
 
+        const params = ast.ListNode.InitParams{
+            .elements = elements,
+            .token = start_token,
+        };
+
+        const list = try ast.ListNode.init(self.allocator, params);
+        // errdefer self.allocator.destroy(list);
+
         const node = try self.allocator.create(ast.Node);
         errdefer self.allocator.destroy(node);
 
-        node.* = .{
-            .list = .{
-                .elements = elements,
-                .token = start_token,
-            },
-        };
+        node.* = .{ .list = list };
 
         return node;
     }
@@ -1756,13 +1786,15 @@ pub const Parser = struct {
         while (i < token.lexeme.len and std.ascii.isWhitespace(token.lexeme[i])) {
             i += 1;
         }
+
         const trimmed = std.mem.trimRight(u8, token.lexeme[i..], &std.ascii.whitespace);
 
-        const comment_node = try ast.CommentNode.init(
-            self.allocator,
-            trimmed,
-            token,
-        );
+        const params = ast.CommentNode.InitParams{
+            .content = trimmed,
+            .token = token,
+        };
+
+        const comment_node = try ast.CommentNode.init(self.allocator, params);
         errdefer self.allocator.destroy(comment_node);
 
         const node = try self.allocator.create(ast.Node);
@@ -1782,13 +1814,15 @@ pub const Parser = struct {
         while (i < token.lexeme.len and std.ascii.isWhitespace(token.lexeme[i])) {
             i += 1;
         }
+
         const trimmed = std.mem.trimRight(u8, token.lexeme[i..], &std.ascii.whitespace);
 
-        const comment_node = try ast.DocCommentNode.init(
-            self.allocator,
-            trimmed,
-            token,
-        );
+        const params = ast.DocCommentNode.InitParams{
+            .content = trimmed,
+            .token = token,
+        };
+
+        const comment_node = try ast.DocCommentNode.init(self.allocator, params);
         errdefer self.allocator.destroy(comment_node);
 
         const node = try self.allocator.create(ast.Node);
@@ -1945,7 +1979,6 @@ test "[float_literal]" {
         const literal = try parser.parseFloatLiteral();
 
         // Assertions
-
         // Validate the literal token and its properties
         try testing.expectEqual(lexer.TokenKind{ .literal = .Float }, literal.token.kind);
 
@@ -2072,7 +2105,7 @@ test "[str_literal]" {
 
         // Action
         const lit = try parser.parseStrLiteral();
-        defer allocator.free(lit.value);
+        defer lit.deinit(allocator);
 
         // Assertions
         // Validate the literal token and its properties
@@ -2085,6 +2118,8 @@ test "[str_literal]" {
         try testing.expectEqualStrings(case.expected, lit.value);
     }
 }
+
+test "[multiline_str_literal]" {}
 
 test "[lower_identifier]" {
     // Setup
@@ -2111,6 +2146,7 @@ test "[lower_identifier]" {
 
         // Action
         const ident = try parser.parseLowerIdentifier();
+        defer ident.deinit(allocator);
 
         // Assertions
         // Verify the token is recognized as a lower identifier
@@ -2150,6 +2186,7 @@ test "[upper_identifier]" {
 
         // Action
         const ident = try parser.parseUpperIdentifier();
+        defer ident.deinit(allocator);
 
         // Assertions
         // Verify the token is recognized as an upper identifier
@@ -3933,132 +3970,62 @@ test "[list]" {
     const allocator = gpa.allocator();
 
     {
-        // []
+        // Test input: []
+
+        var l = lexer.Lexer.init("[]", TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
 
         // Action
-        var empty_list = try allocator.create(ast.Node);
+        const node = try parser.parseList();
         defer {
-            empty_list.deinit(allocator);
-            allocator.destroy(empty_list);
+            node.deinit(allocator);
+            allocator.destroy(node);
         }
-
-        empty_list.* = .{
-            .list = .{
-                .elements = std.ArrayList(*ast.Node).init(allocator),
-                .token = lexer.Token{
-                    .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
-                    .lexeme = "[",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 0, .end = 1 },
-                        .src = .{ .line = 1, .col = 1 },
-                    },
-                },
-            },
-        };
 
         // Assertions
         // Verify that the node type is a list.
-        try testing.expect(empty_list.* == .list);
+        try testing.expect(node.* == .list);
+
+        const list = node.list;
+
         // Ensure the list has no elements.
-        try testing.expectEqual(@as(usize, 0), empty_list.list.elements.items.len);
+        try testing.expectEqual(@as(usize, 0), list.elements.items.len);
     }
 
     {
-        // [1, 2, 3]
+        // Test input: [1, 2, 3]
+
+        var l = lexer.Lexer.init("[1, 2, 3]", TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
 
         // Action
-        var elements = std.ArrayList(*ast.Node).init(allocator);
-
-        const one = try allocator.create(ast.Node);
-        one.* = .{
-            .int_literal = .{
-                .value = 1,
-                .token = lexer.Token{
-                    .kind = lexer.TokenKind{ .literal = .Int },
-                    .lexeme = "1",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 1, .end = 2 },
-                        .src = .{ .line = 1, .col = 2 },
-                    },
-                },
-            },
-        };
-
-        const two = try allocator.create(ast.Node);
-        two.* = .{
-            .int_literal = .{
-                .value = 2,
-                .token = lexer.Token{
-                    .kind = lexer.TokenKind{ .literal = .Int },
-                    .lexeme = "2",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 4, .end = 5 },
-                        .src = .{ .line = 1, .col = 5 },
-                    },
-                },
-            },
-        };
-
-        const three = try allocator.create(ast.Node);
-        three.* = .{
-            .int_literal = .{
-                .value = 3,
-                .token = lexer.Token{
-                    .kind = lexer.TokenKind{ .literal = .Int },
-                    .lexeme = "3",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 7, .end = 8 },
-                        .src = .{ .line = 1, .col = 8 },
-                    },
-                },
-            },
-        };
-
-        try elements.append(one);
-        try elements.append(two);
-        try elements.append(three);
-
-        var populated_list = try allocator.create(ast.Node);
+        const node = try parser.parseList();
         defer {
-            populated_list.deinit(allocator);
-            allocator.destroy(populated_list);
+            node.deinit(allocator);
+            allocator.destroy(node);
         }
-
-        populated_list.* = .{
-            .list = .{
-                .elements = elements,
-                .token = lexer.Token{
-                    .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
-                    .lexeme = "[",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 0, .end = 1 },
-                        .src = .{ .line = 1, .col = 1 },
-                    },
-                },
-            },
-        };
 
         // Assertions
         // Verify that the node type is a list.
-        try testing.expect(populated_list.* == .list);
+        try testing.expect(node.* == .list);
+
+        const list = node.list;
+
         // Ensure the list contains exactly 3 elements.
-        try testing.expectEqual(@as(usize, 3), populated_list.list.elements.items.len);
+        try testing.expectEqual(@as(usize, 3), list.elements.items.len);
 
         // Test first element (1)
-        try testing.expect(populated_list.list.elements.items[0].* == .int_literal);
-        try testing.expectEqual(@as(i64, 1), populated_list.list.elements.items[0].int_literal.value);
+        try testing.expect(list.elements.items[0].* == .int_literal);
+        try testing.expectEqual(@as(i64, 1), list.elements.items[0].int_literal.value);
 
         // Test second element (2)
-        try testing.expect(populated_list.list.elements.items[1].* == .int_literal);
-        try testing.expectEqual(@as(i64, 2), populated_list.list.elements.items[1].int_literal.value);
+        try testing.expect(list.elements.items[1].* == .int_literal);
+        try testing.expectEqual(@as(i64, 2), list.elements.items[1].int_literal.value);
 
         // Test third element (3)
-        try testing.expect(populated_list.list.elements.items[2].* == .int_literal);
-        try testing.expectEqual(@as(i64, 3), populated_list.list.elements.items[2].int_literal.value);
+        try testing.expect(list.elements.items[2].* == .int_literal);
+        try testing.expectEqual(@as(i64, 3), list.elements.items[2].int_literal.value);
     }
 }
