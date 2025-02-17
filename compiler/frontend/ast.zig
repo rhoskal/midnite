@@ -659,16 +659,17 @@ pub const GuardNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         condition: *Node,
         token: lexer.Token,
-    ) !*GuardNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*GuardNode {
         const node = try allocator.create(GuardNode);
 
         node.* = .{
-            .condition = condition,
-            .token = token,
+            .condition = params.condition,
+            .token = params.token,
         };
 
         return node;
@@ -701,20 +702,21 @@ pub const MatchCase = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         pattern: *PatternNode,
         expression: *Node,
         guard: ?*GuardNode,
         token: lexer.Token,
-    ) !*MatchCase {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*MatchCase {
         const case = try allocator.create(MatchCase);
 
         case.* = .{
-            .pattern = pattern,
-            .expression = expression,
-            .guard = guard,
-            .token = token,
+            .pattern = params.pattern,
+            .expression = params.expression,
+            .guard = params.guard,
+            .token = params.token,
         };
 
         return case;
@@ -753,18 +755,19 @@ pub const MatchExprNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         value: *Node,
         cases: std.ArrayList(MatchCase),
         token: lexer.Token,
-    ) !*MatchExprNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*MatchExprNode {
         const node = try allocator.create(MatchExprNode);
 
         node.* = .{
-            .value = value,
-            .cases = cases,
-            .token = token,
+            .value = params.value,
+            .cases = params.cases,
+            .token = params.token,
         };
 
         return node;
@@ -800,16 +803,17 @@ pub const FunctionTypeNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         param_types: std.ArrayList(*Node),
         token: lexer.Token,
-    ) !*FunctionTypeNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*FunctionTypeNode {
         const node = try allocator.create(FunctionTypeNode);
 
         node.* = .{
-            .param_types = param_types,
-            .token = token,
+            .param_types = params.param_types,
+            .token = params.token,
         };
 
         return node;
@@ -833,7 +837,7 @@ pub const FunctionTypeNode = struct {
 /// - `\x y => x + y`
 pub const LambdaExprNode = struct {
     /// Array of parameter names.
-    params: std.ArrayList([]const u8),
+    parameters: std.ArrayList([]const u8),
 
     /// The AST node representing the function body expression.
     body: *Node,
@@ -841,18 +845,18 @@ pub const LambdaExprNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
-        params: std.ArrayList([]const u8),
-        body: *Node,
+    pub const InitParams = struct {
+        parameters: std.ArrayList([]const u8),
         token: lexer.Token,
-    ) !*LambdaExprNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*LambdaExprNode {
         const node = try allocator.create(LambdaExprNode);
 
         node.* = .{
-            .params = params,
-            .body = body,
-            .token = token,
+            .parameters = params.parameters,
+            .body = params.body,
+            .token = params.token,
         };
 
         return node;
@@ -887,18 +891,19 @@ pub const FuncApplicationNode = struct {
     /// The token representing the start of this application (usually the function's token).
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         function: *Node,
         argument: *Node,
         token: lexer.Token,
-    ) !*FuncApplicationNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*FuncApplicationNode {
         const node = try allocator.create(FuncApplicationNode);
 
         node.* = .{
-            .function = function,
-            .argument = argument,
-            .token = token,
+            .function = params.function,
+            .argument = params.argument,
+            .token = params.token,
         };
 
         return node;
@@ -935,18 +940,19 @@ pub const ConsExprNode = struct {
     /// The token representing the cons operator.
     operator: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         head: *Node,
         tail: *Node,
         operator: lexer.Token,
-    ) !*ConsExprNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ConsExprNode {
         const node = try allocator.create(ConsExprNode);
 
         node.* = .{
-            .head = head,
-            .tail = tail,
-            .operator = operator,
+            .head = params.head,
+            .tail = params.tail,
+            .operator = params.operator,
         };
 
         return node;
@@ -993,18 +999,19 @@ pub const CompositionExprNode = struct {
     /// The token representing the composition operator.
     operator: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         first: *Node,
         second: *Node,
         operator: lexer.Token,
-    ) !*CompositionExprNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*CompositionExprNode {
         const node = try allocator.create(CompositionExprNode);
 
         node.* = .{
-            .first = first,
-            .second = second,
-            .operator = operator,
+            .first = params.first,
+            .second = params.second,
+            .operator = params.operator,
         };
 
         return node;
@@ -1037,18 +1044,19 @@ pub const PipeExprNode = struct {
     /// The token representing the pipe operator.
     operator: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         value: *Node,
         func: *Node,
         operator: lexer.Token,
-    ) !*PipeExprNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*PipeExprNode {
         const node = try allocator.create(PipeExprNode);
 
         node.* = .{
-            .value = value,
-            .func = func,
-            .operator = operator,
+            .value = params.value,
+            .func = params.func,
+            .operator = params.operator,
         };
 
         return node;
@@ -1087,18 +1095,24 @@ pub const IfThenElseStmtNode = struct {
     /// The AST node representing the expression to evaluate if condition is false.
     else_branch: *Node,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    /// The token representing the start of this declaration.
+    token: lexer.Token,
+
+    pub const InitParams = struct {
         condition: *Node,
         then_branch: *Node,
         else_branch: *Node,
-    ) !*IfThenElseStmtNode {
+        token: lexer.Token,
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*IfThenElseStmtNode {
         const node = try allocator.create(IfThenElseStmtNode);
 
         node.* = .{
-            .condition = condition,
-            .then_branch = then_branch,
-            .else_branch = else_branch,
+            .condition = params.condition,
+            .then_branch = params.then_branch,
+            .else_branch = params.else_branch,
+            .token = params.token,
         };
 
         return node;
@@ -1152,18 +1166,19 @@ pub const TypeApplicationNode = struct {
     /// The token representing the type application.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         base: *Node,
         args: std.ArrayList(*Node),
         token: lexer.Token,
-    ) !*TypeApplicationNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*TypeApplicationNode {
         const node = try allocator.create(TypeApplicationNode);
 
         node.* = .{
-            .base = base,
-            .args = args,
-            .token = token,
+            .base = params.base,
+            .args = params.args,
+            .token = params.token,
         };
 
         return node;
@@ -1205,6 +1220,13 @@ pub const TypeAliasNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
+
+    pub const InitParams = struct {
+        name: []const u8,
+        type_params: std.ArrayList([]const u8),
+        value: *Node,
+        token: lexer.Token,
+    };
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -1259,18 +1281,19 @@ pub const VariantConstructorNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         name: []const u8,
-        params: std.ArrayList(*Node),
+        parameters: std.ArrayList(*Node),
         token: lexer.Token,
-    ) !*VariantConstructorNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*VariantConstructorNode {
         const node = try allocator.create(VariantConstructorNode);
 
         node.* = .{
-            .name = try allocator.dupe(u8, name),
-            .params = params,
-            .token = token,
+            .name = try allocator.dupe(u8, params.name),
+            .params = params.parameters,
+            .token = params.token,
         };
 
         return node;
@@ -1312,20 +1335,21 @@ pub const VariantTypeNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         name: []const u8,
         type_params: std.ArrayList([]const u8),
         constructors: std.ArrayList(VariantConstructorNode),
         token: lexer.Token,
-    ) !*VariantTypeNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*VariantTypeNode {
         const node = try allocator.create(VariantTypeNode);
 
         node.* = .{
-            .name = try allocator.dupe(u8, name),
-            .type_params = type_params,
-            .constructors = constructors,
-            .token = token,
+            .name = try allocator.dupe(u8, params.name),
+            .type_params = params.type_params,
+            .constructors = params.constructors,
+            .token = params.token,
         };
 
         return node;
@@ -1356,23 +1380,24 @@ pub const RecordFieldNode = struct {
     name: []const u8,
 
     /// The AST node representing the field's type.
-    type: *Node,
+    field_type: *Node,
 
     /// The token representing this field declaration.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         name: []const u8,
-        type_node: *Node,
+        field_type: *Node,
         token: lexer.Token,
-    ) !*RecordFieldNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*RecordFieldNode {
         const node = try allocator.create(RecordFieldNode);
 
         node.* = .{
-            .name = try allocator.dupe(u8, name),
-            .type = type_node,
-            .token = token,
+            .name = try allocator.dupe(u8, params.name),
+            .field_type = params.field_type,
+            .token = params.token,
         };
 
         return node;
@@ -1406,20 +1431,21 @@ pub const RecordTypeNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         name: []const u8,
         type_params: std.ArrayList([]const u8),
         fields: std.ArrayList(RecordFieldNode),
         token: lexer.Token,
-    ) !*RecordTypeNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*RecordTypeNode {
         const node = try allocator.create(RecordTypeNode);
 
         node.* = .{
-            .name = try allocator.dupe(u8, name),
-            .type_params = type_params,
-            .fields = fields,
-            .token = token,
+            .name = try allocator.dupe(u8, params.name),
+            .type_params = params.type_params,
+            .fields = params.fields,
+            .token = params.token,
         };
 
         return node;
@@ -1462,16 +1488,17 @@ pub const ModulePathNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         segments: std.ArrayList([]const u8),
         token: lexer.Token,
-    ) !*ModulePathNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ModulePathNode {
         const node = try allocator.create(ModulePathNode);
 
         node.* = .{
-            .segments = segments,
-            .token = token,
+            .segments = params.segments,
+            .token = params.token,
         };
 
         return node;
@@ -1498,18 +1525,19 @@ pub const ExportItem = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         name: []const u8,
         expose_constructors: bool,
         token: lexer.Token,
-    ) !*ExportItem {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ExportItem {
         const item = try allocator.create(ExportItem);
 
         item.* = .{
-            .name = try allocator.dupe(u8, name),
-            .expose_constructors = expose_constructors,
-            .token = token,
+            .name = try allocator.dupe(u8, params.name),
+            .expose_constructors = params.expose_constructors,
+            .token = params.token,
         };
 
         return item;
@@ -1538,18 +1566,19 @@ pub const ExportSpecNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         exposing_all: bool,
-        items: ?std.ArrayList(ExportItem),
+        items: ?std.ArrayList(ExportItem) = null,
         token: lexer.Token,
-    ) !*ExportSpecNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ExportSpecNode {
         const node = try allocator.create(ExportSpecNode);
 
         node.* = .{
-            .exposing_all = exposing_all,
-            .items = items,
-            .token = token,
+            .exposing_all = params.exposing_all,
+            .items = if (params.items) params.items else null,
+            .token = params.token,
         };
 
         return node;
@@ -1610,36 +1639,45 @@ pub const ImportItem = union(enum) {
         alias: ?[]const u8,
     },
 
-    pub fn init(allocator: std.mem.Allocator, kind: enum { Function, Operator, Type }, args: struct {
-        name: []const u8,
-        alias: ?[]const u8 = null,
-        expose_constructors: bool = false,
-    }) !*ImportItem {
-        const item = try allocator.create(ImportItem);
+    pub const InitParams = struct {
+        kind: enum {
+            Function,
+            Operator,
+            Type,
+        },
+        args: struct {
+            name: []const u8,
+            alias: ?[]const u8 = null,
+            expose_constructors: bool = false,
+        },
+    };
 
-        item.* = switch (kind) {
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ImportItem {
+        const node = try allocator.create(ImportItem);
+
+        node.* = switch (params.kind) {
             .Function => .{
                 .function = .{
-                    .name = try allocator.dupe(u8, args.name),
-                    .alias = if (args.alias) |a| try allocator.dupe(u8, a) else null,
+                    .name = try allocator.dupe(u8, params.args.name),
+                    .alias = if (params.args.alias) |a| try allocator.dupe(u8, a) else null,
                 },
             },
             .Operator => .{
                 .operator = .{
-                    .symbol = try allocator.dupe(u8, args.name),
-                    .alias = if (args.alias) |a| try allocator.dupe(u8, a) else null,
+                    .symbol = try allocator.dupe(u8, params.args.name),
+                    .alias = if (params.args.alias) |a| try allocator.dupe(u8, a) else null,
                 },
             },
             .Type => .{
                 .type = .{
-                    .name = try allocator.dupe(u8, args.name),
-                    .expose_constructors = args.expose_constructors,
-                    .alias = if (args.alias) |a| try allocator.dupe(u8, a) else null,
+                    .name = try allocator.dupe(u8, params.args.name),
+                    .expose_constructors = params.args.expose_constructors,
+                    .alias = if (params.args.alias) |a| try allocator.dupe(u8, a) else null,
                 },
             },
         };
 
-        return item;
+        return node;
     }
 
     pub fn deinit(self: *ImportItem, allocator: std.mem.Allocator) void {
@@ -1724,22 +1762,23 @@ pub const ImportSpecNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         path: ModulePathNode,
         kind: ImportKind,
-        alias: ?[]const u8,
-        items: ?std.ArrayList(ImportItem),
+        alias: ?[]const u8 = null,
+        items: ?std.ArrayList(ImportItem) = null,
         token: lexer.Token,
-    ) !*ImportSpecNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ImportSpecNode {
         const node = try allocator.create(ImportSpecNode);
 
         node.* = .{
-            .path = path,
-            .kind = kind,
-            .alias = if (alias) |a| try allocator.dupe(u8, a) else null,
-            .items = items,
-            .token = token,
+            .path = params.path,
+            .kind = params.kind,
+            .alias = if (params.alias) |a| try allocator.dupe(u8, a) else null,
+            .items = if (params.items) params.items else null,
+            .token = params.token,
         };
 
         return node;
@@ -1782,16 +1821,17 @@ pub const IncludeNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         path: ModulePathNode,
         token: lexer.Token,
-    ) !*IncludeNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*IncludeNode {
         const node = try allocator.create(IncludeNode);
 
         node.* = .{
-            .path = path,
-            .token = token,
+            .path = params.path,
+            .token = params.token,
         };
 
         return node;
@@ -1833,20 +1873,21 @@ pub const FunctionDeclNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         name: []const u8,
-        type_annotation: ?*Node,
+        type_annotation: ?*Node = null,
         value: *Node,
         token: lexer.Token,
-    ) !*FunctionDeclNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*FunctionDeclNode {
         const node = try allocator.create(FunctionDeclNode);
 
         node.* = .{
-            .name = try allocator.dupe(u8, name),
-            .type_annotation = type_annotation,
-            .value = value,
-            .token = token,
+            .name = try allocator.dupe(u8, params.name),
+            .type_annotation = if (params.type_annotation) params.type_annotation else null,
+            .value = params.value,
+            .token = params.token,
         };
 
         return node;
@@ -1886,20 +1927,21 @@ pub const ForeignFunctionDeclNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         name: []const u8,
         type_annotation: *Node,
         external_name: []const u8,
         token: lexer.Token,
-    ) !*ForeignFunctionDeclNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ForeignFunctionDeclNode {
         const node = try allocator.create(ForeignFunctionDeclNode);
 
         node.* = .{
-            .name = try allocator.dupe(u8, name),
-            .type_annotation = type_annotation,
-            .external_name = try allocator.dupe(u8, external_name),
-            .token = token,
+            .name = try allocator.dupe(u8, params.name),
+            .type_annotation = params.type_annotation,
+            .external_name = try allocator.dupe(u8, params.external_name),
+            .token = params.token,
         };
 
         return node;
@@ -1938,20 +1980,21 @@ pub const ModuleDeclNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         path: ModulePathNode,
         exports: ExportSpecNode,
         declarations: std.ArrayList(*Node),
         token: lexer.Token,
-    ) !*ModuleDeclNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ModuleDeclNode {
         const node = try allocator.create(ModuleDeclNode);
 
         node.* = .{
-            .path = path,
-            .exports = exports,
-            .declarations = declarations,
-            .token = token,
+            .path = params.path,
+            .exports = params.exports,
+            .declarations = params.declarations,
+            .token = params.token,
         };
 
         return node;
@@ -1992,16 +2035,17 @@ pub const ProgramNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
+    pub const InitParams = struct {
         statements: std.ArrayList(*Node),
         token: lexer.Token,
-    ) !*ProgramNode {
+    };
+
+    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ProgramNode {
         const node = try allocator.create(ProgramNode);
 
         node.* = .{
-            .statements = statements,
-            .token = token,
+            .statements = params.statements,
+            .token = params.token,
         };
 
         return node;
