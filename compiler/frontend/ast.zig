@@ -17,22 +17,6 @@ pub const CommentNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub const InitParams = struct {
-        content: []const u8,
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*CommentNode {
-        const node = try allocator.create(CommentNode);
-
-        node.* = .{
-            .content = try allocator.dupe(u8, params.content),
-            .token = params.token,
-        };
-
-        return node;
-    }
-
     pub fn deinit(self: *CommentNode, allocator: std.mem.Allocator) void {
         allocator.free(self.content);
 
@@ -50,22 +34,6 @@ pub const DocCommentNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
-
-    pub const InitParams = struct {
-        content: []const u8,
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*DocCommentNode {
-        const node = try allocator.create(DocCommentNode);
-
-        node.* = .{
-            .content = try allocator.dupe(u8, params.content),
-            .token = params.token,
-        };
-
-        return node;
-    }
 
     pub fn deinit(self: *DocCommentNode, allocator: std.mem.Allocator) void {
         allocator.free(self.content);
@@ -85,18 +53,6 @@ pub const IntLiteralNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
-
-    pub const InitParams = struct {
-        value: i64,
-        token: lexer.Token,
-    };
-
-    pub fn init(params: InitParams) IntLiteralNode {
-        return .{
-            .value = params.value,
-            .token = params.token,
-        };
-    }
 };
 
 /// Represents a literal floating-point value.
@@ -111,18 +67,6 @@ pub const FloatLiteralNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
-
-    pub const InitParams = struct {
-        value: f64,
-        token: lexer.Token,
-    };
-
-    pub fn init(params: InitParams) FloatLiteralNode {
-        return .{
-            .value = params.value,
-            .token = params.token,
-        };
-    }
 };
 
 /// Represents a char literal value.
@@ -138,18 +82,6 @@ pub const CharLiteralNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
-
-    pub const InitParams = struct {
-        value: u21,
-        token: lexer.Token,
-    };
-
-    pub fn init(params: InitParams) CharLiteralNode {
-        return .{
-            .value = params.value,
-            .token = params.token,
-        };
-    }
 };
 
 /// Represents a string literal value.
@@ -163,22 +95,6 @@ pub const StrLiteralNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
-
-    pub const InitParams = struct {
-        value: []const u8,
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*StrLiteralNode {
-        const node = try allocator.create(StrLiteralNode);
-
-        node.* = .{
-            .value = try allocator.dupe(u8, params.value),
-            .token = params.token,
-        };
-
-        return node;
-    }
 
     pub fn deinit(self: *StrLiteralNode, allocator: std.mem.Allocator) void {
         allocator.free(self.value);
@@ -201,22 +117,6 @@ pub const MultilineStrLiteralNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub const InitParams = struct {
-        value: []const u8,
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*MultilineStrLiteralNode {
-        const node = try allocator.create(MultilineStrLiteralNode);
-
-        node.* = .{
-            .value = try allocator.dupe(u8, params.value),
-            .token = params.token,
-        };
-
-        return node;
-    }
-
     pub fn deinit(self: *MultilineStrLiteralNode, allocator: std.mem.Allocator) void {
         allocator.free(self.value);
 
@@ -236,22 +136,6 @@ pub const LowerIdentifierNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub const InitParams = struct {
-        name: []const u8,
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*LowerIdentifierNode {
-        const node = try allocator.create(LowerIdentifierNode);
-
-        node.* = .{
-            .name = try allocator.dupe(u8, params.name),
-            .token = params.token,
-        };
-
-        return node;
-    }
-
     pub fn deinit(self: *LowerIdentifierNode, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
 
@@ -266,22 +150,6 @@ pub const UpperIdentifierNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
-
-    pub const InitParams = struct {
-        name: []const u8,
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*UpperIdentifierNode {
-        const node = try allocator.create(UpperIdentifierNode);
-
-        node.* = .{
-            .name = try allocator.dupe(u8, params.name),
-            .token = params.token,
-        };
-
-        return node;
-    }
 
     pub fn deinit(self: *UpperIdentifierNode, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
@@ -306,22 +174,6 @@ pub const ListNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
-
-    pub const InitParams = struct {
-        elements: std.ArrayList(*Node),
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ListNode {
-        const node = try allocator.create(ListNode);
-
-        node.* = .{
-            .elements = params.elements,
-            .token = params.token,
-        };
-
-        return node;
-    }
 
     pub fn deinit(self: *ListNode, allocator: std.mem.Allocator) void {
         for (self.elements.items) |element| {
@@ -348,22 +200,6 @@ pub const TupleNode = struct {
 
     /// The token representing the start of this tuple.
     token: lexer.Token,
-
-    pub const InitParams = struct {
-        elements: std.ArrayList(*Node),
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*TupleNode {
-        const node = try allocator.create(TupleNode);
-
-        node.* = .{
-            .elements = params.elements,
-            .token = params.token,
-        };
-
-        return node;
-    }
 
     pub fn deinit(self: *TupleNode, allocator: std.mem.Allocator) void {
         for (self.elements.items) |element| {
@@ -392,22 +228,6 @@ pub const UnaryExprNode = struct {
     /// The token representing the operator.
     operator: lexer.Token,
 
-    pub const InitParams = struct {
-        operand: *Node,
-        operator: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*UnaryExprNode {
-        const node = try allocator.create(UnaryExprNode);
-
-        node.* = .{
-            .operand = params.operand,
-            .operator = params.operator,
-        };
-
-        return node;
-    }
-
     pub fn deinit(self: *UnaryExprNode, allocator: std.mem.Allocator) void {
         self.operand.deinit(allocator);
         allocator.destroy(self.operand);
@@ -425,24 +245,6 @@ pub const BinaryOp = struct {
 
     /// The token representing the operator.
     operator: lexer.Token,
-
-    pub const InitParams = struct {
-        left: *Node,
-        right: *Node,
-        operator: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*BinaryOp {
-        const node = try allocator.create(BinaryOp);
-
-        node.* = .{
-            .left = params.left,
-            .right = params.right,
-            .operator = params.operator,
-        };
-
-        return node;
-    }
 
     pub fn deinit(self: *BinaryOp, allocator: std.mem.Allocator) void {
         self.left.deinit(allocator);
@@ -503,21 +305,6 @@ pub const PatternNode = union(enum) {
 
         /// The token representing the start of the list pattern
         token: lexer.Token,
-
-        pub fn init(
-            allocator: std.mem.Allocator,
-            elements: std.ArrayList(*PatternNode),
-            token: lexer.Token,
-        ) !*PatternNode.list {
-            const pattern = try allocator.create(PatternNode.list);
-
-            pattern.* = .{
-                .elements = elements,
-                .token = token,
-            };
-
-            return pattern;
-        }
     },
     variable: struct {
         /// The name of the variable to bind.
@@ -525,21 +312,6 @@ pub const PatternNode = union(enum) {
 
         /// The token representing the variable.
         token: lexer.Token,
-
-        pub fn init(
-            allocator: std.mem.Allocator,
-            name: []const u8,
-            token: lexer.Token,
-        ) !*PatternNode.variable {
-            const pattern = try allocator.create(PatternNode.variable);
-
-            pattern.* = .{
-                .name = try allocator.dupe(u8, name),
-                .token = token,
-            };
-
-            return pattern;
-        }
     },
     constructor: struct {
         /// The name of the constructor.
@@ -550,23 +322,6 @@ pub const PatternNode = union(enum) {
 
         /// The token representing the constructor.
         token: lexer.Token,
-
-        pub fn init(
-            allocator: std.mem.Allocator,
-            name: []const u8,
-            args: std.ArrayList(*PatternNode),
-            token: lexer.Token,
-        ) !*PatternNode.constructor {
-            const pattern = try allocator.create(PatternNode.constructor);
-
-            pattern.* = .{
-                .name = try allocator.dupe(u8, name),
-                .args = args,
-                .token = token,
-            };
-
-            return pattern;
-        }
     },
     empty_list: struct {
         /// The token representing the empty list pattern.
@@ -581,23 +336,6 @@ pub const PatternNode = union(enum) {
 
         /// The token representing the cons pattern.
         token: lexer.Token,
-
-        pub fn init(
-            allocator: std.mem.Allocator,
-            head: *PatternNode,
-            tail: *PatternNode,
-            token: lexer.Token,
-        ) !*PatternNode.cons {
-            const pattern = try allocator.create(PatternNode.cons);
-
-            pattern.* = .{
-                .head = head,
-                .tail = tail,
-                .token = token,
-            };
-
-            return pattern;
-        }
     },
 
     pub fn deinit(self: *PatternNode, allocator: std.mem.Allocator) void {
@@ -610,12 +348,10 @@ pub const PatternNode = union(enum) {
             => {},
             .string_literal => |*lit| {
                 lit.deinit(allocator);
-                allocator.destroy(lit);
             },
             .list => |list| {
                 for (list.elements.items) |element| {
                     element.deinit(allocator);
-                    allocator.destroy(element);
                 }
 
                 list.elements.deinit();
@@ -641,8 +377,6 @@ pub const PatternNode = union(enum) {
                 allocator.destroy(cons.tail);
             },
         }
-
-        allocator.destroy(self);
     }
 };
 
@@ -659,27 +393,9 @@ pub const GuardNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub const InitParams = struct {
-        condition: *Node,
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*GuardNode {
-        const node = try allocator.create(GuardNode);
-
-        node.* = .{
-            .condition = params.condition,
-            .token = params.token,
-        };
-
-        return node;
-    }
-
     pub fn deinit(self: *GuardNode, allocator: std.mem.Allocator) void {
         self.condition.deinit(allocator);
         allocator.destroy(self.condition);
-
-        allocator.destroy(self);
     }
 };
 
@@ -702,26 +418,6 @@ pub const MatchCase = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub const InitParams = struct {
-        pattern: *PatternNode,
-        expression: *Node,
-        guard: ?*GuardNode,
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*MatchCase {
-        const case = try allocator.create(MatchCase);
-
-        case.* = .{
-            .pattern = params.pattern,
-            .expression = params.expression,
-            .guard = params.guard,
-            .token = params.token,
-        };
-
-        return case;
-    }
-
     pub fn deinit(self: *MatchCase, allocator: std.mem.Allocator) void {
         self.pattern.deinit(allocator);
         allocator.destroy(self.pattern);
@@ -733,8 +429,6 @@ pub const MatchCase = struct {
             guard.deinit(allocator);
             allocator.destroy(guard);
         }
-
-        allocator.destroy(self);
     }
 };
 
@@ -750,34 +444,16 @@ pub const MatchExprNode = struct {
     value: *Node,
 
     /// Array of match cases to test against.
-    cases: std.ArrayList(MatchCase),
+    cases: std.ArrayList(*MatchCase),
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
-
-    pub const InitParams = struct {
-        value: *Node,
-        cases: std.ArrayList(MatchCase),
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*MatchExprNode {
-        const node = try allocator.create(MatchExprNode);
-
-        node.* = .{
-            .value = params.value,
-            .cases = params.cases,
-            .token = params.token,
-        };
-
-        return node;
-    }
 
     pub fn deinit(self: *MatchExprNode, allocator: std.mem.Allocator) void {
         self.value.deinit(allocator);
         allocator.destroy(self.value);
 
-        for (self.cases.items) |*case| {
+        for (self.cases.items) |case| {
             case.deinit(allocator);
             allocator.destroy(case);
         }
@@ -802,22 +478,6 @@ pub const FunctionTypeNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
-
-    pub const InitParams = struct {
-        param_types: std.ArrayList(*Node),
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*FunctionTypeNode {
-        const node = try allocator.create(FunctionTypeNode);
-
-        node.* = .{
-            .param_types = params.param_types,
-            .token = params.token,
-        };
-
-        return node;
-    }
 
     pub fn deinit(self: *FunctionTypeNode, allocator: std.mem.Allocator) void {
         for (self.param_types.items) |t| {
@@ -844,32 +504,6 @@ pub const LambdaExprNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
-
-    pub const InitParams = struct {
-        parameters: std.ArrayList([]const u8),
-        body: *Node,
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*LambdaExprNode {
-        const node = try allocator.create(LambdaExprNode);
-
-        var param_list = std.ArrayList([]const u8).init(allocator);
-        errdefer param_list.deinit();
-
-        for (params.parameters.items) |param| {
-            const duped = try allocator.dupe(u8, param);
-            try param_list.append(duped);
-        }
-
-        node.* = .{
-            .parameters = param_list,
-            .body = params.body,
-            .token = params.token,
-        };
-
-        return node;
-    }
 
     pub fn deinit(self: *LambdaExprNode, allocator: std.mem.Allocator) void {
         for (self.parameters.items) |param| {
@@ -899,24 +533,6 @@ pub const FuncApplicationNode = struct {
 
     /// The token representing the start of this application (usually the function's token).
     token: lexer.Token,
-
-    pub const InitParams = struct {
-        function: *Node,
-        argument: *Node,
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*FuncApplicationNode {
-        const node = try allocator.create(FuncApplicationNode);
-
-        node.* = .{
-            .function = params.function,
-            .argument = params.argument,
-            .token = params.token,
-        };
-
-        return node;
-    }
 
     pub fn deinit(self: *FuncApplicationNode, allocator: std.mem.Allocator) void {
         self.function.deinit(allocator);
@@ -948,24 +564,6 @@ pub const ConsExprNode = struct {
 
     /// The token representing the cons operator.
     operator: lexer.Token,
-
-    pub const InitParams = struct {
-        head: *Node,
-        tail: *Node,
-        operator: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ConsExprNode {
-        const node = try allocator.create(ConsExprNode);
-
-        node.* = .{
-            .head = params.head,
-            .tail = params.tail,
-            .operator = params.operator,
-        };
-
-        return node;
-    }
 
     pub fn deinit(self: *ConsExprNode, allocator: std.mem.Allocator) void {
         self.head.deinit(allocator);
@@ -1008,24 +606,6 @@ pub const CompositionExprNode = struct {
     /// The token representing the composition operator.
     operator: lexer.Token,
 
-    pub const InitParams = struct {
-        first: *Node,
-        second: *Node,
-        operator: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*CompositionExprNode {
-        const node = try allocator.create(CompositionExprNode);
-
-        node.* = .{
-            .first = params.first,
-            .second = params.second,
-            .operator = params.operator,
-        };
-
-        return node;
-    }
-
     pub fn deinit(self: *CompositionExprNode, allocator: std.mem.Allocator) void {
         self.first.deinit(allocator);
         allocator.destroy(self.first);
@@ -1052,24 +632,6 @@ pub const PipeExprNode = struct {
 
     /// The token representing the pipe operator.
     operator: lexer.Token,
-
-    pub const InitParams = struct {
-        value: *Node,
-        func: *Node,
-        operator: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*PipeExprNode {
-        const node = try allocator.create(PipeExprNode);
-
-        node.* = .{
-            .value = params.value,
-            .func = params.func,
-            .operator = params.operator,
-        };
-
-        return node;
-    }
 
     pub fn deinit(self: *PipeExprNode, allocator: std.mem.Allocator) void {
         self.value.deinit(allocator);
@@ -1106,26 +668,6 @@ pub const IfThenElseStmtNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
-
-    pub const InitParams = struct {
-        condition: *Node,
-        then_branch: *Node,
-        else_branch: *Node,
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*IfThenElseStmtNode {
-        const node = try allocator.create(IfThenElseStmtNode);
-
-        node.* = .{
-            .condition = params.condition,
-            .then_branch = params.then_branch,
-            .else_branch = params.else_branch,
-            .token = params.token,
-        };
-
-        return node;
-    }
 
     pub fn deinit(self: *IfThenElseStmtNode, allocator: std.mem.Allocator) void {
         self.condition.deinit(allocator);
@@ -1175,24 +717,6 @@ pub const TypeApplicationNode = struct {
     /// The token representing the type application.
     token: lexer.Token,
 
-    pub const InitParams = struct {
-        base: *Node,
-        args: std.ArrayList(*Node),
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*TypeApplicationNode {
-        const node = try allocator.create(TypeApplicationNode);
-
-        node.* = .{
-            .base = params.base,
-            .args = params.args,
-            .token = params.token,
-        };
-
-        return node;
-    }
-
     pub fn deinit(self: *TypeApplicationNode, allocator: std.mem.Allocator) void {
         self.base.deinit(allocator);
         allocator.destroy(self.base);
@@ -1230,32 +754,6 @@ pub const TypeAliasNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub const InitParams = struct {
-        name: []const u8,
-        type_params: std.ArrayList([]const u8),
-        value: *Node,
-        token: lexer.Token,
-    };
-
-    pub fn init(
-        allocator: std.mem.Allocator,
-        name: []const u8,
-        type_params: std.ArrayList([]const u8),
-        value: *Node,
-        token: lexer.Token,
-    ) !*TypeAliasNode {
-        const node = try allocator.create(TypeAliasNode);
-
-        node.* = .{
-            .name = try allocator.dupe(u8, name),
-            .type_params = type_params,
-            .value = value,
-            .token = token,
-        };
-
-        return node;
-    }
-
     pub fn deinit(self: *TypeAliasNode, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
 
@@ -1285,38 +783,20 @@ pub const VariantConstructorNode = struct {
     name: []const u8,
 
     /// Array of AST nodes representing the constructor's parameter types.
-    params: std.ArrayList(*Node),
+    parameters: std.ArrayList(*Node),
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub const InitParams = struct {
-        name: []const u8,
-        parameters: std.ArrayList(*Node),
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*VariantConstructorNode {
-        const node = try allocator.create(VariantConstructorNode);
-
-        node.* = .{
-            .name = try allocator.dupe(u8, params.name),
-            .params = params.parameters,
-            .token = params.token,
-        };
-
-        return node;
-    }
-
     pub fn deinit(self: *VariantConstructorNode, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
 
-        for (self.params.items) |param| {
+        for (self.parameters.items) |param| {
             param.deinit(allocator);
             allocator.destroy(param);
         }
 
-        self.params.deinit();
+        self.parameters.deinit();
 
         allocator.destroy(self);
     }
@@ -1339,30 +819,10 @@ pub const VariantTypeNode = struct {
     type_params: std.ArrayList([]const u8),
 
     /// Array of constructors defined for this type.
-    constructors: std.ArrayList(VariantConstructorNode),
+    constructors: std.ArrayList(*VariantConstructorNode),
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
-
-    pub const InitParams = struct {
-        name: []const u8,
-        type_params: std.ArrayList([]const u8),
-        constructors: std.ArrayList(VariantConstructorNode),
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*VariantTypeNode {
-        const node = try allocator.create(VariantTypeNode);
-
-        node.* = .{
-            .name = try allocator.dupe(u8, params.name),
-            .type_params = params.type_params,
-            .constructors = params.constructors,
-            .token = params.token,
-        };
-
-        return node;
-    }
 
     pub fn deinit(self: *VariantTypeNode, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
@@ -1373,7 +833,7 @@ pub const VariantTypeNode = struct {
 
         self.type_params.deinit();
 
-        for (self.constructors.items) |*constructor| {
+        for (self.constructors.items) |constructor| {
             constructor.deinit(allocator);
         }
 
@@ -1389,36 +849,16 @@ pub const RecordFieldNode = struct {
     name: []const u8,
 
     /// The AST node representing the field's type.
-    field_type: *Node,
+    type: *Node,
 
     /// The token representing this field declaration.
     token: lexer.Token,
 
-    pub const InitParams = struct {
-        name: []const u8,
-        field_type: *Node,
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*RecordFieldNode {
-        const node = try allocator.create(RecordFieldNode);
-
-        node.* = .{
-            .name = try allocator.dupe(u8, params.name),
-            .field_type = params.field_type,
-            .token = params.token,
-        };
-
-        return node;
-    }
-
     pub fn deinit(self: *RecordFieldNode, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
 
-        self.field_type.deinit(allocator);
-        allocator.destroy(self.field_type);
-
-        allocator.destroy(self);
+        self.type.deinit(allocator);
+        allocator.destroy(self.type);
     }
 };
 
@@ -1435,30 +875,10 @@ pub const RecordTypeNode = struct {
     type_params: std.ArrayList([]const u8),
 
     /// Array of fields in the record.
-    fields: std.ArrayList(RecordFieldNode),
+    fields: std.ArrayList(*RecordFieldNode),
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
-
-    pub const InitParams = struct {
-        name: []const u8,
-        type_params: std.ArrayList([]const u8),
-        fields: std.ArrayList(RecordFieldNode),
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*RecordTypeNode {
-        const node = try allocator.create(RecordTypeNode);
-
-        node.* = .{
-            .name = try allocator.dupe(u8, params.name),
-            .type_params = params.type_params,
-            .fields = params.fields,
-            .token = params.token,
-        };
-
-        return node;
-    }
 
     pub fn deinit(self: *RecordTypeNode, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
@@ -1469,8 +889,9 @@ pub const RecordTypeNode = struct {
 
         self.type_params.deinit();
 
-        for (self.fields.items) |*field| {
+        for (self.fields.items) |field| {
             field.deinit(allocator);
+            allocator.destroy(field);
         }
 
         self.fields.deinit();
@@ -1497,30 +918,12 @@ pub const ModulePathNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub const InitParams = struct {
-        segments: std.ArrayList([]const u8),
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ModulePathNode {
-        const node = try allocator.create(ModulePathNode);
-
-        node.* = .{
-            .segments = params.segments,
-            .token = params.token,
-        };
-
-        return node;
-    }
-
     pub fn deinit(self: *ModulePathNode, allocator: std.mem.Allocator) void {
         for (self.segments.items) |segment| {
             allocator.free(segment);
         }
 
         self.segments.deinit();
-
-        allocator.destroy(self);
     }
 };
 
@@ -1534,28 +937,8 @@ pub const ExportItem = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub const InitParams = struct {
-        name: []const u8,
-        expose_constructors: bool,
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ExportItem {
-        const item = try allocator.create(ExportItem);
-
-        item.* = .{
-            .name = try allocator.dupe(u8, params.name),
-            .expose_constructors = params.expose_constructors,
-            .token = params.token,
-        };
-
-        return item;
-    }
-
     pub fn deinit(self: *ExportItem, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
-
-        allocator.destroy(self);
     }
 };
 
@@ -1570,39 +953,20 @@ pub const ExportSpecNode = struct {
     exposing_all: bool,
 
     /// Optional array of specific items being exposed.
-    items: ?std.ArrayList(ExportItem),
+    items: ?std.ArrayList(*ExportItem),
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub const InitParams = struct {
-        exposing_all: bool,
-        items: ?std.ArrayList(ExportItem) = null,
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ExportSpecNode {
-        const node = try allocator.create(ExportSpecNode);
-
-        node.* = .{
-            .exposing_all = params.exposing_all,
-            .items = if (params.items) params.items else null,
-            .token = params.token,
-        };
-
-        return node;
-    }
-
     pub fn deinit(self: *ExportSpecNode, allocator: std.mem.Allocator) void {
         if (self.items) |*items| {
-            for (items.items) |*item| {
+            for (items.items) |item| {
                 item.deinit(allocator);
+                allocator.destroy(item);
             }
 
             items.deinit();
         }
-
-        allocator.destroy(self);
     }
 };
 
@@ -1648,47 +1012,6 @@ pub const ImportItem = union(enum) {
         alias: ?[]const u8,
     },
 
-    pub const InitParams = struct {
-        kind: enum {
-            Function,
-            Operator,
-            Type,
-        },
-        args: struct {
-            name: []const u8,
-            alias: ?[]const u8 = null,
-            expose_constructors: bool = false,
-        },
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ImportItem {
-        const node = try allocator.create(ImportItem);
-
-        node.* = switch (params.kind) {
-            .Function => .{
-                .function = .{
-                    .name = try allocator.dupe(u8, params.args.name),
-                    .alias = if (params.args.alias) |a| try allocator.dupe(u8, a) else null,
-                },
-            },
-            .Operator => .{
-                .operator = .{
-                    .symbol = try allocator.dupe(u8, params.args.name),
-                    .alias = if (params.args.alias) |a| try allocator.dupe(u8, a) else null,
-                },
-            },
-            .Type => .{
-                .type = .{
-                    .name = try allocator.dupe(u8, params.args.name),
-                    .expose_constructors = params.args.expose_constructors,
-                    .alias = if (params.args.alias) |a| try allocator.dupe(u8, a) else null,
-                },
-            },
-        };
-
-        return node;
-    }
-
     pub fn deinit(self: *ImportItem, allocator: std.mem.Allocator) void {
         switch (self.*) {
             .function => |*f| {
@@ -1713,8 +1036,6 @@ pub const ImportItem = union(enum) {
                 }
             },
         }
-
-        allocator.destroy(self);
     }
 };
 
@@ -1755,7 +1076,7 @@ pub const ImportKind = enum {
 /// - `open MyModule hiding (internal_func)`
 pub const ImportSpecNode = struct {
     /// The module path being imported.
-    path: ModulePathNode,
+    path: *ModulePathNode,
 
     /// The kind of import being performed.
     kind: ImportKind,
@@ -1766,47 +1087,23 @@ pub const ImportSpecNode = struct {
 
     /// Optional list of items being imported or renamed.
     /// Used when kind is .Using or .Hiding
-    items: ?std.ArrayList(ImportItem),
+    items: ?std.ArrayList(*ImportItem),
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub const InitParams = struct {
-        path: ModulePathNode,
-        kind: ImportKind,
-        alias: ?[]const u8 = null,
-        items: ?std.ArrayList(ImportItem) = null,
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ImportSpecNode {
-        const node = try allocator.create(ImportSpecNode);
-
-        node.* = .{
-            .path = params.path,
-            .kind = params.kind,
-            .alias = if (params.alias) |a| try allocator.dupe(u8, a) else null,
-            .items = if (params.items) params.items else null,
-            .token = params.token,
-        };
-
-        return node;
-    }
-
     pub fn deinit(self: *ImportSpecNode, allocator: std.mem.Allocator) void {
-        for (self.path.segments.items) |segment| {
-            allocator.free(segment);
-        }
-
-        self.path.segments.deinit();
+        self.path.deinit(allocator);
+        allocator.destroy(self.path);
 
         if (self.alias) |alias| {
             allocator.free(alias);
         }
 
         if (self.items) |*items| {
-            for (items.items) |*item| {
+            for (items.items) |item| {
                 item.deinit(allocator);
+                allocator.destroy(item);
             }
 
             items.deinit();
@@ -1825,33 +1122,14 @@ pub const ImportSpecNode = struct {
 /// - `include Parser.Internal`
 pub const IncludeNode = struct {
     /// The module path being included.
-    path: ModulePathNode,
+    path: *ModulePathNode,
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub const InitParams = struct {
-        path: ModulePathNode,
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*IncludeNode {
-        const node = try allocator.create(IncludeNode);
-
-        node.* = .{
-            .path = params.path,
-            .token = params.token,
-        };
-
-        return node;
-    }
-
     pub fn deinit(self: *IncludeNode, allocator: std.mem.Allocator) void {
-        for (self.path.segments.items) |segment| {
-            allocator.free(segment);
-        }
-
-        self.path.segments.deinit();
+        self.path.deinit(allocator);
+        allocator.destroy(self.path);
 
         allocator.destroy(self);
     }
@@ -1881,26 +1159,6 @@ pub const FunctionDeclNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
-
-    pub const InitParams = struct {
-        name: []const u8,
-        type_annotation: ?*Node = null,
-        value: *Node,
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*FunctionDeclNode {
-        const node = try allocator.create(FunctionDeclNode);
-
-        node.* = .{
-            .name = try allocator.dupe(u8, params.name),
-            .type_annotation = if (params.type_annotation) params.type_annotation else null,
-            .value = params.value,
-            .token = params.token,
-        };
-
-        return node;
-    }
 
     pub fn deinit(self: *FunctionDeclNode, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
@@ -1936,26 +1194,6 @@ pub const ForeignFunctionDeclNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub const InitParams = struct {
-        name: []const u8,
-        type_annotation: *Node,
-        external_name: []const u8,
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ForeignFunctionDeclNode {
-        const node = try allocator.create(ForeignFunctionDeclNode);
-
-        node.* = .{
-            .name = try allocator.dupe(u8, params.name),
-            .type_annotation = params.type_annotation,
-            .external_name = try allocator.dupe(u8, params.external_name),
-            .token = params.token,
-        };
-
-        return node;
-    }
-
     pub fn deinit(self: *ForeignFunctionDeclNode, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
 
@@ -1978,10 +1216,10 @@ pub const ForeignFunctionDeclNode = struct {
 /// - `module Parser exposing (Parser, run, map) ... end`
 pub const ModuleDeclNode = struct {
     /// The fully qualified path of the module.
-    path: ModulePathNode,
+    path: *ModulePathNode,
 
     /// Specification of which items to expose from the module.
-    exports: ExportSpecNode,
+    exports: *ExportSpecNode,
 
     /// Array of AST nodes representing the module's contents.
     declarations: std.ArrayList(*Node),
@@ -1989,40 +1227,12 @@ pub const ModuleDeclNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub const InitParams = struct {
-        path: ModulePathNode,
-        exports: ExportSpecNode,
-        declarations: std.ArrayList(*Node),
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ModuleDeclNode {
-        const node = try allocator.create(ModuleDeclNode);
-
-        node.* = .{
-            .path = params.path,
-            .exports = params.exports,
-            .declarations = params.declarations,
-            .token = params.token,
-        };
-
-        return node;
-    }
-
     pub fn deinit(self: *ModuleDeclNode, allocator: std.mem.Allocator) void {
-        for (self.path.segments.items) |segment| {
-            allocator.free(segment);
-        }
+        self.path.deinit(allocator);
+        allocator.destroy(self.path);
 
-        self.path.segments.deinit();
-
-        if (self.exports.items) |*items| {
-            for (items.items) |*item| {
-                item.deinit(allocator);
-            }
-
-            items.deinit();
-        }
+        self.exports.deinit(allocator);
+        allocator.destroy(self.exports);
 
         for (self.declarations.items) |declaration| {
             declaration.deinit(allocator);
@@ -2043,22 +1253,6 @@ pub const ProgramNode = struct {
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
-
-    pub const InitParams = struct {
-        statements: std.ArrayList(*Node),
-        token: lexer.Token,
-    };
-
-    pub fn init(allocator: std.mem.Allocator, params: InitParams) !*ProgramNode {
-        const node = try allocator.create(ProgramNode);
-
-        node.* = .{
-            .statements = params.statements,
-            .token = params.token,
-        };
-
-        return node;
-    }
 
     pub fn deinit(self: *ProgramNode, allocator: std.mem.Allocator) void {
         for (self.statements.items) |statement| {
@@ -2228,8 +1422,9 @@ test "[CommentNode]" {
     const content = "This is a comment";
 
     // Action
-    const params = CommentNode.InitParams{
-        .content = content,
+    const comment_node = try allocator.create(CommentNode);
+    comment_node.* = .{
+        .content = try allocator.dupe(u8, content),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .comment = .Regular },
             .lexeme = "#",
@@ -2240,8 +1435,6 @@ test "[CommentNode]" {
             },
         },
     };
-
-    const comment_node = try CommentNode.init(allocator, params);
 
     const node = try allocator.create(Node);
     defer {
@@ -2275,8 +1468,9 @@ test "[DocCommentNode]" {
     const content = "This is a doc comment";
 
     // Action
-    const params = DocCommentNode.InitParams{
-        .content = content,
+    const comment_node = try allocator.create(DocCommentNode);
+    comment_node.* = .{
+        .content = try allocator.dupe(u8, content),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .comment = .Doc },
             .lexeme = "##",
@@ -2287,8 +1481,6 @@ test "[DocCommentNode]" {
             },
         },
     };
-
-    const comment_node = try DocCommentNode.init(allocator, params);
 
     const node = try allocator.create(Node);
     defer {
@@ -2322,7 +1514,7 @@ test "[IntLiteralNode]" {
     const value = 42;
 
     // Action
-    const params = IntLiteralNode.InitParams{
+    const int_node = .{
         .value = value,
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .literal = .Int },
@@ -2334,8 +1526,6 @@ test "[IntLiteralNode]" {
             },
         },
     };
-
-    const int_node = IntLiteralNode.init(params);
 
     const node = try allocator.create(Node);
     defer {
@@ -2369,7 +1559,7 @@ test "[FloatLiteralNode]" {
     const value = 42.0;
 
     // Action
-    const params = FloatLiteralNode.InitParams{
+    const float_node = .{
         .value = value,
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .literal = .Float },
@@ -2381,8 +1571,6 @@ test "[FloatLiteralNode]" {
             },
         },
     };
-
-    const float_node = FloatLiteralNode.init(params);
 
     const node = try allocator.create(Node);
     defer {
@@ -2416,7 +1604,7 @@ test "[CharLiteralNode]" {
     const value = 'a';
 
     // Action
-    const params = CharLiteralNode.InitParams{
+    const char_node = .{
         .value = value,
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .literal = .Char },
@@ -2428,8 +1616,6 @@ test "[CharLiteralNode]" {
             },
         },
     };
-
-    const char_node = CharLiteralNode.init(params);
 
     const node = try allocator.create(Node);
     defer {
@@ -2463,8 +1649,9 @@ test "[StrLiteralNode]" {
     const value = "foo";
 
     // Action
-    const params = StrLiteralNode.InitParams{
-        .value = value,
+    const literal_node = try allocator.create(StrLiteralNode);
+    literal_node.* = .{
+        .value = try allocator.dupe(u8, value),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .literal = .String },
             .lexeme = "\"",
@@ -2475,8 +1662,6 @@ test "[StrLiteralNode]" {
             },
         },
     };
-
-    const literal_node = try StrLiteralNode.init(allocator, params);
 
     const node = try allocator.create(Node);
     defer {
@@ -2517,8 +1702,9 @@ test "[MultilineStrLiteralNode]" {
     ;
 
     // Action
-    const params = MultilineStrLiteralNode.InitParams{
-        .value = value,
+    const literal_node = try allocator.create(MultilineStrLiteralNode);
+    literal_node.* = .{
+        .value = try allocator.dupe(u8, value),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .literal = .MultilineString },
             .lexeme = "\"\"\"",
@@ -2529,8 +1715,6 @@ test "[MultilineStrLiteralNode]" {
             },
         },
     };
-
-    const literal_node = try MultilineStrLiteralNode.init(allocator, params);
 
     const node = try allocator.create(Node);
     defer {
@@ -2564,8 +1748,9 @@ test "[LowerIdentifierNode]" {
     const name = "my_variable";
 
     // Action
-    const params = LowerIdentifierNode.InitParams{
-        .name = name,
+    const ident_node = try allocator.create(LowerIdentifierNode);
+    ident_node.* = .{
+        .name = try allocator.dupe(u8, name),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Lower },
             .lexeme = name,
@@ -2576,8 +1761,6 @@ test "[LowerIdentifierNode]" {
             },
         },
     };
-
-    const ident_node = try LowerIdentifierNode.init(allocator, params);
 
     const node = try allocator.create(Node);
     defer {
@@ -2614,8 +1797,9 @@ test "[UpperIdentifierNode]" {
     const name = "TypeName";
 
     // Action
-    const params = UpperIdentifierNode.InitParams{
-        .name = name,
+    const ident_node = try allocator.create(UpperIdentifierNode);
+    ident_node.* = .{
+        .name = try allocator.dupe(u8, name),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Upper },
             .lexeme = name,
@@ -2626,8 +1810,6 @@ test "[UpperIdentifierNode]" {
             },
         },
     };
-
-    const ident_node = try UpperIdentifierNode.init(allocator, params);
 
     const node = try allocator.create(Node);
     defer {
@@ -2664,7 +1846,7 @@ test "[ListNode]" {
     // Action
     const elem1 = try allocator.create(Node);
     elem1.* = .{
-        .int_literal = IntLiteralNode.init(.{
+        .int_literal = .{
             .value = 1,
             .token = lexer.Token{
                 .kind = lexer.TokenKind{ .literal = .Int },
@@ -2675,12 +1857,12 @@ test "[ListNode]" {
                     .src = .{ .line = 1, .col = 2 },
                 },
             },
-        }),
+        },
     };
 
     const elem2 = try allocator.create(Node);
     elem2.* = .{
-        .int_literal = IntLiteralNode.init(.{
+        .int_literal = .{
             .value = 2,
             .token = lexer.Token{
                 .kind = lexer.TokenKind{ .literal = .Int },
@@ -2691,14 +1873,15 @@ test "[ListNode]" {
                     .src = .{ .line = 1, .col = 5 },
                 },
             },
-        }),
+        },
     };
 
     var elements = std.ArrayList(*Node).init(allocator);
     try elements.append(elem1);
     try elements.append(elem2);
 
-    const params = ListNode.InitParams{
+    const list_node = try allocator.create(ListNode);
+    list_node.* = .{
         .elements = elements,
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
@@ -2710,8 +1893,6 @@ test "[ListNode]" {
             },
         },
     };
-
-    const list_node = try ListNode.init(allocator, params);
 
     const node = try allocator.create(Node);
     defer {
@@ -2749,7 +1930,7 @@ test "[TupleNode]" {
 
     const first = try allocator.create(Node);
     first.* = .{
-        .int_literal = IntLiteralNode.init(.{
+        .int_literal = .{
             .value = 1,
             .token = lexer.Token{
                 .kind = lexer.TokenKind{ .literal = .Int },
@@ -2760,30 +1941,32 @@ test "[TupleNode]" {
                     .src = .{ .line = 1, .col = 2 },
                 },
             },
-        }),
+        },
+    };
+
+    const second_str = try allocator.create(StrLiteralNode);
+    second_str.* = .{
+        .value = try allocator.dupe(u8, "hello"),
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .literal = .String },
+            .lexeme = "\"hello\"",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 4, .end = 11 },
+                .src = .{ .line = 1, .col = 5 },
+            },
+        },
     };
 
     const second = try allocator.create(Node);
-    second.* = .{
-        .str_literal = try StrLiteralNode.init(allocator, .{
-            .value = "hello",
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .String },
-                .lexeme = "\"hello\"",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 4, .end = 11 },
-                    .src = .{ .line = 1, .col = 5 },
-                },
-            },
-        }),
-    };
+    second.* = .{ .str_literal = second_str };
 
     var elements = std.ArrayList(*Node).init(allocator);
     try elements.append(first);
     try elements.append(second);
 
-    const params = TupleNode.InitParams{
+    const tuple_node = try allocator.create(TupleNode);
+    tuple_node.* = .{
         .elements = elements,
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .delimiter = .LeftParen },
@@ -2795,8 +1978,6 @@ test "[TupleNode]" {
             },
         },
     };
-
-    const tuple_node = try TupleNode.init(allocator, params);
 
     const node = try allocator.create(Node);
     defer {
@@ -2838,7 +2019,7 @@ test "[UnaryExprNode]" {
     // Action
     const operand = try allocator.create(Node);
     operand.* = .{
-        .int_literal = IntLiteralNode.init(.{
+        .int_literal = .{
             .value = 42,
             .token = lexer.Token{
                 .kind = lexer.TokenKind{ .literal = .Int },
@@ -2849,10 +2030,11 @@ test "[UnaryExprNode]" {
                     .src = .{ .line = 1, .col = 2 },
                 },
             },
-        }),
+        },
     };
 
-    const params = UnaryExprNode.InitParams{
+    const unary_node = try allocator.create(UnaryExprNode);
+    unary_node.* = .{
         .operand = operand,
         .operator = lexer.Token{
             .kind = lexer.TokenKind{ .operator = .IntSub },
@@ -2864,8 +2046,6 @@ test "[UnaryExprNode]" {
             },
         },
     };
-
-    const unary_node = try UnaryExprNode.init(allocator, params);
 
     const node = try allocator.create(Node);
     defer {
@@ -2905,7 +2085,7 @@ test "[ArithmeticExprNode]" {
     // Action
     const left = try allocator.create(Node);
     left.* = .{
-        .int_literal = IntLiteralNode.init(.{
+        .int_literal = .{
             .value = 2,
             .token = .{
                 .kind = .{ .literal = .Int },
@@ -2916,12 +2096,12 @@ test "[ArithmeticExprNode]" {
                     .src = .{ .line = 1, .col = 1 },
                 },
             },
-        }),
+        },
     };
 
     const right = try allocator.create(Node);
     right.* = .{
-        .int_literal = IntLiteralNode.init(.{
+        .int_literal = .{
             .value = 3,
             .token = .{
                 .kind = .{ .literal = .Int },
@@ -2932,10 +2112,11 @@ test "[ArithmeticExprNode]" {
                     .src = .{ .line = 1, .col = 5 },
                 },
             },
-        }),
+        },
     };
 
-    const params = ArithmeticExprNode.InitParams{
+    const arithmetic_node = try allocator.create(ArithmeticExprNode);
+    arithmetic_node.* = .{
         .left = left,
         .right = right,
         .operator = lexer.Token{
@@ -2948,8 +2129,6 @@ test "[ArithmeticExprNode]" {
             },
         },
     };
-
-    const arithmetic_node = try ArithmeticExprNode.init(allocator, params);
 
     const node = try allocator.create(Node);
     defer {
@@ -2987,39 +2166,42 @@ test "[LogicalExprNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const left = try allocator.create(Node);
-    left.* = .{
-        .lower_identifier = try LowerIdentifierNode.init(allocator, .{
-            .name = "a",
-            .token = lexer.Token{
-                .kind = .{ .identifier = .Lower },
-                .lexeme = "a",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 1 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
+    const left_ident = try allocator.create(LowerIdentifierNode);
+    left_ident.* = .{
+        .name = try allocator.dupe(u8, "a"),
+        .token = lexer.Token{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "a",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
             },
-        }),
+        },
+    };
+
+    const left = try allocator.create(Node);
+    left.* = .{ .lower_identifier = left_ident };
+
+    const right_ident = try allocator.create(LowerIdentifierNode);
+    right_ident.* = .{
+        .name = try allocator.dupe(u8, "b"),
+        .token = lexer.Token{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "b",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 5, .end = 6 },
+                .src = .{ .line = 1, .col = 6 },
+            },
+        },
     };
 
     const right = try allocator.create(Node);
-    right.* = .{
-        .lower_identifier = try LowerIdentifierNode.init(allocator, .{
-            .name = "b",
-            .token = lexer.Token{
-                .kind = .{ .identifier = .Lower },
-                .lexeme = "b",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 5, .end = 6 },
-                    .src = .{ .line = 1, .col = 6 },
-                },
-            },
-        }),
-    };
+    right.* = .{ .lower_identifier = right_ident };
 
-    const params = LogicalExprNode.InitParams{
+    const logical_node = try allocator.create(LogicalExprNode);
+    logical_node.* = .{
         .left = left,
         .right = right,
         .operator = lexer.Token{
@@ -3032,8 +2214,6 @@ test "[LogicalExprNode]" {
             },
         },
     };
-
-    const logical_node = try LogicalExprNode.init(allocator, params);
 
     const node = try allocator.create(Node);
     defer {
@@ -3071,39 +2251,42 @@ test "[ComparisonExprNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const left = try allocator.create(Node);
-    left.* = .{
-        .lower_identifier = try LowerIdentifierNode.init(allocator, .{
-            .name = "x",
-            .token = lexer.Token{
-                .kind = .{ .identifier = .Lower },
-                .lexeme = "x",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 1 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
+    const left_ident = try allocator.create(LowerIdentifierNode);
+    left_ident.* = .{
+        .name = try allocator.dupe(u8, "x"),
+        .token = lexer.Token{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "x",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
             },
-        }),
+        },
+    };
+
+    const left = try allocator.create(Node);
+    left.* = .{ .lower_identifier = left_ident };
+
+    const right_ident = try allocator.create(LowerIdentifierNode);
+    right_ident.* = .{
+        .name = try allocator.dupe(u8, "y"),
+        .token = lexer.Token{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "y",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 5, .end = 6 },
+                .src = .{ .line = 1, .col = 6 },
+            },
+        },
     };
 
     const right = try allocator.create(Node);
-    right.* = .{
-        .lower_identifier = try LowerIdentifierNode.init(allocator, .{
-            .name = "y",
-            .token = lexer.Token{
-                .kind = .{ .identifier = .Lower },
-                .lexeme = "y",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 5, .end = 6 },
-                    .src = .{ .line = 1, .col = 6 },
-                },
-            },
-        }),
-    };
+    right.* = .{ .lower_identifier = right_ident };
 
-    const params = ComparisonExprNode.InitParams{
+    const comparison_node = try allocator.create(ComparisonExprNode);
+    comparison_node.* = .{
         .left = left,
         .right = right,
         .operator = lexer.Token{
@@ -3116,8 +2299,6 @@ test "[ComparisonExprNode]" {
             },
         },
     };
-
-    const comparison_node = try ComparisonExprNode.init(allocator, params);
 
     const node = try allocator.create(Node);
     defer {
@@ -3146,6 +2327,668 @@ test "[ComparisonExprNode]" {
     try testing.expectEqualStrings("y", expr.right.lower_identifier.name);
 }
 
+test "[MatchExprNode]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    {
+        // Test basic constructor pattern matching
+        // Test input: match opt on | Some x => x | None => 0
+
+        // Action
+        const value_ident = try allocator.create(LowerIdentifierNode);
+        value_ident.* = .{
+            .name = try allocator.dupe(u8, "opt"),
+            .token = lexer.Token{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "opt",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 3 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        const value_node = try allocator.create(Node);
+        value_node.* = .{ .lower_identifier = value_ident };
+
+        // Case 1: Some x => x
+        const var_pattern = try allocator.create(PatternNode);
+        var_pattern.* = .{
+            .variable = .{
+                .name = try allocator.dupe(u8, "x"),
+                .token = .{
+                    .kind = .{ .identifier = .Lower },
+                    .lexeme = "x",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 1 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        var some_args = std.ArrayList(*PatternNode).init(allocator);
+        try some_args.append(var_pattern);
+
+        const some_pattern = try allocator.create(PatternNode);
+        some_pattern.* = .{
+            .constructor = .{
+                .name = try allocator.dupe(u8, "Some"),
+                .args = some_args,
+                .token = .{
+                    .kind = .{ .identifier = .Upper },
+                    .lexeme = "Some",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 4 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        const var_result = try allocator.create(LowerIdentifierNode);
+        var_result.* = .{
+            .name = try allocator.dupe(u8, "x"),
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "x",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        const some_expr = try allocator.create(Node);
+        some_expr.* = .{ .lower_identifier = var_result };
+
+        const some_case = try allocator.create(MatchCase);
+        some_case.* = .{
+            .pattern = some_pattern,
+            .expression = some_expr,
+            .guard = null,
+            .token = .{
+                .kind = .{ .symbol = .Pipe },
+                .lexeme = "|",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        // Case 2: None => 0
+        const none_pattern = try allocator.create(PatternNode);
+        none_pattern.* = .{
+            .constructor = .{
+                .name = try allocator.dupe(u8, "None"),
+                .args = std.ArrayList(*PatternNode).init(allocator),
+                .token = .{
+                    .kind = .{ .identifier = .Upper },
+                    .lexeme = "None",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 4 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        const none_expr = try allocator.create(Node);
+        none_expr.* = .{
+            .int_literal = .{
+                .value = 0,
+                .token = .{
+                    .kind = .{ .literal = .Int },
+                    .lexeme = "0",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 1 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        const none_case = try allocator.create(MatchCase);
+        none_case.* = .{
+            .pattern = none_pattern,
+            .expression = none_expr,
+            .guard = null,
+            .token = .{
+                .kind = .{ .symbol = .Pipe },
+                .lexeme = "|",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        var cases = std.ArrayList(*MatchCase).init(allocator);
+        try cases.append(some_case);
+        try cases.append(none_case);
+
+        const match_expr = try allocator.create(MatchExprNode);
+        match_expr.* = .{
+            .value = value_node,
+            .cases = cases,
+            .token = .{
+                .kind = .{ .keyword = .Match },
+                .lexeme = "match",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 5 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        const node = try allocator.create(Node);
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        node.* = .{ .match_expr = match_expr };
+
+        // Assertions
+        // Verify the node is a match expression
+        try testing.expect(node.* == .match_expr);
+
+        const match = node.match_expr;
+
+        // Verify the match expression has exactly two cases
+        try testing.expectEqual(@as(usize, 2), match.cases.items.len);
+
+        // Ensure the constructor name for the first case is "Some"
+        // try testing.expect(match.value.* == .upper_identifier);
+        // try testing.expectEqualStrings("Some", match.cases.items[0].pattern.constructor.name);
+
+        // Check the argument for the "Some" constructor is a variable named "x"
+        // try testing.expectEqualStrings("x", match.cases.items[0].pattern.constructor.args.items[0].variable.name);
+
+        // Ensure the constructor name for the second case is "None"
+        // try testing.expectEqualStrings("None", match.cases.items[1].pattern.constructor.name);
+
+        // Verify the "None" constructor in the second case has no arguments
+        // try testing.expectEqual(@as(usize, 0), match.cases.items[1].pattern.constructor.args.items.len);
+    }
+
+    {
+        // Test list pattern with cons
+        // Test input: match list on | head :: tail => head | [] => 0
+
+        // Action
+        // Value to match on (a list variable)
+        const value_ident = try allocator.create(LowerIdentifierNode);
+        value_ident.* = .{
+            .name = try allocator.dupe(u8, "list"),
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "list",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        const value_node = try allocator.create(Node);
+        value_node.* = .{ .lower_identifier = value_ident };
+
+        // Case 1: head :: tail => head
+        const head_pattern = try allocator.create(PatternNode);
+        head_pattern.* = .{
+            .variable = .{
+                .name = try allocator.dupe(u8, "head"),
+                .token = .{
+                    .kind = .{ .identifier = .Lower },
+                    .lexeme = "head",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 4 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        const tail_pattern = try allocator.create(PatternNode);
+        tail_pattern.* = .{
+            .variable = .{
+                .name = try allocator.dupe(u8, "tail"),
+                .token = .{
+                    .kind = .{ .identifier = .Lower },
+                    .lexeme = "tail",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 4 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        const cons_pattern = try allocator.create(PatternNode);
+        cons_pattern.* = .{
+            .cons = .{
+                .head = head_pattern,
+                .tail = tail_pattern,
+                .token = .{
+                    .kind = .{ .operator = .Cons },
+                    .lexeme = "::",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 2 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        const head_ident = try allocator.create(LowerIdentifierNode);
+        head_ident.* = .{
+            .name = try allocator.dupe(u8, "head"),
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "head",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        const head_expr = try allocator.create(Node);
+        head_expr.* = .{ .lower_identifier = head_ident };
+
+        const cons_case = try allocator.create(MatchCase);
+        cons_case.* = .{
+            .pattern = cons_pattern,
+            .expression = head_expr,
+            .guard = null,
+            .token = .{
+                .kind = .{ .symbol = .Pipe },
+                .lexeme = "|",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        // Case 2: [] => 0
+        const empty_pattern = try allocator.create(PatternNode);
+        empty_pattern.* = .{
+            .empty_list = .{
+                .token = .{
+                    .kind = .{ .delimiter = .LeftBracket },
+                    .lexeme = "[]",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 2 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        const zero_node = try allocator.create(Node);
+        zero_node.* = .{
+            .int_literal = .{
+                .value = 0,
+                .token = .{
+                    .kind = .{ .literal = .Int },
+                    .lexeme = "0",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 1 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        const empty_case = try allocator.create(MatchCase);
+        empty_case.* = .{
+            .pattern = empty_pattern,
+            .expression = zero_node,
+            .guard = null,
+            .token = .{
+                .kind = .{ .symbol = .Pipe },
+                .lexeme = "|",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        var cases = std.ArrayList(*MatchCase).init(allocator);
+        try cases.append(cons_case);
+        try cases.append(empty_case);
+
+        const match_expr = try allocator.create(MatchExprNode);
+        match_expr.* = .{
+            .value = value_node,
+            .cases = cases,
+            .token = .{
+                .kind = .{ .keyword = .Match },
+                .lexeme = "match",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 5 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        const node = try allocator.create(Node);
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        node.* = .{ .match_expr = match_expr };
+
+        // Assertions
+        // Verify the node is a match expression
+        try testing.expect(node.* == .match_expr);
+
+        const match = node.match_expr;
+
+        // Verify the match expression has exactly two cases
+        try testing.expectEqual(@as(usize, 2), match.cases.items.len);
+
+        // Test the first case (cons pattern)
+        const list_cons_case = match.cases.items[0];
+
+        // Verify the pattern in the first case is a cons pattern (head :: tail)
+        try testing.expect(list_cons_case.pattern.* == .cons);
+
+        // Ensure the name of the head variable in the cons pattern is "head"
+        try testing.expectEqualStrings("head", list_cons_case.pattern.cons.head.variable.name);
+
+        // Ensure the name of the tail variable in the cons pattern is "tail"
+        try testing.expectEqualStrings("tail", list_cons_case.pattern.cons.tail.variable.name);
+
+        // Test the second case (empty list pattern)
+        const empty_list_case = match.cases.items[1];
+
+        // Verify the pattern in the second case is an empty list
+        try testing.expect(empty_list_case.pattern.* == .empty_list);
+    }
+
+    {
+        // Test guards
+        // Test input: match x on | n when n > 0 => "positive" | n => "non-positive"
+
+        // Action
+        const value_ident = try allocator.create(LowerIdentifierNode);
+        value_ident.* = .{
+            .name = try allocator.dupe(u8, "x"),
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "x",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        const value_node = try allocator.create(Node);
+        value_node.* = .{ .lower_identifier = value_ident };
+
+        // Case 1: n when n > 0 => "positive"
+        const n_pattern = try allocator.create(PatternNode);
+        n_pattern.* = .{
+            .variable = .{
+                .name = try allocator.dupe(u8, "n"),
+                .token = .{
+                    .kind = .{ .identifier = .Lower },
+                    .lexeme = "n",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 1 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        const n_ident = try allocator.create(LowerIdentifierNode);
+        n_ident.* = .{
+            .name = try allocator.dupe(u8, "n"),
+            .token = .{
+                .kind = .{ .identifier = .Lower },
+                .lexeme = "n",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        const n_ref = try allocator.create(Node);
+        n_ref.* = .{ .lower_identifier = n_ident };
+
+        const zero_node = try allocator.create(Node);
+        zero_node.* = .{
+            .int_literal = .{
+                .value = 0,
+                .token = .{
+                    .kind = .{ .literal = .Int },
+                    .lexeme = "0",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 1 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        const comp_expr = try allocator.create(ComparisonExprNode);
+        comp_expr.* = .{
+            .left = n_ref,
+            .right = zero_node,
+            .operator = .{
+                .kind = .{ .operator = .GreaterThan },
+                .lexeme = ">",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        const guard_expr = try allocator.create(Node);
+        guard_expr.* = .{ .comparison_expr = comp_expr };
+
+        const guard = try allocator.create(GuardNode);
+        guard.* = .{
+            .condition = guard_expr,
+            .token = .{
+                .kind = .{ .keyword = .When },
+                .lexeme = "when",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        const positive_str = try allocator.create(StrLiteralNode);
+        positive_str.* = .{
+            .value = try allocator.dupe(u8, "positive"),
+            .token = .{
+                .kind = .{ .literal = .String },
+                .lexeme = "\"positive\"",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 10 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        const positive_expr = try allocator.create(Node);
+        positive_expr.* = .{ .str_literal = positive_str };
+
+        const guarded_case = try allocator.create(MatchCase);
+        guarded_case.* = .{
+            .pattern = n_pattern,
+            .expression = positive_expr,
+            .guard = guard,
+            .token = .{
+                .kind = .{ .symbol = .Pipe },
+                .lexeme = "|",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        // Case 2: n => "non-positive"
+        const n2_pattern = try allocator.create(PatternNode);
+        n2_pattern.* = .{
+            .variable = .{
+                .name = try allocator.dupe(u8, "n"),
+                .token = .{
+                    .kind = .{ .identifier = .Lower },
+                    .lexeme = "n",
+                    .loc = .{
+                        .filename = TEST_FILE,
+                        .span = .{ .start = 0, .end = 1 },
+                        .src = .{ .line = 1, .col = 1 },
+                    },
+                },
+            },
+        };
+
+        const non_pos_str = try allocator.create(StrLiteralNode);
+        non_pos_str.* = .{
+            .value = try allocator.dupe(u8, "non-positive"),
+            .token = .{
+                .kind = .{ .literal = .String },
+                .lexeme = "\"non-positive\"",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 14 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        const non_positive_expr = try allocator.create(Node);
+        non_positive_expr.* = .{ .str_literal = non_pos_str };
+
+        const default_case = try allocator.create(MatchCase);
+        default_case.* = .{
+            .pattern = n2_pattern,
+            .expression = non_positive_expr,
+            .guard = null,
+            .token = .{
+                .kind = .{ .symbol = .Pipe },
+                .lexeme = "|",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 1 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        var cases = std.ArrayList(*MatchCase).init(allocator);
+        try cases.append(guarded_case);
+        try cases.append(default_case);
+
+        const match_expr = try allocator.create(MatchExprNode);
+        match_expr.* = .{
+            .value = value_node,
+            .cases = cases,
+            .token = .{
+                .kind = .{ .keyword = .Match },
+                .lexeme = "match",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 5 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        const node = try allocator.create(Node);
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        node.* = .{ .match_expr = match_expr };
+
+        // Assertions
+        // Verify the node is a match expression
+        try testing.expect(node.* == .match_expr);
+
+        const match = node.match_expr;
+
+        // Verify the match expression has exactly two cases
+        try testing.expectEqual(@as(usize, 2), match.cases.items.len);
+
+        // Test the first case (guarded case)
+        const positive_case = match.cases.items[0];
+
+        // Verify the pattern in the guarded case is a variable
+        try testing.expect(positive_case.pattern.* == .variable);
+
+        // Verify the name of the variable
+        try testing.expectEqualStrings("n", positive_case.pattern.variable.name);
+
+        // Ensure the guarded case has a guard condition
+        try testing.expect(positive_case.guard != null);
+
+        // Verify the expression in the guarded case is the string literal "positive"
+        try testing.expectEqualStrings("positive", positive_case.expression.str_literal.value);
+
+        // Test the second case (catch-all case)
+        const non_positive_case = match.cases.items[1];
+
+        // Verify the pattern in the catch-all case is a variable
+        try testing.expect(non_positive_case.pattern.* == .variable);
+
+        // Ensure the name of the variable in the pattern is "n"
+        try testing.expectEqualStrings("n", non_positive_case.pattern.variable.name);
+
+        // Ensure the catch-all case does not have a guard condition
+        try testing.expect(non_positive_case.guard == null);
+
+        // Verify the expression in the catch-all case is the string literal "non-positive"
+        try testing.expectEqualStrings("non-positive", non_positive_case.expression.str_literal.value);
+    }
+}
+
 test "[FunctionTypeNode]" {
     // Test input: : Int -> Int -> Int
 
@@ -3155,60 +2998,64 @@ test "[FunctionTypeNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const int_type1 = try allocator.create(Node);
+    const int_type1 = try allocator.create(UpperIdentifierNode);
     int_type1.* = .{
-        .upper_identifier = try UpperIdentifierNode.init(allocator, .{
-            .name = "Int",
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .identifier = .Upper },
-                .lexeme = "Int",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 2, .end = 5 },
-                    .src = .{ .line = 1, .col = 3 },
-                },
+        .name = try allocator.dupe(u8, "Int"),
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .identifier = .Upper },
+            .lexeme = "Int",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 2, .end = 5 },
+                .src = .{ .line = 1, .col = 3 },
             },
-        }),
+        },
     };
 
-    const int_type2 = try allocator.create(Node);
+    const int_node1 = try allocator.create(Node);
+    int_node1.* = .{ .upper_identifier = int_type1 };
+
+    const int_type2 = try allocator.create(UpperIdentifierNode);
     int_type2.* = .{
-        .upper_identifier = try UpperIdentifierNode.init(allocator, .{
-            .name = "Int",
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .identifier = .Upper },
-                .lexeme = "Int",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 9, .end = 12 },
-                    .src = .{ .line = 1, .col = 10 },
-                },
+        .name = try allocator.dupe(u8, "Int"),
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .identifier = .Upper },
+            .lexeme = "Int",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 9, .end = 12 },
+                .src = .{ .line = 1, .col = 10 },
             },
-        }),
+        },
     };
 
-    const int_type3 = try allocator.create(Node);
+    const int_node2 = try allocator.create(Node);
+    int_node2.* = .{ .upper_identifier = int_type2 };
+
+    const int_type3 = try allocator.create(UpperIdentifierNode);
     int_type3.* = .{
-        .upper_identifier = try UpperIdentifierNode.init(allocator, .{
-            .name = "Int",
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .identifier = .Upper },
-                .lexeme = "Int",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 16, .end = 19 },
-                    .src = .{ .line = 1, .col = 17 },
-                },
+        .name = try allocator.dupe(u8, "Int"),
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .identifier = .Upper },
+            .lexeme = "Int",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 16, .end = 19 },
+                .src = .{ .line = 1, .col = 17 },
             },
-        }),
+        },
     };
+
+    const int_node3 = try allocator.create(Node);
+    int_node3.* = .{ .upper_identifier = int_type3 };
 
     var param_types = std.ArrayList(*Node).init(allocator);
-    try param_types.append(int_type1);
-    try param_types.append(int_type2);
-    try param_types.append(int_type3);
+    try param_types.append(int_node1);
+    try param_types.append(int_node2);
+    try param_types.append(int_node3);
 
-    const params = FunctionTypeNode.InitParams{
+    const ftype_node = try allocator.create(FunctionTypeNode);
+    ftype_node.* = .{
         .param_types = param_types,
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .delimiter = .Colon },
@@ -3220,8 +3067,6 @@ test "[FunctionTypeNode]" {
             },
         },
     };
-
-    const ftype_node = try FunctionTypeNode.init(allocator, params);
 
     const node = try allocator.create(Node);
     defer {
@@ -3284,61 +3129,65 @@ test "[LambdaExprNode]" {
 
     // Action
     var parameters = std.ArrayList([]const u8).init(allocator);
-    try parameters.append("x");
-    try parameters.append("y");
+    try parameters.append(try allocator.dupe(u8, "x"));
+    try parameters.append(try allocator.dupe(u8, "y"));
 
-    const left = try allocator.create(Node);
-    left.* = .{
-        .lower_identifier = try LowerIdentifierNode.init(allocator, .{
-            .name = "x",
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .identifier = .Lower },
-                .lexeme = "x",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 7, .end = 8 },
-                    .src = .{ .line = 1, .col = 8 },
-                },
+    const x_ident = try allocator.create(LowerIdentifierNode);
+    x_ident.* = .{
+        .name = try allocator.dupe(u8, "x"),
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .identifier = .Lower },
+            .lexeme = "x",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 7, .end = 8 },
+                .src = .{ .line = 1, .col = 8 },
             },
-        }),
+        },
     };
 
-    const right = try allocator.create(Node);
-    right.* = .{
-        .lower_identifier = try LowerIdentifierNode.init(allocator, .{
-            .name = "y",
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .identifier = .Lower },
-                .lexeme = "y",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 10, .end = 11 },
-                    .src = .{ .line = 1, .col = 11 },
-                },
+    const x_node = try allocator.create(Node);
+    x_node.* = .{ .lower_identifier = x_ident };
+
+    const y_ident = try allocator.create(LowerIdentifierNode);
+    y_ident.* = .{
+        .name = try allocator.dupe(u8, "y"),
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .identifier = .Lower },
+            .lexeme = "y",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 10, .end = 11 },
+                .src = .{ .line = 1, .col = 11 },
             },
-        }),
+        },
     };
 
-    const body = try allocator.create(Node);
-    body.* = .{
-        .arithmetic_expr = try ArithmeticExprNode.init(allocator, .{
-            .left = left,
-            .right = right,
-            .operator = lexer.Token{
-                .kind = lexer.TokenKind{ .operator = .IntAdd },
-                .lexeme = "+",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 8, .end = 9 },
-                    .src = .{ .line = 1, .col = 9 },
-                },
+    const y_node = try allocator.create(Node);
+    y_node.* = .{ .lower_identifier = y_ident };
+
+    const arithmetic_node = try allocator.create(ArithmeticExprNode);
+    arithmetic_node.* = .{
+        .left = x_node,
+        .right = y_node,
+        .operator = lexer.Token{
+            .kind = lexer.TokenKind{ .operator = .IntAdd },
+            .lexeme = "+",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 8, .end = 9 },
+                .src = .{ .line = 1, .col = 9 },
             },
-        }),
+        },
     };
 
-    const params = LambdaExprNode.InitParams{
+    const body_node = try allocator.create(Node);
+    body_node.* = .{ .arithmetic_expr = arithmetic_node };
+
+    const lambda_node = try allocator.create(LambdaExprNode);
+    lambda_node.* = .{
         .parameters = parameters,
-        .body = body,
+        .body = body_node,
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .operator = .Lambda },
             .lexeme = "\\",
@@ -3349,9 +3198,6 @@ test "[LambdaExprNode]" {
             },
         },
     };
-
-    const lambda_node = try LambdaExprNode.init(allocator, params);
-    parameters.deinit();
 
     const node = try allocator.create(Node);
     defer {
@@ -3409,41 +3255,9 @@ test "[FuncApplicationNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const func = try allocator.create(Node);
-    func.* = .{
-        .lower_identifier = try LowerIdentifierNode.init(allocator, .{
-            .name = "not",
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .identifier = .Lower },
-                .lexeme = "not",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 3 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
-            },
-        }),
-    };
-
-    const arg = try allocator.create(Node);
-    arg.* = .{
-        .upper_identifier = try UpperIdentifierNode.init(allocator, .{
-            .name = "True",
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .identifier = .Upper },
-                .lexeme = "True",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 4, .end = 8 },
-                    .src = .{ .line = 1, .col = 5 },
-                },
-            },
-        }),
-    };
-
-    const params = FuncApplicationNode.InitParams{
-        .function = func,
-        .argument = arg,
+    const not_ident = try allocator.create(LowerIdentifierNode);
+    not_ident.* = .{
+        .name = try allocator.dupe(u8, "not"),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Lower },
             .lexeme = "not",
@@ -3455,7 +3269,40 @@ test "[FuncApplicationNode]" {
         },
     };
 
-    const func_app = try FuncApplicationNode.init(allocator, params);
+    const func_node = try allocator.create(Node);
+    func_node.* = .{ .lower_identifier = not_ident };
+
+    const true_ident = try allocator.create(UpperIdentifierNode);
+    true_ident.* = .{
+        .name = try allocator.dupe(u8, "True"),
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .identifier = .Upper },
+            .lexeme = "True",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 4, .end = 8 },
+                .src = .{ .line = 1, .col = 5 },
+            },
+        },
+    };
+
+    const arg_node = try allocator.create(Node);
+    arg_node.* = .{ .upper_identifier = true_ident };
+
+    const func_app = try allocator.create(FuncApplicationNode);
+    func_app.* = .{
+        .function = func_node,
+        .argument = arg_node,
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .identifier = .Lower },
+            .lexeme = "not",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 3 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
 
     const node = try allocator.create(Node);
     defer {
@@ -3466,6 +3313,9 @@ test "[FuncApplicationNode]" {
     node.* = .{ .function_application = func_app };
 
     // Assertions
+    // Verify the node is a function application
+    try testing.expect(node.* == .function_application);
+
     const app = node.function_application;
 
     // Verify that the function is a lower identifier named "not"
@@ -3494,12 +3344,12 @@ test "[ConsExprNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const one = try allocator.create(Node);
-    one.* = .{
-        .int_literal = IntLiteralNode.init(.{
+    const one_node = try allocator.create(Node);
+    one_node.* = .{
+        .int_literal = .{
             .value = 1,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .Int },
+            .token = .{
+                .kind = .{ .literal = .Int },
                 .lexeme = "1",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -3507,15 +3357,15 @@ test "[ConsExprNode]" {
                     .src = .{ .line = 1, .col = 1 },
                 },
             },
-        }),
+        },
     };
 
-    const two = try allocator.create(Node);
-    two.* = .{
-        .int_literal = IntLiteralNode.init(.{
+    const two_node = try allocator.create(Node);
+    two_node.* = .{
+        .int_literal = .{
             .value = 2,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .Int },
+            .token = .{
+                .kind = .{ .literal = .Int },
                 .lexeme = "2",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -3523,15 +3373,15 @@ test "[ConsExprNode]" {
                     .src = .{ .line = 1, .col = 7 },
                 },
             },
-        }),
+        },
     };
 
-    const three = try allocator.create(Node);
-    three.* = .{
-        .int_literal = IntLiteralNode.init(.{
+    const three_node = try allocator.create(Node);
+    three_node.* = .{
+        .int_literal = .{
             .value = 3,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .Int },
+            .token = .{
+                .kind = .{ .literal = .Int },
                 .lexeme = "3",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -3539,32 +3389,34 @@ test "[ConsExprNode]" {
                     .src = .{ .line = 1, .col = 10 },
                 },
             },
-        }),
+        },
     };
 
     var elements = std.ArrayList(*Node).init(allocator);
-    try elements.append(two);
-    try elements.append(three);
+    try elements.append(two_node);
+    try elements.append(three_node);
 
-    const tail = try allocator.create(Node);
-    tail.* = .{
-        .list = try ListNode.init(allocator, .{
-            .elements = elements,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
-                .lexeme = "[",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 5, .end = 6 },
-                    .src = .{ .line = 1, .col = 6 },
-                },
+    const list_node = try allocator.create(ListNode);
+    list_node.* = .{
+        .elements = elements,
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
+            .lexeme = "[",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 5, .end = 6 },
+                .src = .{ .line = 1, .col = 6 },
             },
-        }),
+        },
     };
 
-    const params = ConsExprNode.InitParams{
-        .head = one,
-        .tail = tail,
+    const tail_node = try allocator.create(Node);
+    tail_node.* = .{ .list = list_node };
+
+    const cons_node = try allocator.create(ConsExprNode);
+    cons_node.* = .{
+        .head = one_node,
+        .tail = tail_node,
         .operator = lexer.Token{
             .kind = lexer.TokenKind{ .operator = .Cons },
             .lexeme = "::",
@@ -3575,8 +3427,6 @@ test "[ConsExprNode]" {
             },
         },
     };
-
-    const cons_node = try ConsExprNode.init(allocator, params);
 
     const node = try allocator.create(Node);
     defer {
@@ -3628,43 +3478,46 @@ test "[StrConcatExprNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const left = try allocator.create(Node);
-    left.* = .{
-        .str_literal = try StrLiteralNode.init(allocator, .{
-            .value = "Hello",
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .String },
-                .lexeme = "\"Hello\"",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 7 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
+    const hello_str = try allocator.create(StrLiteralNode);
+    hello_str.* = .{
+        .value = try allocator.dupe(u8, "Hello"),
+        .token = .{
+            .kind = .{ .literal = .String },
+            .lexeme = "\"Hello\"",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 7 },
+                .src = .{ .line = 1, .col = 1 },
             },
-        }),
+        },
     };
 
-    const right = try allocator.create(Node);
-    right.* = .{
-        .str_literal = try StrLiteralNode.init(allocator, .{
-            .value = "World",
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .String },
-                .lexeme = "\"World\"",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 11, .end = 18 },
-                    .src = .{ .line = 1, .col = 12 },
-                },
+    const left_node = try allocator.create(Node);
+    left_node.* = .{ .str_literal = hello_str };
+
+    const world_str = try allocator.create(StrLiteralNode);
+    world_str.* = .{
+        .value = try allocator.dupe(u8, "World"),
+        .token = .{
+            .kind = .{ .literal = .String },
+            .lexeme = "\"World\"",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 11, .end = 18 },
+                .src = .{ .line = 1, .col = 12 },
             },
-        }),
+        },
     };
 
-    const params = StrConcatExprNode.InitParams{
-        .left = left,
-        .right = right,
-        .operator = lexer.Token{
-            .kind = lexer.TokenKind{ .operator = .StrConcat },
+    const right_node = try allocator.create(Node);
+    right_node.* = .{ .str_literal = world_str };
+
+    const concat_node = try allocator.create(StrConcatExprNode);
+    concat_node.* = .{
+        .left = left_node,
+        .right = right_node,
+        .operator = .{
+            .kind = .{ .operator = .StrConcat },
             .lexeme = "<>",
             .loc = .{
                 .filename = TEST_FILE,
@@ -3673,8 +3526,6 @@ test "[StrConcatExprNode]" {
             },
         },
     };
-
-    const concat_node = try StrConcatExprNode.init(allocator, params);
 
     const node = try allocator.create(Node);
     defer {
@@ -3712,12 +3563,12 @@ test "[ListConcatExprNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const left_elem1 = try allocator.create(Node);
-    left_elem1.* = .{
-        .int_literal = IntLiteralNode.init(.{
+    const one_node = try allocator.create(Node);
+    one_node.* = .{
+        .int_literal = .{
             .value = 1,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .Int },
+            .token = .{
+                .kind = .{ .literal = .Int },
                 .lexeme = "1",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -3725,15 +3576,15 @@ test "[ListConcatExprNode]" {
                     .src = .{ .line = 1, .col = 2 },
                 },
             },
-        }),
+        },
     };
 
-    const left_elem2 = try allocator.create(Node);
-    left_elem2.* = .{
-        .int_literal = IntLiteralNode.init(.{
+    const two_node = try allocator.create(Node);
+    two_node.* = .{
+        .int_literal = .{
             .value = 2,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .Int },
+            .token = .{
+                .kind = .{ .literal = .Int },
                 .lexeme = "2",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -3741,96 +3592,97 @@ test "[ListConcatExprNode]" {
                     .src = .{ .line = 1, .col = 5 },
                 },
             },
-        }),
+        },
     };
 
     var left_elements = std.ArrayList(*Node).init(allocator);
-    try left_elements.append(left_elem1);
-    try left_elements.append(left_elem2);
+    try left_elements.append(one_node);
+    try left_elements.append(two_node);
 
-    const left = try allocator.create(Node);
-    left.* = .{
-        .list = try ListNode.init(allocator, .{
-            .elements = left_elements,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
-                .lexeme = "[",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 1 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
+    const left_list = try allocator.create(ListNode);
+    left_list.* = .{
+        .elements = left_elements,
+        .token = .{
+            .kind = .{ .delimiter = .LeftBracket },
+            .lexeme = "[",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
             },
-        }),
+        },
     };
 
-    const right_elem1 = try allocator.create(Node);
-    right_elem1.* = .{
-        .int_literal = IntLiteralNode.init(.{
+    const left_node = try allocator.create(Node);
+    left_node.* = .{ .list = left_list };
+
+    const three_node = try allocator.create(Node);
+    three_node.* = .{
+        .int_literal = .{
             .value = 3,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .Int },
+            .token = .{
+                .kind = .{ .literal = .Int },
                 .lexeme = "3",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 11, .end = 12 },
-                    .src = .{ .line = 1, .col = 12 },
-                },
-            },
-        }),
-    };
-
-    const right_elem2 = try allocator.create(Node);
-    right_elem2.* = .{
-        .int_literal = IntLiteralNode.init(.{
-            .value = 4,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .Int },
-                .lexeme = "4",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 14, .end = 15 },
-                    .src = .{ .line = 1, .col = 15 },
-                },
-            },
-        }),
-    };
-
-    var right_elements = std.ArrayList(*Node).init(allocator);
-    try right_elements.append(right_elem1);
-    try right_elements.append(right_elem2);
-
-    const right = try allocator.create(Node);
-    right.* = .{
-        .list = try ListNode.init(allocator, .{
-            .elements = right_elements,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
-                .lexeme = "[",
                 .loc = .{
                     .filename = TEST_FILE,
                     .span = .{ .start = 10, .end = 11 },
                     .src = .{ .line = 1, .col = 11 },
                 },
             },
-        }),
+        },
     };
 
-    const params = ListConcatExprNode.InitParams{
-        .left = left,
-        .right = right,
-        .operator = lexer.Token{
-            .kind = lexer.TokenKind{ .operator = .ListConcat },
-            .lexeme = "++",
-            .loc = .{
-                .filename = TEST_FILE,
-                .span = .{ .start = 7, .end = 9 },
-                .src = .{ .line = 1, .col = 8 },
+    const four_node = try allocator.create(Node);
+    four_node.* = .{
+        .int_literal = .{
+            .value = 4,
+            .token = .{
+                .kind = .{ .literal = .Int },
+                .lexeme = "4",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 13, .end = 14 },
+                    .src = .{ .line = 1, .col = 14 },
+                },
             },
         },
     };
 
-    const concat_node = try ListConcatExprNode.init(allocator, params);
+    var right_elements = std.ArrayList(*Node).init(allocator);
+    try right_elements.append(three_node);
+    try right_elements.append(four_node);
+
+    const right_list = try allocator.create(ListNode);
+    right_list.* = .{
+        .elements = right_elements,
+        .token = .{
+            .kind = .{ .delimiter = .LeftBracket },
+            .lexeme = "[",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 9, .end = 10 },
+                .src = .{ .line = 1, .col = 10 },
+            },
+        },
+    };
+
+    const right_node = try allocator.create(Node);
+    right_node.* = .{ .list = right_list };
+
+    const concat_node = try allocator.create(ListConcatExprNode);
+    concat_node.* = .{
+        .left = left_node,
+        .right = right_node,
+        .operator = .{
+            .kind = .{ .operator = .ListConcat },
+            .lexeme = "++",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 6, .end = 8 },
+                .src = .{ .line = 1, .col = 7 },
+            },
+        },
+    };
 
     const node = try allocator.create(Node);
     defer {
@@ -3890,43 +3742,46 @@ test "[CompositionExprNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const f = try allocator.create(Node);
-    f.* = .{
-        .lower_identifier = try LowerIdentifierNode.init(allocator, .{
-            .name = "f",
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .identifier = .Lower },
-                .lexeme = "f",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 1 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
+    const f_ident = try allocator.create(LowerIdentifierNode);
+    f_ident.* = .{
+        .name = try allocator.dupe(u8, "f"),
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "f",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
             },
-        }),
+        },
     };
 
-    const g = try allocator.create(Node);
-    g.* = .{
-        .lower_identifier = try LowerIdentifierNode.init(allocator, .{
-            .name = "g",
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .identifier = .Lower },
-                .lexeme = "g",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 5, .end = 6 },
-                    .src = .{ .line = 1, .col = 6 },
-                },
+    const first_node = try allocator.create(Node);
+    first_node.* = .{ .lower_identifier = f_ident };
+
+    const g_ident = try allocator.create(LowerIdentifierNode);
+    g_ident.* = .{
+        .name = try allocator.dupe(u8, "g"),
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "g",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 5, .end = 6 },
+                .src = .{ .line = 1, .col = 6 },
             },
-        }),
+        },
     };
 
-    const params = CompositionExprNode.InitParams{
-        .first = f,
-        .second = g,
-        .operator = lexer.Token{
-            .kind = lexer.TokenKind{ .operator = .ComposeRight },
+    const second_node = try allocator.create(Node);
+    second_node.* = .{ .lower_identifier = g_ident };
+
+    const composition_node = try allocator.create(CompositionExprNode);
+    composition_node.* = .{
+        .first = first_node,
+        .second = second_node,
+        .operator = .{
+            .kind = .{ .operator = .ComposeRight },
             .lexeme = ">>",
             .loc = .{
                 .filename = TEST_FILE,
@@ -3936,15 +3791,13 @@ test "[CompositionExprNode]" {
         },
     };
 
-    const compose_node = try CompositionExprNode.init(allocator, params);
-
     const node = try allocator.create(Node);
     defer {
         node.deinit(allocator);
         allocator.destroy(node);
     }
 
-    node.* = .{ .composition_expr = compose_node };
+    node.* = .{ .composition_expr = composition_node };
 
     // Assertions
     // Verify the expression is a composition expression
@@ -3986,43 +3839,46 @@ test "[PipeExprNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const value = try allocator.create(Node);
-    value.* = .{
-        .lower_identifier = try LowerIdentifierNode.init(allocator, .{
-            .name = "x",
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .identifier = .Lower },
-                .lexeme = "x",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 0, .end = 1 },
-                    .src = .{ .line = 1, .col = 1 },
-                },
+    const x_ident = try allocator.create(LowerIdentifierNode);
+    x_ident.* = .{
+        .name = try allocator.dupe(u8, "x"),
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "x",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
             },
-        }),
+        },
     };
 
-    const func = try allocator.create(Node);
-    func.* = .{
-        .lower_identifier = try LowerIdentifierNode.init(allocator, .{
-            .name = "f",
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .identifier = .Lower },
-                .lexeme = "f",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 5, .end = 6 },
-                    .src = .{ .line = 1, .col = 6 },
-                },
+    const value_node = try allocator.create(Node);
+    value_node.* = .{ .lower_identifier = x_ident };
+
+    const f_ident = try allocator.create(LowerIdentifierNode);
+    f_ident.* = .{
+        .name = try allocator.dupe(u8, "f"),
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "f",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 5, .end = 6 },
+                .src = .{ .line = 1, .col = 6 },
             },
-        }),
+        },
     };
 
-    const params = PipeExprNode.InitParams{
-        .value = value,
-        .func = func,
-        .operator = lexer.Token{
-            .kind = lexer.TokenKind{ .operator = .PipeRight },
+    const func_node = try allocator.create(Node);
+    func_node.* = .{ .lower_identifier = f_ident };
+
+    const pipe_node = try allocator.create(PipeExprNode);
+    pipe_node.* = .{
+        .value = value_node,
+        .func = func_node,
+        .operator = .{
+            .kind = .{ .operator = .PipeRight },
             .lexeme = "|>",
             .loc = .{
                 .filename = TEST_FILE,
@@ -4031,8 +3887,6 @@ test "[PipeExprNode]" {
             },
         },
     };
-
-    const pipe_node = try PipeExprNode.init(allocator, params);
 
     const node = try allocator.create(Node);
     defer {
@@ -4071,4 +3925,1882 @@ test "[PipeExprNode]" {
 
     // Verify the name of the function being applied is "f".
     try testing.expectEqualStrings("f", expr.func.lower_identifier.name);
+}
+
+test "[IfThenElseStmtNode]" {
+    // Test input: if x == y then True else False
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    const x_ident = try allocator.create(LowerIdentifierNode);
+    x_ident.* = .{
+        .name = try allocator.dupe(u8, "x"),
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "x",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 3, .end = 4 },
+                .src = .{ .line = 1, .col = 4 },
+            },
+        },
+    };
+
+    const x_node = try allocator.create(Node);
+    x_node.* = .{ .lower_identifier = x_ident };
+
+    const y_ident = try allocator.create(LowerIdentifierNode);
+    y_ident.* = .{
+        .name = try allocator.dupe(u8, "y"),
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "y",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 8, .end = 9 },
+                .src = .{ .line = 1, .col = 9 },
+            },
+        },
+    };
+
+    const y_node = try allocator.create(Node);
+    y_node.* = .{ .lower_identifier = y_ident };
+
+    const condition_node = try allocator.create(ComparisonExprNode);
+    condition_node.* = .{
+        .left = x_node,
+        .right = y_node,
+        .operator = .{
+            .kind = .{ .operator = .Equality },
+            .lexeme = "==",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 5, .end = 7 },
+                .src = .{ .line = 1, .col = 6 },
+            },
+        },
+    };
+
+    const cond_node = try allocator.create(Node);
+    cond_node.* = .{ .comparison_expr = condition_node };
+
+    const true_ident = try allocator.create(UpperIdentifierNode);
+    true_ident.* = .{
+        .name = try allocator.dupe(u8, "True"),
+        .token = .{
+            .kind = .{ .identifier = .Upper },
+            .lexeme = "True",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 15, .end = 19 },
+                .src = .{ .line = 1, .col = 16 },
+            },
+        },
+    };
+
+    const then_node = try allocator.create(Node);
+    then_node.* = .{ .upper_identifier = true_ident };
+
+    const false_ident = try allocator.create(UpperIdentifierNode);
+    false_ident.* = .{
+        .name = try allocator.dupe(u8, "False"),
+        .token = .{
+            .kind = .{ .identifier = .Upper },
+            .lexeme = "False",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 25, .end = 30 },
+                .src = .{ .line = 1, .col = 26 },
+            },
+        },
+    };
+
+    const else_node = try allocator.create(Node);
+    else_node.* = .{ .upper_identifier = false_ident };
+
+    const if_node = try allocator.create(IfThenElseStmtNode);
+    if_node.* = .{
+        .condition = cond_node,
+        .then_branch = then_node,
+        .else_branch = else_node,
+        .token = .{
+            .kind = .{ .keyword = .If },
+            .lexeme = "if",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 2 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .if_then_else_stmt = if_node };
+
+    // Assertions
+    // Verify the expression is an if-then-else statement
+    try testing.expect(node.* == .if_then_else_stmt);
+
+    // Verify the condition is a comparison expression
+    try testing.expect(node.if_then_else_stmt.condition.* == .comparison_expr);
+
+    const expr = node.if_then_else_stmt.condition.comparison_expr;
+
+    // Check the operator in the comparison expression is an equality operator (==)
+    try testing.expectEqual(lexer.TokenKind{ .operator = .Equality }, expr.operator.kind);
+
+    // Ensure the lexeme for the equality operator is "=="
+    try testing.expectEqualStrings("==", expr.operator.lexeme);
+
+    // Verify the left operand of the condition is a lower-case identifier (x)
+    try testing.expect(expr.left.* == .lower_identifier);
+
+    // Check the name of the left identifier is "x"
+    try testing.expectEqualStrings("x", expr.left.lower_identifier.name);
+
+    // Ensure the token kind of the left identifier is a lower-case identifier
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.left.lower_identifier.token.kind);
+
+    // Verify the right operand of the condition is a lower-case identifier (y)
+    try testing.expect(expr.right.* == .lower_identifier);
+
+    // Check the name of the right identifier is "y"
+    try testing.expectEqualStrings("y", expr.right.lower_identifier.name);
+
+    // Ensure the token kind of the right identifier is a lower-case identifier
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Lower }, expr.right.lower_identifier.token.kind);
+
+    const stmt = node.if_then_else_stmt;
+
+    // Verify the "then" branch is an upper-case identifier (True)
+    try testing.expect(stmt.then_branch.* == .upper_identifier);
+
+    // Check the name of the "then" branch is "True"
+    try testing.expectEqualStrings("True", stmt.then_branch.upper_identifier.name);
+
+    // Ensure the token kind of the "then" branch is an upper-case identifier
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, stmt.then_branch.upper_identifier.token.kind);
+
+    // Verify the "else" branch is an upper-case identifier (False)
+    try testing.expect(stmt.else_branch.* == .upper_identifier);
+
+    // Check the name of the "else" branch is "False"
+    try testing.expectEqualStrings("False", stmt.else_branch.upper_identifier.name);
+
+    // Ensure the token kind of the "else" branch is an upper-case identifier
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, stmt.else_branch.upper_identifier.token.kind);
+}
+
+test "[TypedHoleNode]" {
+    // Test input: ?
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    const hole_node = try allocator.create(TypedHoleNode);
+    defer allocator.destroy(hole_node);
+
+    hole_node.* = .{
+        .token = .{
+            .kind = .{ .special = .Hole },
+            .lexeme = "?",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .typed_hole = hole_node.* };
+
+    // Assertions
+    // Verify the node is a typed hole
+    try testing.expect(node.* == .typed_hole);
+
+    // Verify the token kind is a question mark
+    try testing.expectEqual(lexer.TokenKind{ .special = .Hole }, node.typed_hole.token.kind);
+
+    // Verify the lexeme is a question mark
+    try testing.expectEqualStrings("?", node.typed_hole.token.lexeme);
+}
+
+test "[TypeApplicationNode]" {
+    // Test input: Map k v
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    const map_ident = try allocator.create(UpperIdentifierNode);
+    map_ident.* = .{
+        .name = try allocator.dupe(u8, "Map"),
+        .token = .{
+            .kind = .{ .identifier = .Upper },
+            .lexeme = "Map",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 3 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const base_node = try allocator.create(Node);
+    base_node.* = .{ .upper_identifier = map_ident };
+
+    const k_ident = try allocator.create(LowerIdentifierNode);
+    k_ident.* = .{
+        .name = try allocator.dupe(u8, "k"),
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "k",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 4, .end = 5 },
+                .src = .{ .line = 1, .col = 5 },
+            },
+        },
+    };
+
+    const k_node = try allocator.create(Node);
+    k_node.* = .{ .lower_identifier = k_ident };
+
+    const v_ident = try allocator.create(LowerIdentifierNode);
+    v_ident.* = .{
+        .name = try allocator.dupe(u8, "v"),
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "v",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 6, .end = 7 },
+                .src = .{ .line = 1, .col = 7 },
+            },
+        },
+    };
+
+    const v_node = try allocator.create(Node);
+    v_node.* = .{ .lower_identifier = v_ident };
+
+    var args = std.ArrayList(*Node).init(allocator);
+    try args.append(k_node);
+    try args.append(v_node);
+
+    const type_app = try allocator.create(TypeApplicationNode);
+    type_app.* = .{
+        .base = base_node,
+        .args = args,
+        .token = .{
+            .kind = .{ .identifier = .Upper },
+            .lexeme = "Map",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 3 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .type_application = type_app };
+
+    // Assertions
+    // Verify the node is a type application
+    try testing.expect(node.* == .type_application);
+
+    const app = node.type_application;
+
+    // Verify the base type of the type application is an upper identifier named "Map"
+    try testing.expect(app.base.* == .upper_identifier);
+    try testing.expectEqualStrings("Map", app.base.upper_identifier.name);
+
+    // Verify that the type application has exactly two arguments
+    try testing.expectEqual(@as(usize, 2), app.args.items.len);
+
+    // Verify the first argument is a lower identifier with the name "k"
+    try testing.expect(app.args.items[0].* == .lower_identifier);
+    try testing.expectEqualStrings("k", app.args.items[0].lower_identifier.name);
+
+    // Verify the second argument is a lower identifier with the name "v"
+    try testing.expect(app.args.items[1].* == .lower_identifier);
+    try testing.expectEqualStrings("v", app.args.items[1].lower_identifier.name);
+}
+
+test "[TypeAliasNode]" {
+    // Test input: type alias UserId = String
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    const type_params = std.ArrayList([]const u8).init(allocator);
+
+    const string_ident = try allocator.create(UpperIdentifierNode);
+    string_ident.* = .{
+        .name = try allocator.dupe(u8, "String"),
+        .token = .{
+            .kind = .{ .identifier = .Upper },
+            .lexeme = "String",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 18, .end = 24 },
+                .src = .{ .line = 1, .col = 19 },
+            },
+        },
+    };
+
+    const value_node = try allocator.create(Node);
+    value_node.* = .{ .upper_identifier = string_ident };
+
+    const type_alias = try allocator.create(TypeAliasNode);
+    type_alias.* = .{
+        .name = try allocator.dupe(u8, "UserId"),
+        .type_params = type_params,
+        .value = value_node,
+        .token = .{
+            .kind = .{ .keyword = .Type },
+            .lexeme = "type",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 4 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .type_alias = type_alias };
+
+    // Assertions
+    // Verify the node is a type alias
+    try testing.expect(node.* == .type_alias);
+
+    // Verify the type alias has no type parameters
+    try testing.expectEqual(@as(usize, 0), node.type_alias.type_params.items.len);
+
+    // Verify the "type" keyword starts the type alias declaration
+    try testing.expectEqual(lexer.TokenKind{ .keyword = .Type }, node.type_alias.token.kind);
+
+    // Verify the lexeme of the "type" keyword
+    try testing.expectEqualStrings("type", node.type_alias.token.lexeme);
+
+    // Verify the name of the type alias
+    try testing.expectEqualStrings("UserId", node.type_alias.name);
+
+    // Check the value node is an upper identifier
+    try testing.expect(node.type_alias.value.* == .upper_identifier);
+
+    const aliased_type = node.type_alias.value.upper_identifier;
+
+    // Verify the name of the upper identifier
+    try testing.expectEqualStrings("String", aliased_type.name);
+
+    // Verify the token kind of the upper identifier
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, aliased_type.token.kind);
+
+    // Verify the lexeme of the upper identifier
+    try testing.expectEqualStrings("String", aliased_type.token.lexeme);
+}
+
+test "[VariantTypeNode]" {
+    // Test input: type Result e a = | Err e | Ok a
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    var type_params = std.ArrayList([]const u8).init(allocator);
+    try type_params.append(try allocator.dupe(u8, "e"));
+    try type_params.append(try allocator.dupe(u8, "a"));
+
+    const e_ident = try allocator.create(LowerIdentifierNode);
+    e_ident.* = .{
+        .name = try allocator.dupe(u8, "e"),
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "e",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 18, .end = 19 },
+                .src = .{ .line = 1, .col = 19 },
+            },
+        },
+    };
+
+    const e_node = try allocator.create(Node);
+    e_node.* = .{ .lower_identifier = e_ident };
+
+    var err_params = std.ArrayList(*Node).init(allocator);
+    try err_params.append(e_node);
+
+    const err_constructor = try allocator.create(VariantConstructorNode);
+    err_constructor.* = .{
+        .name = try allocator.dupe(u8, "Err"),
+        .parameters = err_params,
+        .token = .{
+            .kind = .{ .identifier = .Upper },
+            .lexeme = "Err",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 24, .end = 27 },
+                .src = .{ .line = 1, .col = 25 },
+            },
+        },
+    };
+
+    const a_ident = try allocator.create(LowerIdentifierNode);
+    a_ident.* = .{
+        .name = try allocator.dupe(u8, "a"),
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "a",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 32, .end = 33 },
+                .src = .{ .line = 1, .col = 33 },
+            },
+        },
+    };
+
+    const a_node = try allocator.create(Node);
+    a_node.* = .{ .lower_identifier = a_ident };
+
+    var ok_params = std.ArrayList(*Node).init(allocator);
+    try ok_params.append(a_node);
+
+    const ok_constructor = try allocator.create(VariantConstructorNode);
+    ok_constructor.* = .{
+        .name = try allocator.dupe(u8, "Ok"),
+        .parameters = ok_params,
+        .token = .{
+            .kind = .{ .identifier = .Upper },
+            .lexeme = "Ok",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 30, .end = 32 },
+                .src = .{ .line = 1, .col = 31 },
+            },
+        },
+    };
+
+    var constructors = std.ArrayList(*VariantConstructorNode).init(allocator);
+    try constructors.append(err_constructor);
+    try constructors.append(ok_constructor);
+
+    const variant_type = try allocator.create(VariantTypeNode);
+    variant_type.* = .{
+        .name = try allocator.dupe(u8, "Result"),
+        .type_params = type_params,
+        .constructors = constructors,
+        .token = .{
+            .kind = .{ .keyword = .Type },
+            .lexeme = "type",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 4 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .variant_type = variant_type };
+
+    // Assertions
+    // Verify the node is a variant type
+    try testing.expect(node.* == .variant_type);
+
+    // Verify the name of the variant type is "Result"
+    try testing.expectEqualStrings("Result", node.variant_type.name);
+
+    // Verify the variant type has exactly two type parameters
+    try testing.expectEqual(@as(usize, 2), node.variant_type.type_params.items.len);
+
+    // Verify the name of the first type parameter is "e"
+    try testing.expectEqualStrings("e", node.variant_type.type_params.items[0]);
+
+    // Verify the name of the second type parameter is "a"
+    try testing.expectEqualStrings("a", node.variant_type.type_params.items[1]);
+
+    // Verify the variant type has exactly two constructors
+    try testing.expectEqual(@as(usize, 2), node.variant_type.constructors.items.len);
+
+    // Verify the name of the first constructor is "Err"
+    try testing.expectEqualStrings("Err", node.variant_type.constructors.items[0].name);
+
+    // Verify the name of the second constructor is "Ok"
+    try testing.expectEqualStrings("Ok", node.variant_type.constructors.items[1].name);
+
+    // "Err" constructor
+    const err_variant = node.variant_type.constructors.items[0];
+
+    // Verify the "Err" constructor has one parameter
+    try testing.expectEqual(@as(usize, 1), err_variant.parameters.items.len);
+
+    // Verify the name of the parameter for the "Err" constructor is "e"
+    try testing.expectEqualStrings("e", err_variant.parameters.items[0].lower_identifier.name);
+
+    // "Ok" constructor
+    const ok_variant = node.variant_type.constructors.items[1];
+
+    // Verify the "Ok" constructor has one parameter.
+    try testing.expectEqual(@as(usize, 1), ok_variant.parameters.items.len);
+
+    // Verify the name of the parameter for the "Ok" constructor is "a".
+    try testing.expectEqualStrings("a", ok_variant.parameters.items[0].lower_identifier.name);
+}
+
+test "[RecordTypeNode]" {
+    // Test input: type Point a = { x: a, y: a }
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    var type_params = std.ArrayList([]const u8).init(allocator);
+    try type_params.append(try allocator.dupe(u8, "a"));
+
+    const a_ident = try allocator.create(LowerIdentifierNode);
+    a_ident.* = .{
+        .name = try allocator.dupe(u8, "a"),
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "a",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 15, .end = 16 },
+                .src = .{ .line = 1, .col = 16 },
+            },
+        },
+    };
+
+    const type_x = try allocator.create(Node);
+    type_x.* = .{ .lower_identifier = a_ident };
+
+    const a_ident2 = try allocator.create(LowerIdentifierNode);
+    a_ident2.* = .{
+        .name = try allocator.dupe(u8, "a"),
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "a",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 21, .end = 22 },
+                .src = .{ .line = 1, .col = 22 },
+            },
+        },
+    };
+
+    const type_y = try allocator.create(Node);
+    type_y.* = .{ .lower_identifier = a_ident2 };
+
+    const field_x = try allocator.create(RecordFieldNode);
+    field_x.* = .{
+        .name = try allocator.dupe(u8, "x"),
+        .type = type_x,
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "x",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 13, .end = 14 },
+                .src = .{ .line = 1, .col = 14 },
+            },
+        },
+    };
+
+    const field_y = try allocator.create(RecordFieldNode);
+    field_y.* = .{
+        .name = try allocator.dupe(u8, "y"),
+        .type = type_y,
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "y",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 19, .end = 20 },
+                .src = .{ .line = 1, .col = 20 },
+            },
+        },
+    };
+
+    var fields = std.ArrayList(*RecordFieldNode).init(allocator);
+    try fields.append(field_x);
+    try fields.append(field_y);
+
+    const rtype_node = try allocator.create(RecordTypeNode);
+    rtype_node.* = .{
+        .name = try allocator.dupe(u8, "Point"),
+        .type_params = type_params,
+        .fields = fields,
+        .token = .{
+            .kind = .{ .keyword = .Type },
+            .lexeme = "type",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 4 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .record_type = rtype_node };
+
+    // Assertions
+    // Verify the node is a record type
+    try testing.expect(node.* == .record_type);
+
+    const record = node.record_type;
+
+    // Verify the name of the record type is "Point"
+    try testing.expectEqualStrings("Point", record.name);
+
+    // Ensure the record type has exactly one type parameter
+    try testing.expectEqual(@as(usize, 1), record.type_params.items.len);
+
+    // Check the name of the type parameter is "a"
+    try testing.expectEqualStrings("a", record.type_params.items[0]);
+
+    // Verify the record type has exactly two fields
+    try testing.expectEqual(@as(usize, 2), record.fields.items.len);
+
+    // Test the first field (x)
+    const x_field = record.fields.items[0];
+
+    // Ensure the name of the first field is "x"
+    try testing.expectEqualStrings("x", x_field.name);
+
+    // Verify the type of the first field is a lower-case identifier
+    try testing.expect(x_field.type.* == .lower_identifier);
+
+    // Check the name of the type for the first field is "a"
+    try testing.expectEqualStrings("a", x_field.type.lower_identifier.name);
+
+    // Test the second field (y)
+    const y_field = record.fields.items[1];
+
+    // Ensure the name of the second field is "y"
+    try testing.expectEqualStrings("y", y_field.name);
+
+    // Verify the type of the second field is a lower-case identifier
+    try testing.expect(y_field.type.* == .lower_identifier);
+
+    // Check the name of the type for the second field is "a"
+    try testing.expectEqualStrings("a", y_field.type.lower_identifier.name);
+
+    // Verify the token kind for the record is "Type"
+    try testing.expectEqual(lexer.TokenKind{ .keyword = .Type }, record.token.kind);
+
+    // Ensure the lexeme for the record token is "type"
+    try testing.expectEqualStrings("type", record.token.lexeme);
+}
+
+test "[ModulePathNode]" {
+    // Test input: Std.List
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    var segments = std.ArrayList([]const u8).init(allocator);
+    try segments.append(try allocator.dupe(u8, "Std"));
+    try segments.append(try allocator.dupe(u8, "List"));
+
+    const path_node = try allocator.create(ModulePathNode);
+    path_node.* = .{
+        .segments = segments,
+        .token = .{
+            .kind = .{ .identifier = .Upper },
+            .lexeme = "Std",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 3 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+
+        allocator.destroy(path_node);
+    }
+
+    node.* = .{ .module_path = path_node };
+
+    // Assertions
+    // Verify the node is a module path
+    try testing.expect(node.* == .module_path);
+
+    const path = node.module_path;
+
+    // Verify the include path consists of exactly two segments
+    try testing.expectEqual(@as(usize, 2), path.segments.items.len);
+
+    // Ensure the first segment of the include path is "Std"
+    try testing.expectEqualStrings("Std", path.segments.items[0]);
+
+    // Ensure the second segment of the include path is "List"
+    try testing.expectEqualStrings("List", path.segments.items[1]);
+}
+
+test "[ExportSpecNode]" {
+    // Test input: exposing (func1, Type1(..))
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    const item1 = try allocator.create(ExportItem);
+    item1.* = .{
+        .name = try allocator.dupe(u8, "func1"),
+        .expose_constructors = false,
+        .token = .{
+            .kind = .{ .identifier = .Lower },
+            .lexeme = "func1",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 10, .end = 15 },
+                .src = .{ .line = 1, .col = 11 },
+            },
+        },
+    };
+
+    const item2 = try allocator.create(ExportItem);
+    item2.* = .{
+        .name = try allocator.dupe(u8, "Type1"),
+        .expose_constructors = true,
+        .token = .{
+            .kind = .{ .identifier = .Upper },
+            .lexeme = "Type1",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 17, .end = 22 },
+                .src = .{ .line = 1, .col = 18 },
+            },
+        },
+    };
+
+    var items = std.ArrayList(*ExportItem).init(allocator);
+    try items.append(item1);
+    try items.append(item2);
+
+    const export_node = try allocator.create(ExportSpecNode);
+    export_node.* = .{
+        .exposing_all = false,
+        .items = items,
+        .token = .{
+            .kind = .{ .keyword = .Exposing },
+            .lexeme = "exposing",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 8 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+
+        allocator.destroy(export_node);
+    }
+
+    node.* = .{ .export_spec = export_node };
+
+    // Assertions
+    // Verify the node is an export specification
+    try testing.expect(node.* == .export_spec);
+
+    // Verify it's not exposing all items
+    try testing.expect(!node.export_spec.exposing_all);
+
+    // Verify items list contains two exports
+    try testing.expectEqual(@as(usize, 2), node.export_spec.items.?.items.len);
+
+    // Test first export (func1)
+    try testing.expectEqualStrings("func1", node.export_spec.items.?.items[0].name);
+    try testing.expect(!node.export_spec.items.?.items[0].expose_constructors);
+
+    // Test second export (Type1(..))
+    try testing.expectEqualStrings("Type1", node.export_spec.items.?.items[1].name);
+    try testing.expect(node.export_spec.items.?.items[1].expose_constructors);
+}
+
+test "[ImportSpecNode]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    {
+        // Test input: open MyModule
+        var segments = std.ArrayList([]const u8).init(allocator);
+        try segments.append(try allocator.dupe(u8, "MyModule"));
+
+        const path_node = try allocator.create(ModulePathNode);
+        path_node.* = .{
+            .segments = segments,
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "MyModule",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 5, .end = 13 },
+                    .src = .{ .line = 1, .col = 6 },
+                },
+            },
+        };
+
+        const import_node = try allocator.create(ImportSpecNode);
+        import_node.* = .{
+            .path = path_node,
+            .kind = .Simple,
+            .alias = null,
+            .items = null,
+            .token = .{
+                .kind = .{ .keyword = .Open },
+                .lexeme = "open",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        const node = try allocator.create(Node);
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        node.* = .{ .import_spec = import_node };
+
+        // Assertions
+        // Verify the node is an import specification
+        try testing.expect(node.* == .import_spec);
+
+        const spec = node.import_spec;
+
+        // Verify it's a simple import
+        try testing.expectEqual(ImportKind.Simple, spec.kind);
+
+        // Verify path has exactly one segment
+        try testing.expectEqual(@as(usize, 1), spec.path.segments.items.len);
+
+        // Verify the module name
+        try testing.expectEqualStrings("MyModule", spec.path.segments.items[0]);
+
+        // Verify it has no alias or items
+        try testing.expect(spec.alias == null);
+        try testing.expect(spec.items == null);
+    }
+
+    {
+        // Test input: open MyModule as M
+        var segments = std.ArrayList([]const u8).init(allocator);
+        try segments.append(try allocator.dupe(u8, "MyModule"));
+
+        const path_node = try allocator.create(ModulePathNode);
+        path_node.* = .{
+            .segments = segments,
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "MyModule",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 5, .end = 13 },
+                    .src = .{ .line = 1, .col = 6 },
+                },
+            },
+        };
+
+        const import_node = try allocator.create(ImportSpecNode);
+        import_node.* = .{
+            .path = path_node,
+            .kind = .Alias,
+            .alias = try allocator.dupe(u8, "M"),
+            .items = null,
+            .token = .{
+                .kind = .{ .keyword = .Open },
+                .lexeme = "open",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        const node = try allocator.create(Node);
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        node.* = .{ .import_spec = import_node };
+
+        // Assertions
+        // Verify the node is an import specification
+        try testing.expect(node.* == .import_spec);
+
+        const spec = node.import_spec;
+
+        // Verify it's an alias import
+        try testing.expectEqual(ImportKind.Alias, spec.kind);
+
+        // Verify path has exactly one segment
+        try testing.expectEqual(@as(usize, 1), spec.path.segments.items.len);
+
+        // Verify the module name
+        try testing.expectEqualStrings("MyModule", spec.path.segments.items[0]);
+
+        // Verify the alias
+        try testing.expect(spec.alias != null);
+        try testing.expectEqualStrings("M", spec.alias.?);
+
+        // Verify it has no items
+        try testing.expect(spec.items == null);
+    }
+
+    {
+        // Test input: open MyModule using (map, filter, Maybe, Either(..))
+        var segments = std.ArrayList([]const u8).init(allocator);
+        try segments.append(try allocator.dupe(u8, "MyModule"));
+
+        const path_node = try allocator.create(ModulePathNode);
+        path_node.* = .{
+            .segments = segments,
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "MyModule",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 5, .end = 13 },
+                    .src = .{ .line = 1, .col = 6 },
+                },
+            },
+        };
+
+        const map_item = try allocator.create(ImportItem);
+        map_item.* = .{
+            .function = .{
+                .name = try allocator.dupe(u8, "map"),
+                .alias = null,
+            },
+        };
+
+        const filter_item = try allocator.create(ImportItem);
+        filter_item.* = .{
+            .function = .{
+                .name = try allocator.dupe(u8, "filter"),
+                .alias = null,
+            },
+        };
+
+        const maybe_item = try allocator.create(ImportItem);
+        maybe_item.* = .{
+            .type = .{
+                .name = try allocator.dupe(u8, "Maybe"),
+                .expose_constructors = false,
+                .alias = null,
+            },
+        };
+
+        const either_item = try allocator.create(ImportItem);
+        either_item.* = .{
+            .type = .{
+                .name = try allocator.dupe(u8, "Either"),
+                .expose_constructors = true,
+                .alias = null,
+            },
+        };
+
+        var items = std.ArrayList(*ImportItem).init(allocator);
+        try items.append(map_item);
+        try items.append(filter_item);
+        try items.append(maybe_item);
+        try items.append(either_item);
+
+        const import_node = try allocator.create(ImportSpecNode);
+        import_node.* = .{
+            .path = path_node,
+            .kind = .Using,
+            .alias = null,
+            .items = items,
+            .token = .{
+                .kind = .{ .keyword = .Open },
+                .lexeme = "open",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        const node = try allocator.create(Node);
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        node.* = .{ .import_spec = import_node };
+
+        // Assertions
+        // Verify the node is an import specification
+        try testing.expect(node.* == .import_spec);
+
+        const spec = node.import_spec;
+
+        // Verify it's a using import
+        try testing.expectEqual(ImportKind.Using, spec.kind);
+
+        // Verify path has exactly one segment
+        try testing.expectEqual(@as(usize, 1), spec.path.segments.items.len);
+
+        // Verify the module name
+        try testing.expectEqualStrings("MyModule", spec.path.segments.items[0]);
+
+        // Verify it has no alias
+        try testing.expect(spec.alias == null);
+
+        // Verify items list
+        try testing.expect(spec.items != null);
+        try testing.expectEqual(@as(usize, 4), spec.items.?.items.len);
+
+        // Verify first two items are functions
+        try testing.expect(spec.items.?.items[0].* == .function);
+        try testing.expectEqualStrings("map", spec.items.?.items[0].function.name);
+        try testing.expect(spec.items.?.items[0].function.alias == null);
+        try testing.expect(spec.items.?.items[1].* == .function);
+        try testing.expectEqualStrings("filter", spec.items.?.items[1].function.name);
+        try testing.expect(spec.items.?.items[1].function.alias == null);
+
+        // Verify last two items are types
+        try testing.expect(spec.items.?.items[2].* == .type);
+        try testing.expectEqualStrings("Maybe", spec.items.?.items[2].type.name);
+        try testing.expect(spec.items.?.items[2].type.alias == null);
+        try testing.expect(spec.items.?.items[2].type.expose_constructors == false);
+
+        try testing.expect(spec.items.?.items[3].* == .type);
+        try testing.expectEqualStrings("Either", spec.items.?.items[3].type.name);
+        try testing.expect(spec.items.?.items[3].type.alias == null);
+        try testing.expect(spec.items.?.items[3].type.expose_constructors == true);
+    }
+
+    {
+        // Test input: open MyModule using (map as list_map)
+        var segments = std.ArrayList([]const u8).init(allocator);
+        try segments.append(try allocator.dupe(u8, "MyModule"));
+
+        const path_node = try allocator.create(ModulePathNode);
+        path_node.* = .{
+            .segments = segments,
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "MyModule",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 5, .end = 13 },
+                    .src = .{ .line = 1, .col = 6 },
+                },
+            },
+        };
+
+        const map_item = try allocator.create(ImportItem);
+        map_item.* = .{
+            .function = .{
+                .name = try allocator.dupe(u8, "map"),
+                .alias = try allocator.dupe(u8, "list_map"),
+            },
+        };
+
+        var items = std.ArrayList(*ImportItem).init(allocator);
+        try items.append(map_item);
+
+        const import_node = try allocator.create(ImportSpecNode);
+        import_node.* = .{
+            .path = path_node,
+            .kind = .Using,
+            .alias = null,
+            .items = items,
+            .token = .{
+                .kind = .{ .keyword = .Open },
+                .lexeme = "open",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        const node = try allocator.create(Node);
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        node.* = .{ .import_spec = import_node };
+
+        // Assertions
+        // Verify the node is an import specification
+        try testing.expect(node.* == .import_spec);
+
+        const spec = node.import_spec;
+
+        // Verify it's an using import
+        try testing.expectEqual(ImportKind.Using, spec.kind);
+
+        // Verify path has exactly one segment
+        try testing.expectEqual(@as(usize, 1), spec.path.segments.items.len);
+
+        // Verify the module name
+        try testing.expectEqualStrings("MyModule", spec.path.segments.items[0]);
+
+        // Verify it has no alias
+        try testing.expect(spec.alias == null);
+
+        // Verify items list contains one item
+        try testing.expect(spec.items != null);
+        try testing.expectEqual(@as(usize, 1), spec.items.?.items.len);
+        try testing.expect(spec.items.?.items[0].* == .function);
+        try testing.expectEqualStrings("map", spec.items.?.items[0].function.name);
+        try testing.expectEqualStrings("list_map", spec.items.?.items[0].function.alias.?);
+    }
+
+    {
+        // Test input: open MyModule hiding (internal_func)
+        var segments = std.ArrayList([]const u8).init(allocator);
+        try segments.append(try allocator.dupe(u8, "MyModule"));
+
+        const path_node = try allocator.create(ModulePathNode);
+        path_node.* = .{
+            .segments = segments,
+            .token = .{
+                .kind = .{ .identifier = .Upper },
+                .lexeme = "MyModule",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 5, .end = 13 },
+                    .src = .{ .line = 1, .col = 6 },
+                },
+            },
+        };
+
+        const internal_func = try allocator.create(ImportItem);
+        internal_func.* = .{
+            .function = .{
+                .name = try allocator.dupe(u8, "internal_func"),
+                .alias = null,
+            },
+        };
+
+        var items = std.ArrayList(*ImportItem).init(allocator);
+        try items.append(internal_func);
+
+        const import_node = try allocator.create(ImportSpecNode);
+        import_node.* = .{
+            .path = path_node,
+            .kind = .Hiding,
+            .alias = null,
+            .items = items,
+            .token = .{
+                .kind = .{ .keyword = .Open },
+                .lexeme = "open",
+                .loc = .{
+                    .filename = TEST_FILE,
+                    .span = .{ .start = 0, .end = 4 },
+                    .src = .{ .line = 1, .col = 1 },
+                },
+            },
+        };
+
+        const node = try allocator.create(Node);
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        node.* = .{ .import_spec = import_node };
+
+        // Assertions
+        // Verify the node is an import specification
+        try testing.expect(node.* == .import_spec);
+
+        const spec = node.import_spec;
+
+        // Verify it's a hiding import
+        try testing.expectEqual(ImportKind.Hiding, spec.kind);
+
+        // Verify path has exactly one segment
+        try testing.expectEqual(@as(usize, 1), spec.path.segments.items.len);
+
+        // Verify the module name
+        try testing.expectEqualStrings("MyModule", spec.path.segments.items[0]);
+
+        // Verify it has no alias
+        try testing.expect(spec.alias == null);
+
+        // Verify items list contains one item to hide
+        try testing.expect(spec.items != null);
+        try testing.expectEqual(@as(usize, 1), spec.items.?.items.len);
+        try testing.expect(spec.items.?.items[0].* == .function);
+        try testing.expectEqualStrings("internal_func", spec.items.?.items[0].function.name);
+        try testing.expect(spec.items.?.items[0].function.alias == null);
+    }
+}
+
+test "[IncludeNode]" {
+    // Test input: include Std.List
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    var segments = std.ArrayList([]const u8).init(allocator);
+    try segments.append(try allocator.dupe(u8, "Std"));
+    try segments.append(try allocator.dupe(u8, "List"));
+
+    const path_node = try allocator.create(ModulePathNode);
+    path_node.* = .{
+        .segments = segments,
+        .token = .{
+            .kind = .{ .identifier = .Upper },
+            .lexeme = "Std",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 8, .end = 12 },
+                .src = .{ .line = 1, .col = 9 },
+            },
+        },
+    };
+
+    const include_node = try allocator.create(IncludeNode);
+    include_node.* = .{
+        .path = path_node,
+        .token = .{
+            .kind = .{ .keyword = .Include },
+            .lexeme = "include",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 7 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .include = include_node };
+
+    // Assertions
+    // Verify the node is an include declaration
+    try testing.expect(node.* == .include);
+
+    const include = node.include;
+
+    // Verify the include path consists of exactly two segments
+    try testing.expectEqual(@as(usize, 2), include.path.segments.items.len);
+
+    // Ensure the first segment of the include path is "Std"
+    try testing.expectEqualStrings("Std", include.path.segments.items[0]);
+
+    // Ensure the second segment of the include path is "List"
+    try testing.expectEqualStrings("List", include.path.segments.items[1]);
+}
+
+test "[FunctionDeclNode]" {
+    // Test input: let add : Int -> Int -> Int = \x y => x + y
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    const int_type1 = try allocator.create(UpperIdentifierNode);
+    int_type1.* = .{
+        .name = try allocator.dupe(u8, "Int"),
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .identifier = .Upper },
+            .lexeme = "Int",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 9, .end = 12 },
+                .src = .{ .line = 1, .col = 10 },
+            },
+        },
+    };
+
+    const int_node1 = try allocator.create(Node);
+    int_node1.* = .{ .upper_identifier = int_type1 };
+
+    const int_type2 = try allocator.create(UpperIdentifierNode);
+    int_type2.* = .{
+        .name = try allocator.dupe(u8, "Int"),
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .identifier = .Upper },
+            .lexeme = "Int",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 16, .end = 19 },
+                .src = .{ .line = 1, .col = 17 },
+            },
+        },
+    };
+
+    const int_node2 = try allocator.create(Node);
+    int_node2.* = .{ .upper_identifier = int_type2 };
+
+    const int_type3 = try allocator.create(UpperIdentifierNode);
+    int_type3.* = .{
+        .name = try allocator.dupe(u8, "Int"),
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .identifier = .Upper },
+            .lexeme = "Int",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 23, .end = 26 },
+                .src = .{ .line = 1, .col = 24 },
+            },
+        },
+    };
+
+    const int_node3 = try allocator.create(Node);
+    int_node3.* = .{ .upper_identifier = int_type3 };
+
+    var param_types = std.ArrayList(*Node).init(allocator);
+    try param_types.append(int_node1);
+    try param_types.append(int_node2);
+    try param_types.append(int_node3);
+
+    const ftype_node = try allocator.create(FunctionTypeNode);
+    ftype_node.* = .{
+        .param_types = param_types,
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .delimiter = .Colon },
+            .lexeme = ":",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 7, .end = 8 },
+                .src = .{ .line = 1, .col = 8 },
+            },
+        },
+    };
+
+    const type_annot_node = try allocator.create(Node);
+    type_annot_node.* = .{ .function_type = ftype_node };
+
+    var lambda_params = std.ArrayList([]const u8).init(allocator);
+    try lambda_params.append(try allocator.dupe(u8, "x"));
+    try lambda_params.append(try allocator.dupe(u8, "y"));
+
+    const x_ident = try allocator.create(LowerIdentifierNode);
+    x_ident.* = .{
+        .name = try allocator.dupe(u8, "x"),
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .identifier = .Lower },
+            .lexeme = "x",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 37, .end = 38 },
+                .src = .{ .line = 1, .col = 38 },
+            },
+        },
+    };
+
+    const x_node = try allocator.create(Node);
+    x_node.* = .{ .lower_identifier = x_ident };
+
+    const y_ident = try allocator.create(LowerIdentifierNode);
+    y_ident.* = .{
+        .name = try allocator.dupe(u8, "y"),
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .identifier = .Lower },
+            .lexeme = "y",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 41, .end = 42 },
+                .src = .{ .line = 1, .col = 42 },
+            },
+        },
+    };
+
+    const y_node = try allocator.create(Node);
+    y_node.* = .{ .lower_identifier = y_ident };
+
+    const arith_node = try allocator.create(ArithmeticExprNode);
+    arith_node.* = .{
+        .left = x_node,
+        .right = y_node,
+        .operator = lexer.Token{
+            .kind = lexer.TokenKind{ .operator = .IntAdd },
+            .lexeme = "+",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 39, .end = 40 },
+                .src = .{ .line = 1, .col = 40 },
+            },
+        },
+    };
+
+    const body_node = try allocator.create(Node);
+    body_node.* = .{ .arithmetic_expr = arith_node };
+
+    const lambda_node = try allocator.create(LambdaExprNode);
+    lambda_node.* = .{
+        .parameters = lambda_params,
+        .body = body_node,
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .operator = .Lambda },
+            .lexeme = "\\",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 30, .end = 31 },
+                .src = .{ .line = 1, .col = 31 },
+            },
+        },
+    };
+
+    const lambda_expr_node = try allocator.create(Node);
+    lambda_expr_node.* = .{ .lambda_expr = lambda_node };
+
+    const func_decl_node = try allocator.create(FunctionDeclNode);
+    func_decl_node.* = .{
+        .name = try allocator.dupe(u8, "add"),
+        .type_annotation = type_annot_node,
+        .value = lambda_expr_node,
+        .token = lexer.Token{
+            .kind = lexer.TokenKind{ .keyword = .Let },
+            .lexeme = "let",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 3 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .function_decl = func_decl_node };
+
+    // Assertions
+    // Verify the node is a function declaration
+    try testing.expect(node.* == .function_decl);
+
+    const func_decl = node.function_decl;
+
+    // Check the keyword for the function declaration is "let"
+    try testing.expectEqual(lexer.TokenKind{ .keyword = .Let }, func_decl.token.kind);
+
+    // Verify the lexeme for the "let" keyword matches "let"
+    try testing.expectEqualStrings("let", func_decl.token.lexeme);
+
+    // Verify the function name is "add"
+    try testing.expectEqualStrings("add", func_decl.name);
+
+    const type_annot = func_decl.type_annotation.?;
+    try testing.expect(type_annot.* == .function_type);
+
+    // Check the token for the type annotation is a colon (":")
+    try testing.expectEqual(lexer.TokenKind{ .delimiter = .Colon }, type_annot.function_type.token.kind);
+
+    // Check the function type has exactly 3 parameter types (Int -> Int -> Int)
+    try testing.expectEqual(@as(usize, 3), type_annot.function_type.param_types.items.len);
+
+    // Verify lambda parameter count matches function type (excluding return type)
+    try testing.expectEqual(type_annot.function_type.param_types.items.len - 1, func_decl.value.lambda_expr.parameters.items.len);
+
+    for (type_annot.function_type.param_types.items) |type_node| {
+        // Check the type node is an upper identifier
+        try testing.expect(type_node.* == .upper_identifier);
+
+        // Check the token kind for the type node is an upper identifier
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, type_node.upper_identifier.token.kind);
+
+        // Check the name of the type node is "Int"
+        try testing.expectEqualStrings("Int", type_node.upper_identifier.name);
+    }
+
+    // Check the function body is a lambda expression
+    try testing.expect(func_decl.value.* == .lambda_expr);
+
+    const lambda_value = func_decl.value.lambda_expr;
+
+    // Check the token for the lambda expression is a lambda operator ("\")
+    try testing.expectEqual(lexer.TokenKind{ .operator = .Lambda }, lambda_value.token.kind);
+
+    // Check the lambda has exactly 2 parameters
+    try testing.expectEqual(@as(usize, 2), lambda_value.parameters.items.len);
+
+    // Verify the names of the lambda parameters are "x" and "y"
+    try testing.expectEqualStrings("x", lambda_value.parameters.items[0]);
+    try testing.expectEqualStrings("y", lambda_value.parameters.items[1]);
+
+    const lambda_body = lambda_value.body;
+
+    // Check the lambda body is an arithmetic expression
+    try testing.expect(lambda_body.* == .arithmetic_expr);
+
+    // Check the operator in the arithmetic expression is integer addition ("+")
+    try testing.expectEqual(lexer.TokenKind{ .operator = .IntAdd }, lambda_body.arithmetic_expr.operator.kind);
+
+    // Check the lexeme for the addition operator matches "+"
+    try testing.expectEqualStrings("+", lambda_body.arithmetic_expr.operator.lexeme);
+
+    const body_left = lambda_body.arithmetic_expr.left;
+
+    // Check the left operand is a lower identifier with the name "x"
+    try testing.expect(body_left.* == .lower_identifier);
+    try testing.expectEqualStrings("x", body_left.lower_identifier.name);
+
+    const body_right = lambda_body.arithmetic_expr.right;
+
+    // Check the left operand is a lower identifier with the name "y"
+    try testing.expect(body_right.* == .lower_identifier);
+    try testing.expectEqualStrings("y", body_right.lower_identifier.name);
+}
+
+test "[ForeignFunctionDeclNode]" {
+    // Test input: foreign sqrt : Float -> Float = "c_sqrt"
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    const float_type1 = try allocator.create(UpperIdentifierNode);
+    float_type1.* = .{
+        .name = try allocator.dupe(u8, "Float"),
+        .token = .{
+            .kind = .{ .identifier = .Upper },
+            .lexeme = "Float",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 5 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const float_node1 = try allocator.create(Node);
+    float_node1.* = .{ .upper_identifier = float_type1 };
+
+    const float_type2 = try allocator.create(UpperIdentifierNode);
+    float_type2.* = .{
+        .name = try allocator.dupe(u8, "Float"),
+        .token = .{
+            .kind = .{ .identifier = .Upper },
+            .lexeme = "Float",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 5 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const float_node2 = try allocator.create(Node);
+    float_node2.* = .{ .upper_identifier = float_type2 };
+
+    var param_types = std.ArrayList(*Node).init(allocator);
+    try param_types.append(float_node1);
+    try param_types.append(float_node2);
+
+    const ftype_node = try allocator.create(FunctionTypeNode);
+    ftype_node.* = .{
+        .param_types = param_types,
+        .token = .{
+            .kind = .{ .symbol = .ArrowRight },
+            .lexeme = "->",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 2 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const type_node = try allocator.create(Node);
+    type_node.* = .{ .function_type = ftype_node };
+
+    const foreign_node = try allocator.create(ForeignFunctionDeclNode);
+    foreign_node.* = .{
+        .name = try allocator.dupe(u8, "sqrt"),
+        .type_annotation = type_node,
+        .external_name = try allocator.dupe(u8, "c_sqrt"),
+        .token = .{
+            .kind = .{ .keyword = .Foreign },
+            .lexeme = "foreign",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 7 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .foreign_function_decl = foreign_node };
+
+    // Assertions
+    // Verify the node is a foreign function declaration
+    try testing.expect(node.* == .foreign_function_decl);
+
+    const decl = node.foreign_function_decl;
+
+    // Verify the name of the declaration
+    try testing.expectEqualStrings("sqrt", decl.name);
+
+    // Verify the external name of the declaration
+    try testing.expectEqualStrings("c_sqrt", decl.external_name);
+
+    // Check the function type annotation specifies exactly two parameter types
+    try testing.expectEqual(@as(usize, 2), decl.type_annotation.function_type.param_types.items.len);
+
+    // Verify both parameter types are Float
+    const fn_param_types = decl.type_annotation.function_type.param_types.items;
+    try testing.expect(fn_param_types[0].* == .upper_identifier);
+    try testing.expectEqualStrings("Float", fn_param_types[0].upper_identifier.name);
+    try testing.expect(fn_param_types[1].* == .upper_identifier);
+    try testing.expectEqualStrings("Float", fn_param_types[1].upper_identifier.name);
+}
+
+test "[ModuleDeclNode]" {
+    // Test input: module MyModule exposing (..) ... end
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    var segments = std.ArrayList([]const u8).init(allocator);
+    try segments.append(try allocator.dupe(u8, "MyModule"));
+
+    const path_node = try allocator.create(ModulePathNode);
+    path_node.* = .{
+        .segments = segments,
+        .token = .{
+            .kind = .{ .identifier = .Upper },
+            .lexeme = "MyModule",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 7, .end = 15 },
+                .src = .{ .line = 1, .col = 8 },
+            },
+        },
+    };
+
+    const export_node = try allocator.create(ExportSpecNode);
+    export_node.* = .{
+        .exposing_all = true,
+        .items = null,
+        .token = .{
+            .kind = .{ .keyword = .Exposing },
+            .lexeme = "exposing",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 16, .end = 24 },
+                .src = .{ .line = 1, .col = 17 },
+            },
+        },
+    };
+
+    // Create a dummy declaration
+    const comment_node = try allocator.create(CommentNode);
+    comment_node.* = .{
+        .content = try allocator.dupe(u8, "dummy declaration"),
+        .token = .{
+            .kind = .{ .comment = .Regular },
+            .lexeme = "#",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const comment_decl = try allocator.create(Node);
+    comment_decl.* = .{ .comment = comment_node };
+
+    var declarations = std.ArrayList(*Node).init(allocator);
+    try declarations.append(comment_decl);
+
+    const module_node = try allocator.create(ModuleDeclNode);
+    module_node.* = .{
+        .path = path_node,
+        .exports = export_node,
+        .declarations = declarations,
+        .token = .{
+            .kind = .{ .keyword = .Module },
+            .lexeme = "module",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 6 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .module_decl = module_node };
+
+    // Assertions
+    // Verify the node is a module declaration
+    try testing.expect(node.* == .module_decl);
+
+    // Verify module path
+    try testing.expectEqual(@as(usize, 1), node.module_decl.path.segments.items.len);
+    try testing.expectEqualStrings("MyModule", node.module_decl.path.segments.items[0]);
+
+    // Verify exports
+    try testing.expect(node.module_decl.exports.exposing_all);
+    try testing.expect(node.module_decl.exports.items == null);
+
+    // Verify declarations
+    try testing.expectEqual(@as(usize, 1), node.module_decl.declarations.items.len);
+    try testing.expect(node.module_decl.declarations.items[0].* == .comment);
+}
+
+test "[ProgramNode]" {
+    // Test input: A program with a single declaration
+
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Action
+    const comment_node = try allocator.create(CommentNode);
+    comment_node.* = .{
+        .content = try allocator.dupe(u8, "program statement"),
+        .token = .{
+            .kind = .{ .comment = .Regular },
+            .lexeme = "#",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 1 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const stmt = try allocator.create(Node);
+    stmt.* = .{ .comment = comment_node };
+
+    var statements = std.ArrayList(*Node).init(allocator);
+    try statements.append(stmt);
+
+    const program_node = try allocator.create(ProgramNode);
+    program_node.* = .{
+        .statements = statements,
+        .token = .{
+            .kind = .{ .keyword = .Module },
+            .lexeme = "module",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 6 },
+                .src = .{ .line = 1, .col = 1 },
+            },
+        },
+    };
+
+    const node = try allocator.create(Node);
+    defer {
+        node.deinit(allocator);
+        allocator.destroy(node);
+    }
+
+    node.* = .{ .program = program_node };
+
+    // Assertions
+    // Verify the node is a program
+    try testing.expect(node.* == .program);
+
+    // Verify program contains one statement
+    try testing.expectEqual(@as(usize, 1), node.program.statements.items.len);
+    try testing.expect(node.program.statements.items[0].* == .comment);
 }
