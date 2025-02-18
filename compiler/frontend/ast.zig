@@ -298,7 +298,7 @@ pub const PatternNode = union(enum) {
     int_literal: IntLiteralNode,
     float_literal: FloatLiteralNode,
     char_literal: CharLiteralNode,
-    string_literal: StrLiteralNode,
+    string_literal: *StrLiteralNode,
     list: struct {
         /// Array of pattern nodes for matching against list elements.
         elements: std.ArrayList(*PatternNode),
@@ -346,7 +346,7 @@ pub const PatternNode = union(enum) {
             .char_literal,
             .empty_list,
             => {},
-            .string_literal => |*lit| {
+            .string_literal => |lit| {
                 lit.deinit(allocator);
             },
             .list => |list| {
@@ -486,8 +486,6 @@ pub const FunctionTypeNode = struct {
         }
 
         self.param_types.deinit();
-
-        allocator.destroy(self);
     }
 };
 
@@ -709,7 +707,7 @@ pub const TypedHoleNode = struct {
 /// - `Tree (Maybe a)`
 pub const TypeApplicationNode = struct {
     /// The type constructor being applied (e.g., Map, List, Maybe).
-    base: *Node,
+    base: *UpperIdentifierNode,
 
     /// The type arguments being applied.
     args: std.ArrayList(*Node),
@@ -719,7 +717,6 @@ pub const TypeApplicationNode = struct {
 
     pub fn deinit(self: *TypeApplicationNode, allocator: std.mem.Allocator) void {
         self.base.deinit(allocator);
-        allocator.destroy(self.base);
 
         for (self.args.items) |arg| {
             arg.deinit(allocator);
@@ -1150,7 +1147,7 @@ pub const FunctionDeclNode = struct {
     name: []const u8,
 
     /// Optional AST node representing the type annotation.
-    type_annotation: ?*Node,
+    type_annotation: ?*FunctionTypeNode,
 
     // doc_comments: []*DocCommentNode,
 
@@ -1186,7 +1183,7 @@ pub const ForeignFunctionDeclNode = struct {
     name: []const u8,
 
     /// The function's type signature.
-    type_annotation: *Node,
+    type_annotation: *FunctionTypeNode,
 
     /// The external symbol name to link against.
     external_name: []const u8,
@@ -3072,6 +3069,8 @@ test "[FunctionTypeNode]" {
     defer {
         node.deinit(allocator);
         allocator.destroy(node);
+
+        allocator.destroy(ftype_node);
     }
 
     node.* = .{ .function_type = ftype_node };
@@ -4166,9 +4165,6 @@ test "[TypeApplicationNode]" {
         },
     };
 
-    const base_node = try allocator.create(Node);
-    base_node.* = .{ .upper_identifier = map_ident };
-
     const k_ident = try allocator.create(LowerIdentifierNode);
     k_ident.* = .{
         .name = try allocator.dupe(u8, "k"),
@@ -4209,7 +4205,7 @@ test "[TypeApplicationNode]" {
 
     const type_app = try allocator.create(TypeApplicationNode);
     type_app.* = .{
-        .base = base_node,
+        .base = map_ident,
         .args = args,
         .token = .{
             .kind = .{ .identifier = .Upper },
@@ -4237,8 +4233,8 @@ test "[TypeApplicationNode]" {
     const app = node.type_application;
 
     // Verify the base type of the type application is an upper identifier named "Map"
-    try testing.expect(app.base.* == .upper_identifier);
-    try testing.expectEqualStrings("Map", app.base.upper_identifier.name);
+    try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, app.base.token.kind);
+    try testing.expectEqualStrings("Map", app.base.name);
 
     // Verify that the type application has exactly two arguments
     try testing.expectEqual(@as(usize, 2), app.args.items.len);
@@ -5353,9 +5349,6 @@ test "[FunctionDeclNode]" {
         },
     };
 
-    const type_annot_node = try allocator.create(Node);
-    type_annot_node.* = .{ .function_type = ftype_node };
-
     var lambda_params = std.ArrayList([]const u8).init(allocator);
     try lambda_params.append(try allocator.dupe(u8, "x"));
     try lambda_params.append(try allocator.dupe(u8, "y"));
@@ -5433,7 +5426,7 @@ test "[FunctionDeclNode]" {
     const func_decl_node = try allocator.create(FunctionDeclNode);
     func_decl_node.* = .{
         .name = try allocator.dupe(u8, "add"),
-        .type_annotation = type_annot_node,
+        .type_annotation = ftype_node,
         .value = lambda_expr_node,
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .keyword = .Let },
@@ -5470,18 +5463,19 @@ test "[FunctionDeclNode]" {
     try testing.expectEqualStrings("add", func_decl.name);
 
     const type_annot = func_decl.type_annotation.?;
-    try testing.expect(type_annot.* == .function_type);
+
+    // try testing.expect(type_annot.* == .function_type);
 
     // Check the token for the type annotation is a colon (":")
-    try testing.expectEqual(lexer.TokenKind{ .delimiter = .Colon }, type_annot.function_type.token.kind);
+    try testing.expectEqual(lexer.TokenKind{ .delimiter = .Colon }, type_annot.token.kind);
 
     // Check the function type has exactly 3 parameter types (Int -> Int -> Int)
-    try testing.expectEqual(@as(usize, 3), type_annot.function_type.param_types.items.len);
+    try testing.expectEqual(@as(usize, 3), type_annot.param_types.items.len);
 
     // Verify lambda parameter count matches function type (excluding return type)
-    try testing.expectEqual(type_annot.function_type.param_types.items.len - 1, func_decl.value.lambda_expr.parameters.items.len);
+    try testing.expectEqual(type_annot.param_types.items.len - 1, func_decl.value.lambda_expr.parameters.items.len);
 
-    for (type_annot.function_type.param_types.items) |type_node| {
+    for (type_annot.param_types.items) |type_node| {
         // Check the type node is an upper identifier
         try testing.expect(type_node.* == .upper_identifier);
 
@@ -5592,13 +5586,10 @@ test "[ForeignFunctionDeclNode]" {
         },
     };
 
-    const type_node = try allocator.create(Node);
-    type_node.* = .{ .function_type = ftype_node };
-
     const foreign_node = try allocator.create(ForeignFunctionDeclNode);
     foreign_node.* = .{
         .name = try allocator.dupe(u8, "sqrt"),
-        .type_annotation = type_node,
+        .type_annotation = ftype_node,
         .external_name = try allocator.dupe(u8, "c_sqrt"),
         .token = .{
             .kind = .{ .keyword = .Foreign },
@@ -5632,10 +5623,11 @@ test "[ForeignFunctionDeclNode]" {
     try testing.expectEqualStrings("c_sqrt", decl.external_name);
 
     // Check the function type annotation specifies exactly two parameter types
-    try testing.expectEqual(@as(usize, 2), decl.type_annotation.function_type.param_types.items.len);
+    try testing.expectEqual(@as(usize, 2), decl.type_annotation.param_types.items.len);
 
     // Verify both parameter types are Float
-    const fn_param_types = decl.type_annotation.function_type.param_types.items;
+    const fn_param_types = decl.type_annotation.param_types.items;
+
     try testing.expect(fn_param_types[0].* == .upper_identifier);
     try testing.expectEqualStrings("Float", fn_param_types[0].upper_identifier.name);
     try testing.expect(fn_param_types[1].* == .upper_identifier);
