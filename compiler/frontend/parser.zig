@@ -222,24 +222,36 @@ pub const Parser = struct {
     fn parseLowerIdentifier(self: *Parser) ParserError!*ast.LowerIdentifierNode {
         const token = try self.expect(lexer.TokenKind{ .identifier = .Lower });
 
-        const params = ast.LowerIdentifierNode.InitParams{
-            .name = token.lexeme,
+        const node = try self.allocator.create(ast.LowerIdentifierNode);
+        errdefer {
+            node.deinit(self.allocator);
+            self.allocator.destroy(node);
+        }
+
+        node.* = .{
+            .name = try self.allocator.dupe(u8, token.lexeme),
             .token = token,
         };
 
-        return ast.LowerIdentifierNode.init(self.allocator, params);
+        return node;
     }
 
     /// Parses a upper-case identifier into a structured node.
     fn parseUpperIdentifier(self: *Parser) ParserError!*ast.UpperIdentifierNode {
         const token = try self.expect(lexer.TokenKind{ .identifier = .Upper });
 
-        const params = ast.UpperIdentifierNode.InitParams{
-            .name = token.lexeme,
+        const node = try self.allocator.create(ast.UpperIdentifierNode);
+        errdefer {
+            node.deinit(self.allocator);
+            self.allocator.destroy(node);
+        }
+
+        node.* = .{
+            .name = try self.allocator.dupe(u8, token.lexeme),
             .token = token,
         };
 
-        return ast.UpperIdentifierNode.init(self.allocator, params);
+        return node;
     }
 
     /// Parses an integer literal value into a structured node.
@@ -252,12 +264,10 @@ pub const Parser = struct {
             return error.InvalidIntLiteral;
         };
 
-        const params = ast.IntLiteralNode.InitParams{
+        return .{
             .value = value,
             .token = token,
         };
-
-        return ast.IntLiteralNode.init(params);
     }
 
     /// Parses a floating-point literal value into a structured node.
@@ -270,12 +280,10 @@ pub const Parser = struct {
             return error.InvalidFloatLiteral;
         };
 
-        const params = ast.FloatLiteralNode.InitParams{
+        return .{
             .value = value,
             .token = token,
         };
-
-        return ast.FloatLiteralNode.init(params);
     }
 
     /// Parses a character literal into its Unicode codepoint value.
@@ -298,12 +306,10 @@ pub const Parser = struct {
             };
         }
 
-        const params = ast.CharLiteralNode.InitParams{
+        return .{
             .value = value,
             .token = token,
         };
-
-        return ast.CharLiteralNode.init(params);
     }
 
     /// Parses a string literal into a structured node.
@@ -334,12 +340,18 @@ pub const Parser = struct {
             }
         }
 
-        const params = ast.StrLiteralNode.InitParams{
-            .value = result.items,
+        const node = try self.allocator.create(ast.StrLiteralNode);
+        errdefer {
+            node.deinit(self.allocator);
+            self.allocator.destroy(node);
+        }
+
+        node.* = .{
+            .value = try self.allocator.dupe(u8, result.items),
             .token = token,
         };
 
-        return ast.StrLiteralNode.init(self.allocator, params);
+        return node;
     }
 
     const EscapeSequence = struct {
@@ -1131,10 +1143,6 @@ pub const Parser = struct {
     /// correctly structured expression trees.
     fn parseBinaryExpr(self: *Parser, min_precedence: u8) ParserError!*ast.Node {
         var left = try self.parseSimpleExpr();
-        errdefer {
-            left.deinit(self.allocator);
-            self.allocator.destroy(left);
-        }
 
         while (true) {
             const op_info = if (Parser.getOperatorInfo(self.current_token.kind)) |info| info else break;
@@ -1152,69 +1160,71 @@ pub const Parser = struct {
             };
 
             const right = try self.parseBinaryExpr(next_min);
-            errdefer {
-                right.deinit(self.allocator);
-                self.allocator.destroy(right);
-            }
 
             const node = try self.allocator.create(ast.Node);
             errdefer {
-                right.deinit(self.allocator);
-                self.allocator.destroy(right);
+                node.deinit(self.allocator);
                 self.allocator.destroy(node);
             }
 
-            node.* = switch (operator.kind) {
-                .operator => |op| switch (op) {
-                    .Exp,
-                    .FloatAdd,
-                    .FloatDiv,
-                    .FloatMul,
-                    .FloatSub,
-                    .IntAdd,
-                    .IntDiv,
-                    .IntMul,
-                    .IntSub,
-                    => .{
-                        .arithmetic_expr = .{
+            switch (operator.kind) {
+                .operator => |op| {
+                    if (op == .Exp or op == .FloatAdd or op == .FloatDiv or
+                        op == .FloatMul or op == .FloatSub or op == .IntAdd or
+                        op == .IntDiv or op == .IntMul or op == .IntSub)
+                    {
+                        const arithmetic_node = try self.allocator.create(ast.ArithmeticExprNode);
+                        arithmetic_node.* = .{
                             .left = left,
-                            .operator = operator,
                             .right = right,
-                        },
-                    },
-                    .LogicalAnd,
-                    .LogicalOr,
-                    => .{
-                        .logical_expr = .{
+                            .operator = operator,
+                        };
+
+                        node.* = .{ .arithmetic_expr = arithmetic_node };
+                    } else if (op == .LogicalAnd or op == .LogicalOr) {
+                        const logical_node = try self.allocator.create(ast.LogicalExprNode);
+                        logical_node.* = .{
                             .left = left,
-                            .operator = operator,
                             .right = right,
-                        },
-                    },
-                    .Equality,
-                    .GreaterThan,
-                    .GreaterThanEqual,
-                    .LessThan,
-                    .LessThanEqual,
-                    .NotEqual,
-                    => .{
-                        .comparison_expr = .{
+                            .operator = operator,
+                        };
+
+                        node.* = .{ .logical_expr = logical_node };
+                    } else if (op == .Equality or op == .GreaterThan or op == .GreaterThanEqual or
+                        op == .LessThan or op == .LessThanEqual or op == .NotEqual)
+                    {
+                        const comparison_node = try self.allocator.create(ast.ComparisonExprNode);
+                        comparison_node.* = .{
                             .left = left,
-                            .operator = operator,
                             .right = right,
-                        },
-                    },
-                    .StrConcat => .{
-                        .str_concat_expr = .{
+                            .operator = operator,
+                        };
+
+                        node.* = .{ .comparison_expr = comparison_node };
+                    } else if (op == .StrConcat) {
+                        const str_concat_node = try self.allocator.create(ast.StrConcatExprNode);
+                        str_concat_node.* = .{
                             .left = left,
-                            .operator = operator,
                             .right = right,
-                        },
-                    },
-                    else => unreachable,
+                            .operator = operator,
+                        };
+
+                        node.* = .{ .str_concat_expr = str_concat_node };
+                    } else if (op == .ListConcat) {
+                        const list_concat_node = try self.allocator.create(ast.ListConcatExprNode);
+                        list_concat_node.* = .{
+                            .left = left,
+                            .right = right,
+                            .operator = operator,
+                        };
+
+                        node.* = .{ .list_concat_expr = list_concat_node };
+                    } else {
+                        unreachable;
+                    }
                 },
                 else => unreachable,
-            };
+            }
 
             left = node;
         }
@@ -1232,9 +1242,6 @@ pub const Parser = struct {
     /// Otherwise, delegates to `parsePrimaryExpr` for parsing primary expressions.
     fn parseSimpleExpr(self: *Parser) ParserError!*ast.Node {
         if (self.isUnaryOp()) {
-            const node = try self.allocator.create(ast.Node);
-            errdefer self.allocator.destroy(node);
-
             const operator = self.current_token;
             try self.advance();
 
@@ -1244,12 +1251,19 @@ pub const Parser = struct {
                 self.allocator.destroy(operand);
             }
 
-            node.* = .{
-                .unary_expr = .{
-                    .operator = operator,
-                    .operand = operand,
-                },
+            const unary_node = try self.allocator.create(ast.UnaryExprNode);
+            unary_node.* = .{
+                .operand = operand,
+                .operator = operator,
             };
+
+            const node = try self.allocator.create(ast.Node);
+            errdefer {
+                node.deinit(self.allocator);
+                self.allocator.destroy(node);
+            }
+
+            node.* = .{ .unary_expr = unary_node };
 
             return node;
         }
@@ -1279,22 +1293,21 @@ pub const Parser = struct {
             },
             .identifier => |ident| {
                 const node = try self.allocator.create(ast.Node);
-                errdefer self.allocator.destroy(node);
+                errdefer {
+                    node.deinit(self.allocator);
+                    self.allocator.destroy(node);
+                }
 
                 switch (ident) {
                     .Lower => {
                         const identifier = try self.parseLowerIdentifier();
 
-                        node.* = .{
-                            .lower_identifier = identifier,
-                        };
+                        node.* = .{ .lower_identifier = identifier };
                     },
                     .Upper => {
                         const identifier = try self.parseUpperIdentifier();
 
-                        node.* = .{
-                            .upper_identifier = identifier,
-                        };
+                        node.* = .{ .upper_identifier = identifier };
                     },
                 }
 
@@ -1308,36 +1321,31 @@ pub const Parser = struct {
             },
             .literal => |lit| {
                 const node = try self.allocator.create(ast.Node);
-                errdefer self.allocator.destroy(node);
+                errdefer {
+                    node.deinit(self.allocator);
+                    self.allocator.destroy(node);
+                }
 
                 switch (lit) {
                     .Char => {
                         const char_literal = try self.parseCharLiteral();
 
-                        node.* = .{
-                            .char_literal = char_literal,
-                        };
+                        node.* = .{ .char_literal = char_literal };
                     },
                     .Float => {
                         const float_literal = try self.parseFloatLiteral();
 
-                        node.* = .{
-                            .float_literal = float_literal,
-                        };
+                        node.* = .{ .float_literal = float_literal };
                     },
                     .Int => {
                         const int_literal = try self.parseIntLiteral();
 
-                        node.* = .{
-                            .int_literal = int_literal,
-                        };
+                        node.* = .{ .int_literal = int_literal };
                     },
                     .String => {
                         const str_literal = try self.parseStrLiteral();
 
-                        node.* = .{
-                            .str_literal = str_literal,
-                        };
+                        node.* = .{ .str_literal = str_literal };
                     },
                     .MultilineString => return error.UnexpectedToken,
                 }
@@ -1369,8 +1377,7 @@ pub const Parser = struct {
     fn parseLambdaExpr(self: *Parser) ParserError!*ast.Node {
         const token = try self.expect(lexer.TokenKind{ .operator = .Lambda });
 
-        var params = std.ArrayList([]const u8).init(self.allocator);
-        errdefer params.deinit();
+        var parameters = std.ArrayList([]const u8).init(self.allocator);
 
         while (self.check(lexer.TokenKind{ .identifier = .Lower }) or
             self.check(lexer.TokenKind{ .symbol = .Underscore }))
@@ -1379,36 +1386,30 @@ pub const Parser = struct {
 
             try self.advance();
 
-            try params.append(param.lexeme);
+            try parameters.append(param.lexeme);
         }
 
-        if (params.items.len == 0) {
+        if (parameters.items.len == 0) {
             return error.EmptyLambdaParams;
         }
 
         _ = try self.expect(lexer.TokenKind{ .symbol = .DoubleArrowRight });
         const body = try self.parseExpression();
-        errdefer {
-            params.deinit();
-            body.deinit(self.allocator);
-            self.allocator.destroy(body);
-        }
+
+        const lambda_node = try self.allocator.create(ast.LambdaExprNode);
+        lambda_node.* = .{
+            .parameters = parameters,
+            .body = body,
+            .token = token,
+        };
 
         const node = try self.allocator.create(ast.Node);
         errdefer {
-            params.deinit();
-            body.deinit(self.allocator);
-            self.allocator.destroy(body);
+            node.deinit(self.allocator);
             self.allocator.destroy(node);
         }
 
-        node.* = .{
-            .lambda_expr = .{
-                .params = params,
-                .body = body,
-                .token = token,
-            },
-        };
+        node.* = .{ .lambda_expr = lambda_node };
 
         return node;
     }
@@ -1439,16 +1440,17 @@ pub const Parser = struct {
 
         // Handle empty list case
         if (try self.match(lexer.TokenKind{ .delimiter = .RightBracket })) {
-            const params = ast.ListNode.InitParams{
+            const empty_list = try self.allocator.create(ast.ListNode);
+            empty_list.* = .{
                 .elements = elements,
                 .token = start_token,
             };
 
-            const empty_list = try ast.ListNode.init(self.allocator, params);
-            // errdefer self.allocator.destroy(empty_list);
-
             const node = try self.allocator.create(ast.Node);
-            errdefer self.allocator.destroy(node);
+            errdefer {
+                node.deinit(self.allocator);
+                self.allocator.destroy(node);
+            }
 
             node.* = .{ .list = empty_list };
 
@@ -1466,18 +1468,19 @@ pub const Parser = struct {
 
         _ = try self.expect(lexer.TokenKind{ .delimiter = .RightBracket });
 
-        const params = ast.ListNode.InitParams{
+        const list_node = try self.allocator.create(ast.ListNode);
+        list_node.* = .{
             .elements = elements,
             .token = start_token,
         };
 
-        const list = try ast.ListNode.init(self.allocator, params);
-        // errdefer self.allocator.destroy(list);
-
         const node = try self.allocator.create(ast.Node);
-        errdefer self.allocator.destroy(node);
+        errdefer {
+            node.deinit(self.allocator);
+            self.allocator.destroy(node);
+        }
 
-        node.* = .{ .list = list };
+        node.* = .{ .list = list_node };
 
         return node;
     }
@@ -1507,7 +1510,7 @@ pub const Parser = struct {
     ///    else
     ///      "positive"`
     fn parseIfThenElse(self: *Parser) ParserError!*ast.Node {
-        _ = try self.expect(lexer.TokenKind{ .keyword = .If });
+        const token = try self.expect(lexer.TokenKind{ .keyword = .If });
         const condition = try self.parseExpression();
 
         _ = try self.expect(lexer.TokenKind{ .keyword = .Then });
@@ -1516,21 +1519,21 @@ pub const Parser = struct {
         _ = try self.expect(lexer.TokenKind{ .keyword = .Else });
         const else_branch = try self.parseExpression();
 
+        const if_node = try self.allocator.create(ast.IfThenElseStmtNode);
+        if_node.* = .{
+            .condition = condition,
+            .then_branch = then_branch,
+            .else_branch = else_branch,
+            .token = token,
+        };
+
         const node = try self.allocator.create(ast.Node);
         errdefer {
-            condition.deinit(self.allocator);
-            then_branch.deinit(self.allocator);
-            else_branch.deinit(self.allocator);
+            node.deinit(self.allocator);
             self.allocator.destroy(node);
         }
 
-        node.* = .{
-            .if_then_else_stmt = .{
-                .condition = condition,
-                .then_branch = then_branch,
-                .else_branch = else_branch,
-            },
-        };
+        node.* = .{ .if_then_else_stmt = if_node };
 
         return node;
     }
@@ -1789,16 +1792,17 @@ pub const Parser = struct {
 
         const trimmed = std.mem.trimRight(u8, token.lexeme[i..], &std.ascii.whitespace);
 
-        const params = ast.CommentNode.InitParams{
-            .content = trimmed,
+        const comment_node = try self.allocator.create(ast.CommentNode);
+        comment_node.* = .{
+            .content = try self.allocator.dupe(u8, trimmed),
             .token = token,
         };
 
-        const comment_node = try ast.CommentNode.init(self.allocator, params);
-        errdefer self.allocator.destroy(comment_node);
-
         const node = try self.allocator.create(ast.Node);
-        errdefer self.allocator.destroy(node);
+        errdefer {
+            node.deinit(self.allocator);
+            self.allocator.destroy(node);
+        }
 
         node.* = .{ .comment = comment_node };
 
@@ -1817,16 +1821,17 @@ pub const Parser = struct {
 
         const trimmed = std.mem.trimRight(u8, token.lexeme[i..], &std.ascii.whitespace);
 
-        const params = ast.DocCommentNode.InitParams{
-            .content = trimmed,
+        const comment_node = try self.allocator.create(ast.DocCommentNode);
+        comment_node.* = .{
+            .content = try self.allocator.dupe(u8, trimmed),
             .token = token,
         };
 
-        const comment_node = try ast.DocCommentNode.init(self.allocator, params);
-        errdefer self.allocator.destroy(comment_node);
-
         const node = try self.allocator.create(ast.Node);
-        errdefer self.allocator.destroy(node);
+        errdefer {
+            node.deinit(self.allocator);
+            self.allocator.destroy(node);
+        }
 
         node.* = .{ .doc_comment = comment_node };
 
@@ -2670,24 +2675,29 @@ test "[lambda_expr]" {
     defer parser.deinit();
 
     // Action
-    const expr = try parser.parseExpression();
+    const node = try parser.parseExpression();
     defer {
-        expr.deinit(allocator);
-        allocator.destroy(expr);
+        node.deinit(allocator);
+        allocator.destroy(node);
     }
 
     // Assertions
     // Ensure the expression is identified as a lambda expression
-    try testing.expect(expr.* == .lambda_expr);
+    try testing.expect(node.* == .lambda_expr);
+
+    const expr = node.lambda_expr;
 
     // Validate that the lambda expression has exactly one parameter
-    try testing.expectEqual(@as(usize, 1), expr.lambda_expr.params.items.len);
+    try testing.expectEqual(@as(usize, 1), expr.parameters.items.len);
 
     // Ensure the parameter name matches the expected value ("x")
-    try testing.expectEqualStrings("x", expr.lambda_expr.params.items[0]);
+    try testing.expectEqualStrings("x", expr.parameters.items[0]);
+
+    // Verify the token kind matches
+    try testing.expectEqual(lexer.TokenKind{ .operator = .Lambda }, expr.token.kind);
 
     // Validate that the body of the lambda expression is an arithmetic expression
-    try testing.expect(expr.lambda_expr.body.* == .arithmetic_expr);
+    try testing.expect(expr.body.* == .arithmetic_expr);
 }
 
 test "[if_then_else_stmt]" {
