@@ -136,10 +136,8 @@ pub const LowerIdentifierNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *LowerIdentifierNode, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: LowerIdentifierNode, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
-
-        allocator.destroy(self);
     }
 };
 
@@ -151,10 +149,8 @@ pub const UpperIdentifierNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *UpperIdentifierNode, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: UpperIdentifierNode, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
-
-        allocator.destroy(self);
     }
 };
 
@@ -480,9 +476,9 @@ pub const FunctionTypeNode = struct {
     token: lexer.Token,
 
     pub fn deinit(self: *FunctionTypeNode, allocator: std.mem.Allocator) void {
-        for (self.param_types.items) |t| {
-            t.deinit(allocator);
-            allocator.destroy(t);
+        for (self.param_types.items) |param_type| {
+            param_type.deinit(allocator);
+            allocator.destroy(param_type);
         }
 
         self.param_types.deinit();
@@ -707,7 +703,7 @@ pub const TypedHoleNode = struct {
 /// - `Tree (Maybe a)`
 pub const TypeApplicationNode = struct {
     /// The type constructor being applied (e.g., Map, List, Maybe).
-    base: *UpperIdentifierNode,
+    base: UpperIdentifierNode,
 
     /// The type arguments being applied.
     args: std.ArrayList(*Node),
@@ -934,7 +930,7 @@ pub const ExportItem = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *ExportItem, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: ExportItem, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
     }
 };
@@ -950,7 +946,7 @@ pub const ExportSpecNode = struct {
     exposing_all: bool,
 
     /// Optional array of specific items being exposed.
-    items: ?std.ArrayList(*ExportItem),
+    items: ?std.ArrayList(ExportItem),
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
@@ -959,7 +955,6 @@ pub const ExportSpecNode = struct {
         if (self.items) |*items| {
             for (items.items) |item| {
                 item.deinit(allocator);
-                allocator.destroy(item);
             }
 
             items.deinit();
@@ -1278,8 +1273,8 @@ pub const Node = union(enum) {
     multiline_str_literal: *MultilineStrLiteralNode,
 
     // Identifiers
-    lower_identifier: *LowerIdentifierNode,
-    upper_identifier: *UpperIdentifierNode,
+    lower_identifier: LowerIdentifierNode,
+    upper_identifier: UpperIdentifierNode,
 
     // Basic Data Structures
     list: *ListNode,
@@ -1745,8 +1740,7 @@ test "[LowerIdentifierNode]" {
     const name = "my_variable";
 
     // Action
-    const ident_node = try allocator.create(LowerIdentifierNode);
-    ident_node.* = .{
+    const identifier = LowerIdentifierNode{
         .name = try allocator.dupe(u8, name),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Lower },
@@ -1758,21 +1752,9 @@ test "[LowerIdentifierNode]" {
             },
         },
     };
-
-    const node = try allocator.create(Node);
-    defer {
-        node.deinit(allocator);
-        allocator.destroy(node);
-    }
-
-    node.* = .{ .lower_identifier = ident_node };
+    defer identifier.deinit(allocator);
 
     // Assertions
-    // Verify the node is a lower identifier
-    try testing.expect(node.* == .lower_identifier);
-
-    const identifier = node.lower_identifier;
-
     // Verify the name of the identifier
     try testing.expectEqualStrings(name, identifier.name);
 
@@ -1794,8 +1776,7 @@ test "[UpperIdentifierNode]" {
     const name = "TypeName";
 
     // Action
-    const ident_node = try allocator.create(UpperIdentifierNode);
-    ident_node.* = .{
+    const identifier = UpperIdentifierNode{
         .name = try allocator.dupe(u8, name),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Upper },
@@ -1807,21 +1788,9 @@ test "[UpperIdentifierNode]" {
             },
         },
     };
-
-    const node = try allocator.create(Node);
-    defer {
-        node.deinit(allocator);
-        allocator.destroy(node);
-    }
-
-    node.* = .{ .upper_identifier = ident_node };
+    defer identifier.deinit(allocator);
 
     // Assertions
-    // Verify the node is an upper identifier
-    try testing.expect(node.* == .upper_identifier);
-
-    const identifier = node.upper_identifier;
-
     // Verify the name of the identifier
     try testing.expectEqualStrings(name, identifier.name);
 
@@ -2163,8 +2132,7 @@ test "[LogicalExprNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const left_ident = try allocator.create(LowerIdentifierNode);
-    left_ident.* = .{
+    const left_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "a"),
         .token = lexer.Token{
             .kind = .{ .identifier = .Lower },
@@ -2180,8 +2148,7 @@ test "[LogicalExprNode]" {
     const left = try allocator.create(Node);
     left.* = .{ .lower_identifier = left_ident };
 
-    const right_ident = try allocator.create(LowerIdentifierNode);
-    right_ident.* = .{
+    const right_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "b"),
         .token = lexer.Token{
             .kind = .{ .identifier = .Lower },
@@ -2248,8 +2215,7 @@ test "[ComparisonExprNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const left_ident = try allocator.create(LowerIdentifierNode);
-    left_ident.* = .{
+    const left_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "x"),
         .token = lexer.Token{
             .kind = .{ .identifier = .Lower },
@@ -2265,8 +2231,7 @@ test "[ComparisonExprNode]" {
     const left = try allocator.create(Node);
     left.* = .{ .lower_identifier = left_ident };
 
-    const right_ident = try allocator.create(LowerIdentifierNode);
-    right_ident.* = .{
+    const right_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "y"),
         .token = lexer.Token{
             .kind = .{ .identifier = .Lower },
@@ -2335,8 +2300,7 @@ test "[MatchExprNode]" {
         // Test input: match opt on | Some x => x | None => 0
 
         // Action
-        const value_ident = try allocator.create(LowerIdentifierNode);
-        value_ident.* = .{
+        const value_ident = LowerIdentifierNode{
             .name = try allocator.dupe(u8, "opt"),
             .token = lexer.Token{
                 .kind = .{ .identifier = .Lower },
@@ -2389,8 +2353,7 @@ test "[MatchExprNode]" {
             },
         };
 
-        const var_result = try allocator.create(LowerIdentifierNode);
-        var_result.* = .{
+        const var_result = LowerIdentifierNode{
             .name = try allocator.dupe(u8, "x"),
             .token = .{
                 .kind = .{ .identifier = .Lower },
@@ -2528,8 +2491,7 @@ test "[MatchExprNode]" {
 
         // Action
         // Value to match on (a list variable)
-        const value_ident = try allocator.create(LowerIdentifierNode);
-        value_ident.* = .{
+        const value_ident = LowerIdentifierNode{
             .name = try allocator.dupe(u8, "list"),
             .token = .{
                 .kind = .{ .identifier = .Lower },
@@ -2595,8 +2557,7 @@ test "[MatchExprNode]" {
             },
         };
 
-        const head_ident = try allocator.create(LowerIdentifierNode);
-        head_ident.* = .{
+        const head_ident = LowerIdentifierNode{
             .name = try allocator.dupe(u8, "head"),
             .token = .{
                 .kind = .{ .identifier = .Lower },
@@ -2736,8 +2697,7 @@ test "[MatchExprNode]" {
         // Test input: match x on | n when n > 0 => "positive" | n => "non-positive"
 
         // Action
-        const value_ident = try allocator.create(LowerIdentifierNode);
-        value_ident.* = .{
+        const value_ident = LowerIdentifierNode{
             .name = try allocator.dupe(u8, "x"),
             .token = .{
                 .kind = .{ .identifier = .Lower },
@@ -2770,8 +2730,7 @@ test "[MatchExprNode]" {
             },
         };
 
-        const n_ident = try allocator.create(LowerIdentifierNode);
-        n_ident.* = .{
+        const n_ident = LowerIdentifierNode{
             .name = try allocator.dupe(u8, "n"),
             .token = .{
                 .kind = .{ .identifier = .Lower },
@@ -2995,8 +2954,7 @@ test "[FunctionTypeNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const int_type1 = try allocator.create(UpperIdentifierNode);
-    int_type1.* = .{
+    const int_type1 = UpperIdentifierNode{
         .name = try allocator.dupe(u8, "Int"),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Upper },
@@ -3012,8 +2970,7 @@ test "[FunctionTypeNode]" {
     const int_node1 = try allocator.create(Node);
     int_node1.* = .{ .upper_identifier = int_type1 };
 
-    const int_type2 = try allocator.create(UpperIdentifierNode);
-    int_type2.* = .{
+    const int_type2 = UpperIdentifierNode{
         .name = try allocator.dupe(u8, "Int"),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Upper },
@@ -3029,8 +2986,7 @@ test "[FunctionTypeNode]" {
     const int_node2 = try allocator.create(Node);
     int_node2.* = .{ .upper_identifier = int_type2 };
 
-    const int_type3 = try allocator.create(UpperIdentifierNode);
-    int_type3.* = .{
+    const int_type3 = UpperIdentifierNode{
         .name = try allocator.dupe(u8, "Int"),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Upper },
@@ -3131,8 +3087,7 @@ test "[LambdaExprNode]" {
     try parameters.append(try allocator.dupe(u8, "x"));
     try parameters.append(try allocator.dupe(u8, "y"));
 
-    const x_ident = try allocator.create(LowerIdentifierNode);
-    x_ident.* = .{
+    const x_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "x"),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Lower },
@@ -3148,8 +3103,7 @@ test "[LambdaExprNode]" {
     const x_node = try allocator.create(Node);
     x_node.* = .{ .lower_identifier = x_ident };
 
-    const y_ident = try allocator.create(LowerIdentifierNode);
-    y_ident.* = .{
+    const y_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "y"),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Lower },
@@ -3254,8 +3208,7 @@ test "[FuncApplicationNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const not_ident = try allocator.create(LowerIdentifierNode);
-    not_ident.* = .{
+    const not_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "not"),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Lower },
@@ -3271,8 +3224,7 @@ test "[FuncApplicationNode]" {
     const func_node = try allocator.create(Node);
     func_node.* = .{ .lower_identifier = not_ident };
 
-    const true_ident = try allocator.create(UpperIdentifierNode);
-    true_ident.* = .{
+    const true_ident = UpperIdentifierNode{
         .name = try allocator.dupe(u8, "True"),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Upper },
@@ -3741,8 +3693,7 @@ test "[CompositionExprNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const f_ident = try allocator.create(LowerIdentifierNode);
-    f_ident.* = .{
+    const f_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "f"),
         .token = .{
             .kind = .{ .identifier = .Lower },
@@ -3758,8 +3709,7 @@ test "[CompositionExprNode]" {
     const first_node = try allocator.create(Node);
     first_node.* = .{ .lower_identifier = f_ident };
 
-    const g_ident = try allocator.create(LowerIdentifierNode);
-    g_ident.* = .{
+    const g_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "g"),
         .token = .{
             .kind = .{ .identifier = .Lower },
@@ -3838,8 +3788,7 @@ test "[PipeExprNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const x_ident = try allocator.create(LowerIdentifierNode);
-    x_ident.* = .{
+    const x_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "x"),
         .token = .{
             .kind = .{ .identifier = .Lower },
@@ -3855,8 +3804,7 @@ test "[PipeExprNode]" {
     const value_node = try allocator.create(Node);
     value_node.* = .{ .lower_identifier = x_ident };
 
-    const f_ident = try allocator.create(LowerIdentifierNode);
-    f_ident.* = .{
+    const f_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "f"),
         .token = .{
             .kind = .{ .identifier = .Lower },
@@ -3935,8 +3883,7 @@ test "[IfThenElseStmtNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const x_ident = try allocator.create(LowerIdentifierNode);
-    x_ident.* = .{
+    const x_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "x"),
         .token = .{
             .kind = .{ .identifier = .Lower },
@@ -3952,8 +3899,7 @@ test "[IfThenElseStmtNode]" {
     const x_node = try allocator.create(Node);
     x_node.* = .{ .lower_identifier = x_ident };
 
-    const y_ident = try allocator.create(LowerIdentifierNode);
-    y_ident.* = .{
+    const y_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "y"),
         .token = .{
             .kind = .{ .identifier = .Lower },
@@ -3987,8 +3933,7 @@ test "[IfThenElseStmtNode]" {
     const cond_node = try allocator.create(Node);
     cond_node.* = .{ .comparison_expr = condition_node };
 
-    const true_ident = try allocator.create(UpperIdentifierNode);
-    true_ident.* = .{
+    const true_ident = UpperIdentifierNode{
         .name = try allocator.dupe(u8, "True"),
         .token = .{
             .kind = .{ .identifier = .Upper },
@@ -4004,8 +3949,7 @@ test "[IfThenElseStmtNode]" {
     const then_node = try allocator.create(Node);
     then_node.* = .{ .upper_identifier = true_ident };
 
-    const false_ident = try allocator.create(UpperIdentifierNode);
-    false_ident.* = .{
+    const false_ident = UpperIdentifierNode{
         .name = try allocator.dupe(u8, "False"),
         .token = .{
             .kind = .{ .identifier = .Upper },
@@ -4151,8 +4095,7 @@ test "[TypeApplicationNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const map_ident = try allocator.create(UpperIdentifierNode);
-    map_ident.* = .{
+    const map_ident = UpperIdentifierNode{
         .name = try allocator.dupe(u8, "Map"),
         .token = .{
             .kind = .{ .identifier = .Upper },
@@ -4165,8 +4108,7 @@ test "[TypeApplicationNode]" {
         },
     };
 
-    const k_ident = try allocator.create(LowerIdentifierNode);
-    k_ident.* = .{
+    const k_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "k"),
         .token = .{
             .kind = .{ .identifier = .Lower },
@@ -4182,8 +4124,7 @@ test "[TypeApplicationNode]" {
     const k_node = try allocator.create(Node);
     k_node.* = .{ .lower_identifier = k_ident };
 
-    const v_ident = try allocator.create(LowerIdentifierNode);
-    v_ident.* = .{
+    const v_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "v"),
         .token = .{
             .kind = .{ .identifier = .Lower },
@@ -4259,8 +4200,7 @@ test "[TypeAliasNode]" {
     // Action
     const type_params = std.ArrayList([]const u8).init(allocator);
 
-    const string_ident = try allocator.create(UpperIdentifierNode);
-    string_ident.* = .{
+    const string_ident = UpperIdentifierNode{
         .name = try allocator.dupe(u8, "String"),
         .token = .{
             .kind = .{ .identifier = .Upper },
@@ -4344,8 +4284,7 @@ test "[VariantTypeNode]" {
     try type_params.append(try allocator.dupe(u8, "e"));
     try type_params.append(try allocator.dupe(u8, "a"));
 
-    const e_ident = try allocator.create(LowerIdentifierNode);
-    e_ident.* = .{
+    const e_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "e"),
         .token = .{
             .kind = .{ .identifier = .Lower },
@@ -4379,8 +4318,7 @@ test "[VariantTypeNode]" {
         },
     };
 
-    const a_ident = try allocator.create(LowerIdentifierNode);
-    a_ident.* = .{
+    const a_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "a"),
         .token = .{
             .kind = .{ .identifier = .Lower },
@@ -4498,8 +4436,7 @@ test "[RecordTypeNode]" {
     var type_params = std.ArrayList([]const u8).init(allocator);
     try type_params.append(try allocator.dupe(u8, "a"));
 
-    const a_ident = try allocator.create(LowerIdentifierNode);
-    a_ident.* = .{
+    const a_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "a"),
         .token = .{
             .kind = .{ .identifier = .Lower },
@@ -4515,8 +4452,7 @@ test "[RecordTypeNode]" {
     const type_x = try allocator.create(Node);
     type_x.* = .{ .lower_identifier = a_ident };
 
-    const a_ident2 = try allocator.create(LowerIdentifierNode);
-    a_ident2.* = .{
+    const a_ident2 = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "a"),
         .token = .{
             .kind = .{ .identifier = .Lower },
@@ -4701,8 +4637,7 @@ test "[ExportSpecNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const item1 = try allocator.create(ExportItem);
-    item1.* = .{
+    const item1 = ExportItem{
         .name = try allocator.dupe(u8, "func1"),
         .expose_constructors = false,
         .token = .{
@@ -4716,8 +4651,7 @@ test "[ExportSpecNode]" {
         },
     };
 
-    const item2 = try allocator.create(ExportItem);
-    item2.* = .{
+    const item2 = ExportItem{
         .name = try allocator.dupe(u8, "Type1"),
         .expose_constructors = true,
         .token = .{
@@ -4731,7 +4665,9 @@ test "[ExportSpecNode]" {
         },
     };
 
-    var items = std.ArrayList(*ExportItem).init(allocator);
+    var items = std.ArrayList(ExportItem).init(allocator);
+    // defer items.deinit();
+
     try items.append(item1);
     try items.append(item2);
 
@@ -5279,8 +5215,7 @@ test "[FunctionDeclNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const int_type1 = try allocator.create(UpperIdentifierNode);
-    int_type1.* = .{
+    const int_type1 = UpperIdentifierNode{
         .name = try allocator.dupe(u8, "Int"),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Upper },
@@ -5296,8 +5231,7 @@ test "[FunctionDeclNode]" {
     const int_node1 = try allocator.create(Node);
     int_node1.* = .{ .upper_identifier = int_type1 };
 
-    const int_type2 = try allocator.create(UpperIdentifierNode);
-    int_type2.* = .{
+    const int_type2 = UpperIdentifierNode{
         .name = try allocator.dupe(u8, "Int"),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Upper },
@@ -5313,8 +5247,7 @@ test "[FunctionDeclNode]" {
     const int_node2 = try allocator.create(Node);
     int_node2.* = .{ .upper_identifier = int_type2 };
 
-    const int_type3 = try allocator.create(UpperIdentifierNode);
-    int_type3.* = .{
+    const int_type3 = UpperIdentifierNode{
         .name = try allocator.dupe(u8, "Int"),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Upper },
@@ -5353,8 +5286,7 @@ test "[FunctionDeclNode]" {
     try lambda_params.append(try allocator.dupe(u8, "x"));
     try lambda_params.append(try allocator.dupe(u8, "y"));
 
-    const x_ident = try allocator.create(LowerIdentifierNode);
-    x_ident.* = .{
+    const x_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "x"),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Lower },
@@ -5370,8 +5302,7 @@ test "[FunctionDeclNode]" {
     const x_node = try allocator.create(Node);
     x_node.* = .{ .lower_identifier = x_ident };
 
-    const y_ident = try allocator.create(LowerIdentifierNode);
-    y_ident.* = .{
+    const y_ident = LowerIdentifierNode{
         .name = try allocator.dupe(u8, "y"),
         .token = lexer.Token{
             .kind = lexer.TokenKind{ .identifier = .Lower },
@@ -5534,8 +5465,7 @@ test "[ForeignFunctionDeclNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const float_type1 = try allocator.create(UpperIdentifierNode);
-    float_type1.* = .{
+    const float_type1 = UpperIdentifierNode{
         .name = try allocator.dupe(u8, "Float"),
         .token = .{
             .kind = .{ .identifier = .Upper },
@@ -5551,8 +5481,7 @@ test "[ForeignFunctionDeclNode]" {
     const float_node1 = try allocator.create(Node);
     float_node1.* = .{ .upper_identifier = float_type1 };
 
-    const float_type2 = try allocator.create(UpperIdentifierNode);
-    float_type2.* = .{
+    const float_type2 = UpperIdentifierNode{
         .name = try allocator.dupe(u8, "Float"),
         .token = .{
             .kind = .{ .identifier = .Upper },
