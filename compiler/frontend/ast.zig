@@ -11,7 +11,7 @@ const lexer = @import("lexer.zig");
 /// Examples:
 /// - `# This is a comment`
 pub const CommentNode = struct {
-    /// The content of the comment, excluding the comment marker.
+    /// The text of the comment, excluding the comment marker.
     text: []const u8,
 
     /// The token representing the start of this declaration.
@@ -29,7 +29,7 @@ pub const CommentNode = struct {
 /// Examples:
 /// - `## This is a doc comment`
 pub const DocCommentNode = struct {
-    /// The content of the documentation comment, excluding the comment marker.
+    /// The text of the documentation comment, excluding the comment marker.
     text: []const u8,
 
     /// The token representing the start of this declaration.
@@ -284,7 +284,7 @@ pub const ComparisonExprNode = BinaryOp;
 /// Examples:
 /// - `_` matches anything
 /// - `42` matches literal integer
-/// - `Some x` matches constructor with variable
+/// - `Some x` matches constructor with variable (parameters bind sub-patterns)
 /// - `head :: tail` matches list with head and tail
 /// - `[]` matches empty list
 pub const PatternNode = union(enum) {
@@ -469,7 +469,7 @@ pub const MatchExprNode = struct {
 /// Examples:
 /// - `Int -> Int -> Int`
 pub const FunctionTypeNode = struct {
-    /// Array of AST nodes representing parameter types, with last being return type.
+    /// Array of AST nodes representing the full signature (parameters and return type).
     signature_types: std.ArrayList(*Node),
 
     /// The token representing the start of this declaration.
