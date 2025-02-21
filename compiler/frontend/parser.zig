@@ -1104,7 +1104,7 @@ pub const Parser = struct {
         errdefer foreign_node.deinit(self.allocator);
 
         foreign_node.* = .{
-            .name = try self.allocator.dupe(u8, fn_name.name),
+            .name = try self.allocator.dupe(u8, fn_name.identifier),
             .type_annotation = type_expr.function_type,
             .external_name = try self.allocator.dupe(u8, external_name.value),
             .token = start_token,
@@ -2412,7 +2412,7 @@ test "[logical_expr]" {
         try testing.expect(left.* == .lower_identifier);
 
         // Verify the name of the left operand matches the expected value
-        try testing.expectEqualStrings("true", left.lower_identifier.name);
+        try testing.expectEqualStrings("true", left.lower_identifier.identifier);
 
         const right = expr.logical_expr.right;
 
@@ -2420,7 +2420,7 @@ test "[logical_expr]" {
         try testing.expect(right.* == .lower_identifier);
 
         // Verify the name of the right operand matches the expected value
-        try testing.expectEqualStrings("false", right.lower_identifier.name);
+        try testing.expectEqualStrings("false", right.lower_identifier.identifier);
     }
 }
 
@@ -2914,15 +2914,15 @@ test "[foreign_function_decl]" {
     try testing.expectEqualStrings("c_sqrt", decl.external_name);
 
     // Verify the function type has exactly two parameter types
-    try testing.expectEqual(@as(usize, 2), decl.type_annotation.param_types.items.len);
+    try testing.expectEqual(@as(usize, 2), decl.type_annotation.signature_types.items.len);
 
-    const fn_param_types = decl.type_annotation.param_types.items;
+    const signature_types = decl.type_annotation.signature_types.items;
 
     // Check both parameter types are upper identifiers with the name "Float"
-    try testing.expect(fn_param_types[0].* == .upper_identifier);
-    try testing.expectEqualStrings("Float", fn_param_types[0].upper_identifier.name);
-    try testing.expect(fn_param_types[1].* == .upper_identifier);
-    try testing.expectEqualStrings("Float", fn_param_types[1].upper_identifier.name);
+    try testing.expect(signature_types[0].* == .upper_identifier);
+    try testing.expectEqualStrings("Float", signature_types[0].upper_identifier.identifier);
+    try testing.expect(signature_types[1].* == .upper_identifier);
+    try testing.expectEqualStrings("Float", signature_types[1].upper_identifier.identifier);
 }
 
 test "[module_path]" {
@@ -3510,7 +3510,7 @@ test "[record_type]" {
 
             // Ensure the field type is 'String'
             try testing.expect(name_field.type.* == .upper_identifier);
-            try testing.expectEqualStrings("String", name_field.type.upper_identifier.name);
+            try testing.expectEqualStrings("String", name_field.type.upper_identifier.identifier);
         }
 
         // Check second field (age)
@@ -3522,7 +3522,7 @@ test "[record_type]" {
 
             // Ensure the field type is 'Int'
             try testing.expect(age_field.type.* == .upper_identifier);
-            try testing.expectEqualStrings("Int", age_field.type.upper_identifier.name);
+            try testing.expectEqualStrings("Int", age_field.type.upper_identifier.identifier);
         }
     }
 
@@ -3564,7 +3564,7 @@ test "[record_type]" {
 
             // Ensure the field type is the generic type parameter 'a'
             try testing.expect(x_field.type.* == .lower_identifier);
-            try testing.expectEqualStrings("a", x_field.type.lower_identifier.name);
+            try testing.expectEqualStrings("a", x_field.type.lower_identifier.identifier);
         }
 
         // Check second field (y)
@@ -3576,7 +3576,7 @@ test "[record_type]" {
 
             // Ensure the field type is the generic type parameter 'a'
             try testing.expect(y_field.type.* == .lower_identifier);
-            try testing.expectEqualStrings("a", y_field.type.lower_identifier.name);
+            try testing.expectEqualStrings("a", y_field.type.lower_identifier.identifier);
         }
     }
 
@@ -3623,13 +3623,13 @@ test "[record_type]" {
             const app = keys_field.type.type_application;
 
             // Ensure the base type is 'List'
-            try testing.expect(app.base.* == .upper_identifier);
-            try testing.expectEqualStrings("List", app.base.upper_identifier.name);
+            try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, app.constructor.token.kind);
+            try testing.expectEqualStrings("List", app.constructor.identifier);
 
             // Ensure 'List' has exactly one type argument: 'k'
             try testing.expectEqual(@as(usize, 1), app.args.items.len);
             try testing.expect(app.args.items[0].* == .lower_identifier);
-            try testing.expectEqualStrings("k", app.args.items[0].lower_identifier.name);
+            try testing.expectEqualStrings("k", app.args.items[0].lower_identifier.identifier);
         }
 
         // Check second field (values)
@@ -3645,13 +3645,13 @@ test "[record_type]" {
             const app = values_field.type.type_application;
 
             // Ensure the base type is 'List'
-            try testing.expect(app.base.* == .upper_identifier);
-            try testing.expectEqualStrings("List", app.base.upper_identifier.name);
+            try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, app.constructor.token.kind);
+            try testing.expectEqualStrings("List", app.constructor.identifier);
 
             // Ensure 'List' has exactly one type argument: 'v'
             try testing.expectEqual(@as(usize, 1), app.args.items.len);
             try testing.expect(app.args.items[0].* == .lower_identifier);
-            try testing.expectEqualStrings("v", app.args.items[0].lower_identifier.name);
+            try testing.expectEqualStrings("v", app.args.items[0].lower_identifier.identifier);
         }
     }
 
@@ -3697,8 +3697,7 @@ test "[record_type]" {
             const list_app = items_field.type.type_application;
 
             // Ensure the base type is 'List'
-            try testing.expect(list_app.base.* == .upper_identifier);
-            try testing.expectEqualStrings("List", list_app.base.upper_identifier.name);
+            try testing.expectEqualStrings("List", list_app.constructor.identifier);
 
             // Ensure List has exactly one type argument
             try testing.expectEqual(@as(usize, 1), list_app.args.items.len);
@@ -3709,13 +3708,12 @@ test "[record_type]" {
             const maybe_app = list_app.args.items[0].type_application;
 
             // Ensure the base type is 'Maybe'
-            try testing.expect(maybe_app.base.* == .upper_identifier);
-            try testing.expectEqualStrings("Maybe", maybe_app.base.upper_identifier.name);
+            try testing.expectEqualStrings("Maybe", maybe_app.constructor.identifier);
 
             // Ensure Maybe has one type argument: 'a'
             try testing.expectEqual(@as(usize, 1), maybe_app.args.items.len);
             try testing.expect(maybe_app.args.items[0].* == .lower_identifier);
-            try testing.expectEqualStrings("a", maybe_app.args.items[0].lower_identifier.name);
+            try testing.expectEqualStrings("a", maybe_app.args.items[0].lower_identifier.identifier);
         }
 
         // Check second field (count: Maybe Int)
@@ -3731,13 +3729,13 @@ test "[record_type]" {
             const maybe_app = count_field.type.type_application;
 
             // Ensure the base type is 'Maybe'
-            try testing.expect(maybe_app.base.* == .upper_identifier);
-            try testing.expectEqualStrings("Maybe", maybe_app.base.upper_identifier.name);
+            try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, maybe_app.constructor.token.kind);
+            try testing.expectEqualStrings("Maybe", maybe_app.constructor.identifier);
 
             // Ensure Maybe has exactly one type argument: 'Int'
             try testing.expectEqual(@as(usize, 1), maybe_app.args.items.len);
             try testing.expect(maybe_app.args.items[0].* == .upper_identifier);
-            try testing.expectEqualStrings("Int", maybe_app.args.items[0].upper_identifier.name);
+            try testing.expectEqualStrings("Int", maybe_app.args.items[0].upper_identifier.identifier);
         }
 
         // Check third field (names: List String)
@@ -3753,13 +3751,13 @@ test "[record_type]" {
             const list_app = names_field.type.type_application;
 
             // Ensure the base type is 'List'
-            try testing.expect(list_app.base.* == .upper_identifier);
-            try testing.expectEqualStrings("List", list_app.base.upper_identifier.name);
+            try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, list_app.constructor.token.kind);
+            try testing.expectEqualStrings("List", list_app.constructor.identifier);
 
             // Ensure List has exactly one type argument: 'String'
             try testing.expectEqual(@as(usize, 1), list_app.args.items.len);
             try testing.expect(list_app.args.items[0].* == .upper_identifier);
-            try testing.expectEqualStrings("String", list_app.args.items[0].upper_identifier.name);
+            try testing.expectEqualStrings("String", list_app.args.items[0].upper_identifier.identifier);
         }
     }
 }
@@ -3806,7 +3804,7 @@ test "[variant_type]" {
             try testing.expectEqualStrings("True", true_constructor.name);
 
             // Ensure 'True' has no associated parameters
-            try testing.expectEqual(@as(usize, 0), true_constructor.params.items.len);
+            try testing.expectEqual(@as(usize, 0), true_constructor.parameters.items.len);
         }
 
         // Check second constructor (False)
@@ -3817,7 +3815,7 @@ test "[variant_type]" {
             try testing.expectEqualStrings("False", false_constructor.name);
 
             // Ensure 'False' has no associated parameters
-            try testing.expectEqual(@as(usize, 0), false_constructor.params.items.len);
+            try testing.expectEqual(@as(usize, 0), false_constructor.parameters.items.len);
         }
     }
 
@@ -3858,7 +3856,7 @@ test "[variant_type]" {
             try testing.expectEqualStrings("None", none_constructor.name);
 
             // Ensure 'None' has no associated parameters
-            try testing.expectEqual(@as(usize, 0), none_constructor.params.items.len);
+            try testing.expectEqual(@as(usize, 0), none_constructor.parameters.items.len);
         }
 
         // Check second constructor (Some a)
@@ -3869,13 +3867,13 @@ test "[variant_type]" {
             try testing.expectEqualStrings("Some", some_constructor.name);
 
             // Ensure 'Some' has exactly one associated parameter
-            try testing.expectEqual(@as(usize, 1), some_constructor.params.items.len);
+            try testing.expectEqual(@as(usize, 1), some_constructor.parameters.items.len);
 
-            const param = some_constructor.params.items[0];
+            const param = some_constructor.parameters.items[0];
 
             // Validate that the parameter is the type variable 'a'
             try testing.expect(param.* == .lower_identifier);
-            try testing.expectEqualStrings("a", param.lower_identifier.name);
+            try testing.expectEqualStrings("a", param.lower_identifier.identifier);
         }
     }
 
@@ -3916,7 +3914,7 @@ test "[variant_type]" {
             try testing.expectEqualStrings("Leaf", leaf_constructor.name);
 
             // Ensure 'Leaf' has no associated parameters
-            try testing.expectEqual(@as(usize, 0), leaf_constructor.params.items.len);
+            try testing.expectEqual(@as(usize, 0), leaf_constructor.parameters.items.len);
         }
 
         // Check second constructor (Branch (Tree a) a (Tree a))
@@ -3927,11 +3925,11 @@ test "[variant_type]" {
             try testing.expectEqualStrings("Branch", branch_constructor.name);
 
             // Ensure 'Branch' has exactly three parameters
-            try testing.expectEqual(@as(usize, 3), branch_constructor.params.items.len);
+            try testing.expectEqual(@as(usize, 3), branch_constructor.parameters.items.len);
 
             // First parameter (Tree a)
             {
-                const param1 = branch_constructor.params.items[0];
+                const param1 = branch_constructor.parameters.items[0];
 
                 // Ensure 'param1' is a type application
                 try testing.expect(param1.* == .type_application);
@@ -3939,27 +3937,27 @@ test "[variant_type]" {
                 const app = param1.type_application;
 
                 // Ensure the base type is 'Tree'
-                try testing.expect(app.base.* == .upper_identifier);
-                try testing.expectEqualStrings("Tree", app.base.upper_identifier.name);
+                try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, app.constructor.token.kind);
+                try testing.expectEqualStrings("Tree", app.constructor.identifier);
 
                 // Ensure 'Tree' is applied to one argument ('a')
                 try testing.expectEqual(@as(usize, 1), app.args.items.len);
                 try testing.expect(app.args.items[0].* == .lower_identifier);
-                try testing.expectEqualStrings("a", app.args.items[0].lower_identifier.name);
+                try testing.expectEqualStrings("a", app.args.items[0].lower_identifier.identifier);
             }
 
             // Second parameter (a)
             {
-                const param2 = branch_constructor.params.items[1];
+                const param2 = branch_constructor.parameters.items[1];
 
                 // Ensure 'param2' is the type variable 'a'
                 try testing.expect(param2.* == .lower_identifier);
-                try testing.expectEqualStrings("a", param2.lower_identifier.name);
+                try testing.expectEqualStrings("a", param2.lower_identifier.identifier);
             }
 
             // Third parameter (Tree a)
             {
-                const param3 = branch_constructor.params.items[2];
+                const param3 = branch_constructor.parameters.items[2];
 
                 // Ensure 'param3' is a type application
                 try testing.expect(param3.* == .type_application);
@@ -3967,13 +3965,13 @@ test "[variant_type]" {
                 const app = param3.type_application;
 
                 // Ensure the base type is 'Tree'
-                try testing.expect(app.base.* == .upper_identifier);
-                try testing.expectEqualStrings("Tree", app.base.upper_identifier.name);
+                try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, app.constructor.token.kind);
+                try testing.expectEqualStrings("Tree", app.constructor.identifier);
 
                 // Ensure 'Tree' is applied to one argument ('a')
                 try testing.expectEqual(@as(usize, 1), app.args.items.len);
                 try testing.expect(app.args.items[0].* == .lower_identifier);
-                try testing.expectEqualStrings("a", app.args.items[0].lower_identifier.name);
+                try testing.expectEqualStrings("a", app.args.items[0].lower_identifier.identifier);
             }
         }
     }
