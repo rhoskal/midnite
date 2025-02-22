@@ -797,10 +797,7 @@ pub const Parser = struct {
                 const param = try self.parseLowerIdentifier();
                 defer param.deinit(self.allocator);
 
-                const duped = try self.allocator.dupe(u8, param.identifier);
-                errdefer self.allocator.free(duped);
-
-                try type_params.append(duped);
+                try type_params.append(try self.allocator.dupe(u8, param.identifier));
             }
 
             _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
@@ -842,17 +839,12 @@ pub const Parser = struct {
             const param = try self.parseLowerIdentifier();
             defer param.deinit(self.allocator);
 
-            const duped = try self.allocator.dupe(u8, param.name);
-            errdefer self.allocator.free(duped);
-
-            try type_params.append(duped);
+            try type_params.append(try self.allocator.dupe(u8, param.identifier));
         }
 
         _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
 
-        // Branch based on what follows the equals sign
         if (try self.match(lexer.TokenKind{ .delimiter = .LeftBrace })) {
-            // Parse record type fields
             var fields = std.ArrayList(*ast.RecordFieldNode).init(self.allocator);
             errdefer {
                 for (fields.items) |field| {
@@ -861,11 +853,8 @@ pub const Parser = struct {
                 }
 
                 fields.deinit();
-
-                self.allocator.destroy(fields);
             }
 
-            // Parse fields until we hit closing brace
             while (!self.check(lexer.TokenKind{ .delimiter = .RightBrace })) {
                 const field_name = try self.parseLowerIdentifier();
                 defer field_name.deinit(self.allocator);
@@ -878,14 +867,13 @@ pub const Parser = struct {
                 errdefer field_node.deinit(self.allocator);
 
                 field_node.* = .{
-                    .name = try self.allocator.dupe(u8, field_name.name),
+                    .name = try self.allocator.dupe(u8, field_name.identifier),
                     .type = field_type,
                     .token = field_name.token,
                 };
 
                 try fields.append(field_node);
 
-                // Handle comma between fields
                 if (!self.check(lexer.TokenKind{ .delimiter = .RightBrace })) {
                     _ = try self.expect(lexer.TokenKind{ .delimiter = .Comma });
                 }
@@ -897,7 +885,7 @@ pub const Parser = struct {
             errdefer rtype_node.deinit(self.allocator);
 
             rtype_node.* = .{
-                .name = try self.allocator.dupe(u8, type_ident.name),
+                .name = try self.allocator.dupe(u8, type_ident.identifier),
                 .type_params = type_params,
                 .fields = fields,
                 .token = start_token,
@@ -948,7 +936,7 @@ pub const Parser = struct {
             errdefer constructor_node.deinit(self.allocator);
 
             constructor_node.* = .{
-                .name = constructor.name,
+                .name = constructor.identifier,
                 .parameters = parameters,
                 .token = constructor.token,
             };
@@ -993,7 +981,7 @@ pub const Parser = struct {
                 errdefer next_constructor_node.deinit(self.allocator);
 
                 next_constructor_node.* = .{
-                    .name = try self.allocator.dupe(u8, next_constructor.name),
+                    .name = try self.allocator.dupe(u8, next_constructor.identifier),
                     .parameters = next_params,
                     .token = next_constructor.token,
                 };
@@ -1005,7 +993,7 @@ pub const Parser = struct {
             errdefer vtype_node.deinit(self.allocator);
 
             vtype_node.* = .{
-                .name = try self.allocator.dupe(u8, type_ident.name),
+                .name = try self.allocator.dupe(u8, type_ident.identifier),
                 .type_params = type_params,
                 .constructors = constructors,
                 .token = start_token,
@@ -1593,7 +1581,13 @@ pub const Parser = struct {
             for (second_type.function_type.signature_types.items) |stype| {
                 try signature_types.append(stype);
             }
+
+            if (second_type.* == .function_type) {
+                second_type.function_type.signature_types.deinit();
+                self.allocator.destroy(second_type.function_type);
             }
+
+            self.allocator.destroy(second_type);
         } else {
             try signature_types.append(second_type);
         }
@@ -3413,8 +3407,8 @@ test "[type_alias]" {
         const tree_app = type_alias.value.type_application;
 
         // Validate that the base type is 'Tree'
-        try testing.expect(tree_app.base.* == .upper_identifier);
-        try testing.expectEqualStrings("Tree", tree_app.base.upper_identifier.name);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, tree_app.constructor.token.kind);
+        try testing.expectEqualStrings("Tree", tree_app.constructor.identifier);
 
         // Ensure 'Tree' has exactly two type arguments: (Pair k v) and (Compare k)
         try testing.expectEqual(@as(usize, 2), tree_app.args.items.len);
@@ -3429,19 +3423,19 @@ test "[type_alias]" {
             const pair_app = pair_arg.type_application;
 
             // Verify 'Pair' as the base type
-            try testing.expect(pair_app.base.* == .upper_identifier);
-            try testing.expectEqualStrings("Pair", pair_app.base.upper_identifier.name);
+            try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, pair_app.constructor.token.kind);
+            try testing.expectEqualStrings("Pair", pair_app.constructor.identifier);
 
             // Ensure 'Pair' takes two arguments: 'k' and 'v'
             try testing.expectEqual(@as(usize, 2), pair_app.args.items.len);
 
             // Validate first argument of Pair: 'k'
             try testing.expect(pair_app.args.items[0].* == .lower_identifier);
-            try testing.expectEqualStrings("k", pair_app.args.items[0].lower_identifier.name);
+            try testing.expectEqualStrings("k", pair_app.args.items[0].lower_identifier.identifier);
 
             // Validate second argument of Pair: 'v'
             try testing.expect(pair_app.args.items[1].* == .lower_identifier);
-            try testing.expectEqualStrings("v", pair_app.args.items[1].lower_identifier.name);
+            try testing.expectEqualStrings("v", pair_app.args.items[1].lower_identifier.identifier);
         }
 
         // Check second argument (Compare k)
@@ -3454,15 +3448,15 @@ test "[type_alias]" {
             const compare_app = compare_arg.type_application;
 
             // Verify 'Compare' as the base type
-            try testing.expect(compare_app.base.* == .upper_identifier);
-            try testing.expectEqualStrings("Compare", compare_app.base.upper_identifier.name);
+            try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, compare_app.constructor.token.kind);
+            try testing.expectEqualStrings("Compare", compare_app.constructor.identifier);
 
             // Ensure 'Compare' takes exactly one argument: 'k'
             try testing.expectEqual(@as(usize, 1), compare_app.args.items.len);
 
             // Validate argument of Compare: 'k'
             try testing.expect(compare_app.args.items[0].* == .lower_identifier);
-            try testing.expectEqualStrings("k", compare_app.args.items[0].lower_identifier.name);
+            try testing.expectEqualStrings("k", compare_app.args.items[0].lower_identifier.identifier);
         }
     }
 }

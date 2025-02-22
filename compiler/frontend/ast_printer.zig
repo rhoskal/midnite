@@ -212,7 +212,6 @@ pub const AstPrinter = struct {
                 try self.writer.styled(term.Color.Dim, "}\n");
             },
             .logical_expr => |expr| {
-                try self.printIndent();
                 try self.writer.styled(term.Color.Bold, "LogicalExpr");
                 try self.writer.styled(term.Color.Dim, " {\n");
 
