@@ -38,7 +38,10 @@ pub fn compile(allocator: std.mem.Allocator, writer: anytype, filepath: []const 
         defer parser.deinit();
 
         const ast = try parser.parseProgram();
-        defer ast.deinit(allocator);
+        defer {
+            ast.deinit(allocator);
+            allocator.destroy(ast);
+        }
 
         try writer.print("\n=== AST ===\n", .{});
         var printer = ast_printer.AstPrinter.init(allocator, writer);

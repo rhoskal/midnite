@@ -34,11 +34,11 @@ pub const Formatter = struct {
             // Basic Literals
             .comment => |comment| {
                 try self.write("# ");
-                try self.write(comment.content);
+                try self.write(comment.text);
             },
             .doc_comment => |comment| {
                 try self.write("## ");
-                try self.write(comment.content);
+                try self.write(comment.text);
             },
             .int_literal => |lit| {
                 try self.write(lit.token.lexeme);
@@ -58,10 +58,10 @@ pub const Formatter = struct {
 
             // Identifiers
             .lower_identifier => |ident| {
-                try self.write(ident.name);
+                try self.write(ident.identifier);
             },
             .upper_identifier => |ident| {
-                try self.write(ident.name);
+                try self.write(ident.identifier);
             },
 
             // Basic Data Structures
@@ -194,7 +194,7 @@ pub const Formatter = struct {
 
             // Pattern Matching
             .pattern => |pat| {
-                switch (pat) {
+                switch (pat.*) {
                     .wildcard => {
                         try self.write("_");
                     },
@@ -213,10 +213,10 @@ pub const Formatter = struct {
                     .list => |list| {
                         try self.write("[");
 
-                        for (list.elements.items, 0..) |element, i| {
-                            try self.formatNode(&.{ .pattern = element.* });
+                        for (list.patterns.items, 0..) |pattern, i| {
+                            try self.formatNode(&.{ .pattern = pattern });
 
-                            if (i < list.elements.items.len - 1) {
+                            if (i < list.patterns.items.len - 1) {
                                 try self.write(", ");
                             }
                         }
@@ -226,7 +226,7 @@ pub const Formatter = struct {
                     .variable => |var_pattern| {
                         try self.formatNode(&.{
                             .lower_identifier = .{
-                                .name = var_pattern.name,
+                                .identifier = var_pattern.name,
                                 .token = var_pattern.token,
                             },
                         });
@@ -234,30 +234,30 @@ pub const Formatter = struct {
                     .constructor => |con| {
                         try self.write(con.name);
 
-                        for (con.args.items) |arg| {
+                        for (con.parameters.items) |param| {
                             try self.write(" ");
-                            try self.formatNode(&.{ .pattern = arg.* });
+                            try self.formatNode(&.{ .pattern = param });
                         }
                     },
                     .empty_list => {
                         try self.write("[]");
                     },
                     .cons => |cons| {
-                        try self.formatNode(&.{ .pattern = cons.head.* });
+                        try self.formatNode(&.{ .pattern = cons.head });
                         try self.write(" :: ");
-                        try self.formatNode(&.{ .pattern = cons.tail.* });
+                        try self.formatNode(&.{ .pattern = cons.tail });
                     },
                 }
             },
             .match_expr => |expr| {
                 try self.write("match ");
-                try self.formatNode(expr.value);
+                try self.formatNode(expr.subject);
                 try self.write(" on\n");
 
                 for (expr.cases.items) |case| {
                     try self.writeIndent();
                     try self.write("| ");
-                    try self.formatNode(&.{ .pattern = case.pattern.* });
+                    try self.formatNode(&.{ .pattern = case.pattern });
 
                     if (case.guard) |guard| {
                         try self.write(" when ");
@@ -272,10 +272,10 @@ pub const Formatter = struct {
 
             // Functions and Applications
             .function_type => |ftype| {
-                for (ftype.param_types.items, 0..) |param, i| {
-                    try self.formatNode(param);
+                for (ftype.signature_types.items, 0..) |stype, i| {
+                    try self.formatNode(stype);
 
-                    if (i < ftype.param_types.items.len - 1) {
+                    if (i < ftype.signature_types.items.len - 1) {
                         try self.write(" -> ");
                     }
                 }
@@ -283,10 +283,10 @@ pub const Formatter = struct {
             .lambda_expr => |expr| {
                 try self.write("\\");
 
-                for (expr.params.items, 0..) |param, i| {
+                for (expr.param_names.items, 0..) |param, i| {
                     try self.write(param);
 
-                    if (i < expr.params.items.len - 1) {
+                    if (i < expr.param_names.items.len - 1) {
                         try self.write(" ");
                     }
                 }
@@ -396,7 +396,7 @@ pub const Formatter = struct {
                 try self.write(" ? ");
             },
             .type_application => |app| {
-                try self.formatNode(app.base);
+                try self.formatNode(&ast.Node{ .upper_identifier = app.constructor });
                 try self.write(" ");
 
                 for (app.args.items, 0..) |arg, i| {
@@ -450,7 +450,7 @@ pub const Formatter = struct {
                     try self.write("| ");
                     try self.write(constructor.name);
 
-                    for (constructor.params.items) |param| {
+                    for (constructor.parameters.items) |param| {
                         try self.write(" ");
 
                         const needs_parens = (param.* == .type_application);
@@ -600,7 +600,7 @@ pub const Formatter = struct {
                             defer sorted.deinit();
 
                             for (sorted.items, 0..) |item, i| {
-                                switch (item) {
+                                switch (item.*) {
                                     .function => |f| {
                                         try self.write(f.name);
 
@@ -649,7 +649,7 @@ pub const Formatter = struct {
                             defer sorted.deinit();
 
                             for (sorted.items, 0..) |item, i| {
-                                switch (item) {
+                                switch (item.*) {
                                     .function => |f| {
                                         try self.write(f.name);
                                     },
@@ -700,7 +700,7 @@ pub const Formatter = struct {
 
                 if (decl.type_annotation) |anno| {
                     try self.write(" : ");
-                    try self.formatNode(anno);
+                    try self.formatNode(&ast.Node{ .function_type = anno });
                 }
 
                 try self.write(" = ");
@@ -713,7 +713,7 @@ pub const Formatter = struct {
                 try self.write(decl.name);
 
                 try self.write(" : ");
-                try self.formatNode(decl.type_annotation);
+                try self.formatNode(&ast.Node{ .function_type = decl.type_annotation });
 
                 try self.write(" = ");
                 try self.write("\"");
@@ -819,22 +819,19 @@ pub const Formatter = struct {
     /// Example output: `[Maybe(..), Tree(..), filter, map, (++), (>>=)]`
     fn sortImportItems(
         allocator: std.mem.Allocator,
-        items: std.ArrayList(ast.ImportItem),
-    ) !std.ArrayList(ast.ImportItem) {
-        var types = std.ArrayList(ast.ImportItem).init(allocator);
+        items: std.ArrayList(*ast.ImportItem),
+    ) !std.ArrayList(*ast.ImportItem) {
+        var types = std.ArrayList(*ast.ImportItem).init(allocator);
         defer types.deinit();
 
-        var functions = std.ArrayList(ast.ImportItem).init(allocator);
+        var functions = std.ArrayList(*ast.ImportItem).init(allocator);
         defer functions.deinit();
 
-        var operators = std.ArrayList(ast.ImportItem).init(allocator);
+        var operators = std.ArrayList(*ast.ImportItem).init(allocator);
         defer operators.deinit();
 
-        var result = std.ArrayList(ast.ImportItem).init(allocator);
-        errdefer result.deinit();
-
         for (items.items) |item| {
-            switch (item) {
+            switch (item.*) {
                 .type => try types.append(item),
                 .function => try functions.append(item),
                 .operator => try operators.append(item),
@@ -842,35 +839,32 @@ pub const Formatter = struct {
         }
 
         const typeSort = struct {
-            fn lessThan(_: void, a: ast.ImportItem, b: ast.ImportItem) bool {
-                const a_name = if (a == .type) a.type.name else unreachable;
-                const b_name = if (b == .type) b.type.name else unreachable;
-
-                return std.mem.lessThan(u8, a_name, b_name);
+            fn lessThan(_: void, a: *ast.ImportItem, b: *ast.ImportItem) bool {
+                return std.mem.lessThan(u8, a.type.name, b.type.name);
             }
         }.lessThan;
 
         const functionSort = struct {
-            fn lessThan(_: void, a: ast.ImportItem, b: ast.ImportItem) bool {
-                const a_name = if (a == .function) a.function.name else unreachable;
-                const b_name = if (b == .function) b.function.name else unreachable;
-
-                return std.mem.lessThan(u8, a_name, b_name);
+            fn lessThan(_: void, a: *ast.ImportItem, b: *ast.ImportItem) bool {
+                return std.mem.lessThan(u8, a.function.name, b.function.name);
             }
         }.lessThan;
 
         const operatorSort = struct {
-            fn lessThan(_: void, a: ast.ImportItem, b: ast.ImportItem) bool {
-                const a_sym = if (a == .operator) a.operator.symbol else unreachable;
-                const b_sym = if (b == .operator) b.operator.symbol else unreachable;
-
-                return std.mem.lessThan(u8, a_sym, b_sym);
+            fn lessThan(_: void, a: *ast.ImportItem, b: *ast.ImportItem) bool {
+                return std.mem.lessThan(u8, a.operator.symbol, b.operator.symbol);
             }
         }.lessThan;
 
-        std.mem.sort(ast.ImportItem, types.items, {}, typeSort);
-        std.mem.sort(ast.ImportItem, functions.items, {}, functionSort);
-        std.mem.sort(ast.ImportItem, operators.items, {}, operatorSort);
+        std.mem.sort(*ast.ImportItem, types.items, {}, typeSort);
+        std.mem.sort(*ast.ImportItem, functions.items, {}, functionSort);
+        std.mem.sort(*ast.ImportItem, operators.items, {}, operatorSort);
+
+        var result = try std.ArrayList(*ast.ImportItem).initCapacity(
+            allocator,
+            types.items.len + functions.items.len + operators.items.len,
+        );
+        errdefer result.deinit();
 
         try result.appendSlice(types.items);
         try result.appendSlice(functions.items);

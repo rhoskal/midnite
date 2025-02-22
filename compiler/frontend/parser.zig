@@ -220,21 +220,21 @@ pub const Parser = struct {
 
     /// Parses a lower-case identifier into a structured node.
     fn parseLowerIdentifier(self: *Parser) ParserError!ast.LowerIdentifierNode {
-        const token = try self.expect(lexer.TokenKind{ .identifier = .Lower });
+        const start_token = try self.expect(lexer.TokenKind{ .identifier = .Lower });
 
-        return ast.LowerIdentifierNode{
-            .name = token.lexeme,
-            .token = token,
+        return .{
+            .identifier = try self.allocator.dupe(u8, start_token.lexeme),
+            .token = start_token,
         };
     }
 
     /// Parses a upper-case identifier into a structured node.
     fn parseUpperIdentifier(self: *Parser) ParserError!ast.UpperIdentifierNode {
-        const token = try self.expect(lexer.TokenKind{ .identifier = .Upper });
+        const start_token = try self.expect(lexer.TokenKind{ .identifier = .Upper });
 
-        return ast.UpperIdentifierNode{
-            .name = token.lexeme,
-            .token = token,
+        return .{
+            .identifier = try self.allocator.dupe(u8, start_token.lexeme),
+            .token = start_token,
         };
     }
 
@@ -242,15 +242,15 @@ pub const Parser = struct {
     /// The literal can be in decimal, hexadecimal (0x), binary (0b), or octal (0o) format.
     /// Underscores in numbers are allowed and ignored (e.g., 1_000_000).
     fn parseIntLiteral(self: *Parser) ParserError!ast.IntLiteralNode {
-        const token = try self.expect(lexer.TokenKind{ .literal = .Int });
+        const start_token = try self.expect(lexer.TokenKind{ .literal = .Int });
 
-        const value = std.fmt.parseInt(i64, token.lexeme, 0) catch {
+        const value = std.fmt.parseInt(i64, start_token.lexeme, 0) catch {
             return error.InvalidIntLiteral;
         };
 
-        return ast.IntLiteralNode{
+        return .{
             .value = value,
-            .token = token,
+            .token = start_token,
         };
     }
 
@@ -258,24 +258,50 @@ pub const Parser = struct {
     /// The literal can include decimal points and optional scientific notation (e.g., 1.23e-4).
     /// Underscores in numbers are allowed and ignored (e.g., 3.141_592).
     fn parseFloatLiteral(self: *Parser) ParserError!ast.FloatLiteralNode {
-        const token = try self.expect(lexer.TokenKind{ .literal = .Float });
+        const start_token = try self.expect(lexer.TokenKind{ .literal = .Float });
 
-        const value = std.fmt.parseFloat(f64, token.lexeme) catch {
+        const value = std.fmt.parseFloat(f64, start_token.lexeme) catch {
             return error.InvalidFloatLiteral;
         };
 
-        return ast.FloatLiteralNode{
+        return .{
             .value = value,
-            .token = token,
+            .token = start_token,
+        };
+    }
+
+    /// Parses a character literal into its Unicode codepoint value.
+    /// Handles standard characters ('a'), escape sequences ('\n', '\t', etc.),
+    /// and Unicode escape sequences ('\u{0061}').
+    fn parseCharLiteral(self: *Parser) ParserError!ast.CharLiteralNode {
+        const start_token = try self.expect(lexer.TokenKind{ .literal = .Char });
+
+        // Lexeme includes the quotes, so it's at least 3 chars: 'x'
+        std.debug.assert(start_token.lexeme.len >= 3);
+
+        const unquoted = start_token.lexeme[1 .. start_token.lexeme.len - 1];
+
+        var value: u21 = undefined;
+        if (unquoted[0] == '\\') {
+            value = try parseCharEscapeSequence(unquoted);
+        } else {
+            value = std.unicode.utf8Decode(unquoted) catch {
+                return error.InvalidCharLiteral;
+            };
+        }
+
+        return .{
+            .value = value,
+            .token = start_token,
         };
     }
 
     /// Parses a string literal into a structured node.
-    fn parseStrLiteral(self: *Parser) ParserError!ast.StrLiteralNode {
-        const token = try self.expect(lexer.TokenKind{ .literal = .String });
+    fn parseStrLiteral(self: *Parser) ParserError!*ast.StrLiteralNode {
+        const start_token = try self.expect(lexer.TokenKind{ .literal = .String });
 
         // Strip quotes
-        const unquoted = token.lexeme[1 .. token.lexeme.len - 1];
+        const unquoted = start_token.lexeme[1 .. start_token.lexeme.len - 1];
 
         var result = std.ArrayList(u8).init(self.allocator);
         defer result.deinit();
@@ -298,36 +324,18 @@ pub const Parser = struct {
             }
         }
 
-        return ast.StrLiteralNode{
-            .value = try self.allocator.dupe(u8, result.items),
-            .token = token,
-        };
-    }
-
-    /// Parses a character literal into its Unicode codepoint value.
-    /// Handles standard characters ('a'), escape sequences ('\n', '\t', etc.),
-    /// and Unicode escape sequences ('\u{0061}').
-    fn parseCharLiteral(self: *Parser) ParserError!ast.CharLiteralNode {
-        const token = try self.expect(lexer.TokenKind{ .literal = .Char });
-
-        // Lexeme includes the quotes, so it's at least 3 chars: 'x'
-        std.debug.assert(token.lexeme.len >= 3);
-
-        const unquoted = token.lexeme[1 .. token.lexeme.len - 1];
-
-        var value: u21 = undefined;
-        if (unquoted[0] == '\\') {
-            value = try parseCharEscapeSequence(unquoted);
-        } else {
-            value = std.unicode.utf8Decode(unquoted) catch {
-                return error.InvalidCharLiteral;
-            };
+        const node = try self.allocator.create(ast.StrLiteralNode);
+        errdefer {
+            node.deinit(self.allocator);
+            self.allocator.destroy(node);
         }
 
-        return ast.CharLiteralNode{
-            .value = value,
-            .token = token,
+        node.* = .{
+            .value = try self.allocator.dupe(u8, result.items),
+            .token = start_token,
         };
+
+        return node;
     }
 
     const EscapeSequence = struct {
@@ -397,29 +405,24 @@ pub const Parser = struct {
     /// Parses a complete program, which consists of a sequence of top-level declarations.
     pub fn parseProgram(self: *Parser) ParserError!*ast.Node {
         var statements = std.ArrayList(*ast.Node).init(self.allocator);
-        errdefer {
-            for (statements.items) |stmt| {
-                stmt.deinit(self.allocator);
-                self.allocator.destroy(stmt);
-            }
-
-            statements.deinit();
-        }
 
         while (!self.check(lexer.TokenKind{ .special = .Eof })) {
             const stmt = try self.parseTopLevel();
             try statements.append(stmt);
         }
 
-        const node = try self.allocator.create(ast.Node);
-        errdefer self.allocator.destroy(node);
+        const program_node = try self.allocator.create(ast.ProgramNode);
+        errdefer program_node.deinit(self.allocator);
 
-        node.* = .{
-            .program = .{
-                .statements = statements,
-                .token = self.current_token,
-            },
+        program_node.* = .{
+            .statements = statements,
+            .token = self.current_token,
         };
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer node.deinit(self.allocator);
+
+        node.* = .{ .program = program_node };
 
         return node;
     }
@@ -453,48 +456,31 @@ pub const Parser = struct {
     /// - `open Std.List using (map as list_map)`
     /// - `open Foo.Bar hiding (internal_func)`
     fn parseImportSpec(self: *Parser) ParserError!*ast.Node {
-        const token = try self.expect(lexer.TokenKind{ .keyword = .Open });
+        const start_token = try self.expect(lexer.TokenKind{ .keyword = .Open });
 
         const path_node = try self.parseModulePath();
-        errdefer {
-            path_node.deinit(self.allocator);
-            self.allocator.destroy(path_node);
-        }
+        defer self.allocator.destroy(path_node);
 
         var kind: ast.ImportKind = .Simple;
+
         var alias: ?[]const u8 = null;
-        var items: ?std.ArrayList(ast.ImportItem) = null;
         errdefer {
-            if (alias) |a| self.allocator.free(a);
+            if (alias) |a| {
+                self.allocator.free(a);
+            }
+        }
 
-            if (items) |*list| {
-                for (list.items) |item| {
-                    switch (item) {
-                        .function => |f| {
-                            self.allocator.free(f.name);
-
-                            if (f.alias) |a| {
-                                self.allocator.free(a);
-                            }
-                        },
-                        .operator => |op| {
-                            self.allocator.free(op.symbol);
-
-                            if (op.alias) |a| {
-                                self.allocator.free(a);
-                            }
-                        },
-                        .type => |t| {
-                            self.allocator.free(t.name);
-
-                            if (t.alias) |a| {
-                                self.allocator.free(a);
-                            }
-                        },
-                    }
+        var items: ?std.ArrayList(*ast.ImportItem) = null;
+        errdefer {
+            if (items) |*import_list| {
+                for (import_list.items) |item| {
+                    item.deinit(self.allocator);
+                    self.allocator.destroy(item);
                 }
 
-                list.deinit();
+                import_list.deinit();
+
+                self.allocator.destroy(import_list);
             }
         }
 
@@ -515,29 +501,18 @@ pub const Parser = struct {
 
                     _ = try self.expect(lexer.TokenKind{ .delimiter = .LeftParen });
 
-                    var list = std.ArrayList(ast.ImportItem).init(self.allocator);
+                    var list = std.ArrayList(*ast.ImportItem).init(self.allocator);
                     errdefer {
-                        for (list.items) |item| {
-                            switch (item) {
-                                .function => |f| {
-                                    self.allocator.free(f.name);
-
-                                    if (f.alias) |a| self.allocator.free(a);
-                                },
-                                .operator => |op| {
-                                    self.allocator.free(op.symbol);
-
-                                    if (op.alias) |a| self.allocator.free(a);
-                                },
-                                .type => |t| {
-                                    self.allocator.free(t.name);
-
-                                    if (t.alias) |a| self.allocator.free(a);
-                                },
+                        if (items) |*import_list| {
+                            for (import_list.items) |item| {
+                                item.deinit(self.allocator);
+                                self.allocator.destroy(item);
                             }
-                        }
 
-                        list.deinit();
+                            import_list.deinit();
+
+                            self.allocator.destroy(import_list);
+                        }
                     }
 
                     while (!self.check(lexer.TokenKind{ .delimiter = .RightParen })) {
@@ -545,28 +520,41 @@ pub const Parser = struct {
                             .identifier => |ident| switch (ident) {
                                 .Lower => {
                                     const func = try self.parseLowerIdentifier();
+                                    defer func.deinit(self.allocator);
 
                                     var func_alias: ?[]const u8 = null;
-                                    errdefer if (func_alias) |a| self.allocator.free(a);
+                                    errdefer {
+                                        if (func_alias) |a| self.allocator.free(a);
+                                    }
 
                                     if (try self.match(lexer.TokenKind{ .keyword = .As })) {
                                         const alias_ident = try self.parseLowerIdentifier();
-                                        func_alias = try self.allocator.dupe(u8, alias_ident.name);
+                                        defer alias_ident.deinit(self.allocator);
+
+                                        func_alias = try self.allocator.dupe(u8, alias_ident.identifier);
                                     }
 
-                                    try list.append(.{
+                                    const import_item = try self.allocator.create(ast.ImportItem);
+                                    errdefer import_item.deinit(self.allocator);
+
+                                    import_item.* = .{
                                         .function = .{
-                                            .name = try self.allocator.dupe(u8, func.name),
+                                            .name = try self.allocator.dupe(u8, func.identifier),
                                             .alias = func_alias,
                                         },
-                                    });
+                                    };
+
+                                    try list.append(import_item);
                                 },
                                 .Upper => {
                                     const type_name = try self.parseUpperIdentifier();
+                                    defer type_name.deinit(self.allocator);
 
                                     var expose_constructors = false;
                                     var type_alias: ?[]const u8 = null;
-                                    errdefer if (type_alias) |a| self.allocator.free(a);
+                                    errdefer {
+                                        if (type_alias) |a| self.allocator.free(a);
+                                    }
 
                                     if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
                                         _ = try self.expect(lexer.TokenKind{ .operator = .Expand });
@@ -576,16 +564,23 @@ pub const Parser = struct {
 
                                     if (try self.match(lexer.TokenKind{ .keyword = .As })) {
                                         const alias_ident = try self.parseUpperIdentifier();
-                                        type_alias = try self.allocator.dupe(u8, alias_ident.name);
+                                        defer alias_ident.deinit(self.allocator);
+
+                                        type_alias = try self.allocator.dupe(u8, alias_ident.identifier);
                                     }
 
-                                    try list.append(.{
+                                    const import_item = try self.allocator.create(ast.ImportItem);
+                                    errdefer import_item.deinit(self.allocator);
+
+                                    import_item.* = .{
                                         .type = .{
-                                            .name = try self.allocator.dupe(u8, type_name.name),
+                                            .name = try self.allocator.dupe(u8, type_name.identifier),
                                             .expose_constructors = expose_constructors,
                                             .alias = type_alias,
                                         },
-                                    });
+                                    };
+
+                                    try list.append(import_item);
                                 },
                             },
                             .delimiter => |delim| switch (delim) {
@@ -598,19 +593,28 @@ pub const Parser = struct {
                                     _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
 
                                     var op_alias: ?[]const u8 = null;
-                                    errdefer if (op_alias) |a| self.allocator.free(a);
+                                    errdefer {
+                                        if (op_alias) |a| self.allocator.free(a);
+                                    }
 
                                     if (try self.match(lexer.TokenKind{ .keyword = .As })) {
                                         const alias_ident = try self.parseLowerIdentifier();
-                                        op_alias = try self.allocator.dupe(u8, alias_ident.name);
+                                        defer alias_ident.deinit(self.allocator);
+
+                                        op_alias = try self.allocator.dupe(u8, alias_ident.identifier);
                                     }
 
-                                    try list.append(.{
+                                    const import_item = try self.allocator.create(ast.ImportItem);
+                                    errdefer import_item.deinit(self.allocator);
+
+                                    import_item.* = .{
                                         .operator = .{
                                             .symbol = try self.allocator.dupe(u8, op),
                                             .alias = op_alias,
                                         },
-                                    });
+                                    };
+
+                                    try list.append(import_item);
                                 },
                                 else => return error.InvalidImportItem,
                             },
@@ -626,6 +630,7 @@ pub const Parser = struct {
                     if (list.items.len == 0) return error.EmptyImportList;
 
                     _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+
                     items = list;
                 },
                 .Hiding => {
@@ -635,29 +640,18 @@ pub const Parser = struct {
 
                     _ = try self.expect(lexer.TokenKind{ .delimiter = .LeftParen });
 
-                    var list = std.ArrayList(ast.ImportItem).init(self.allocator);
+                    var list = std.ArrayList(*ast.ImportItem).init(self.allocator);
                     errdefer {
-                        for (list.items) |item| {
-                            switch (item) {
-                                .function => |f| {
-                                    self.allocator.free(f.name);
-
-                                    if (f.alias) |a| self.allocator.free(a);
-                                },
-                                .operator => |op| {
-                                    self.allocator.free(op.symbol);
-
-                                    if (op.alias) |a| self.allocator.free(a);
-                                },
-                                .type => |t| {
-                                    self.allocator.free(t.name);
-
-                                    if (t.alias) |a| self.allocator.free(a);
-                                },
+                        if (items) |*import_list| {
+                            for (import_list.items) |item| {
+                                item.deinit(self.allocator);
+                                self.allocator.destroy(item);
                             }
-                        }
 
-                        list.deinit();
+                            import_list.deinit();
+
+                            self.allocator.destroy(import_list);
+                        }
                     }
 
                     while (!self.check(lexer.TokenKind{ .delimiter = .RightParen })) {
@@ -665,16 +659,24 @@ pub const Parser = struct {
                             .identifier => |ident| switch (ident) {
                                 .Lower => {
                                     const func = try self.parseLowerIdentifier();
+                                    defer func.deinit(self.allocator);
 
-                                    try list.append(.{
+                                    const import_item = try self.allocator.create(ast.ImportItem);
+                                    errdefer import_item.deinit(self.allocator);
+
+                                    import_item.* = .{
                                         .function = .{
-                                            .name = try self.allocator.dupe(u8, func.name),
+                                            .name = try self.allocator.dupe(u8, func.identifier),
                                             .alias = null,
                                         },
-                                    });
+                                    };
+
+                                    try list.append(import_item);
                                 },
                                 .Upper => {
                                     const type_name = try self.parseUpperIdentifier();
+                                    defer type_name.deinit(self.allocator);
+
                                     var expose_constructors = false;
 
                                     if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
@@ -683,13 +685,18 @@ pub const Parser = struct {
                                         expose_constructors = true;
                                     }
 
-                                    try list.append(.{
+                                    const import_item = try self.allocator.create(ast.ImportItem);
+                                    errdefer import_item.deinit(self.allocator);
+
+                                    import_item.* = .{
                                         .type = .{
-                                            .name = try self.allocator.dupe(u8, type_name.name),
+                                            .name = try self.allocator.dupe(u8, type_name.identifier),
                                             .expose_constructors = expose_constructors,
                                             .alias = null,
                                         },
-                                    });
+                                    };
+
+                                    try list.append(import_item);
                                 },
                             },
                             .delimiter => |delim| switch (delim) {
@@ -702,12 +709,17 @@ pub const Parser = struct {
 
                                     _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
 
-                                    try list.append(.{
+                                    const import_item = try self.allocator.create(ast.ImportItem);
+                                    errdefer import_item.deinit(self.allocator);
+
+                                    import_item.* = .{
                                         .operator = .{
                                             .symbol = try self.allocator.dupe(u8, op),
                                             .alias = null,
                                         },
-                                    });
+                                    };
+
+                                    try list.append(import_item);
                                 },
                                 else => return error.InvalidImportItem,
                             },
@@ -720,9 +732,12 @@ pub const Parser = struct {
                         }
                     }
 
-                    if (list.items.len == 0) return error.EmptyImportList;
+                    if (list.items.len == 0) {
+                        return error.EmptyImportList;
+                    }
 
                     _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+
                     items = list;
                 },
                 else => {},
@@ -730,20 +745,21 @@ pub const Parser = struct {
             else => {},
         }
 
-        const node = try self.allocator.create(ast.Node);
-        errdefer self.allocator.destroy(node);
+        const import_node = try self.allocator.create(ast.ImportSpecNode);
+        errdefer import_node.deinit(self.allocator);
 
-        node.* = .{
-            .import_spec = .{
-                .path = path_node.module_path,
-                .kind = kind,
-                .alias = alias,
-                .items = items,
-                .token = token,
-            },
+        import_node.* = .{
+            .path = path_node.module_path,
+            .kind = kind,
+            .alias = alias,
+            .items = items,
+            .token = start_token,
         };
 
-        self.allocator.destroy(path_node);
+        const node = try self.allocator.create(ast.Node);
+        errdefer node.deinit(self.allocator);
+
+        node.* = .{ .import_spec = import_node };
 
         return node;
     }
@@ -762,10 +778,11 @@ pub const Parser = struct {
     /// - `type Dict k v = { keys: List k, values: List v }`
     /// - `type Maybe a = | None | Some a`
     fn parseTypeDecl(self: *Parser) ParserError!*ast.Node {
-        const type_token = try self.expect(lexer.TokenKind{ .keyword = .Type });
+        const start_token = try self.expect(lexer.TokenKind{ .keyword = .Type });
 
         if (try self.match(lexer.TokenKind{ .keyword = .Alias })) {
             const type_ident = try self.parseUpperIdentifier();
+            defer type_ident.deinit(self.allocator);
 
             var type_params = std.ArrayList([]const u8).init(self.allocator);
             errdefer {
@@ -778,38 +795,36 @@ pub const Parser = struct {
 
             while (self.check(lexer.TokenKind{ .identifier = .Lower })) {
                 const param = try self.parseLowerIdentifier();
+                defer param.deinit(self.allocator);
 
-                const duped = try self.allocator.dupe(u8, param.name);
-                errdefer self.allocator.free(duped);
-
-                try type_params.append(duped);
+                try type_params.append(try self.allocator.dupe(u8, param.identifier));
             }
 
             _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
 
             const value = try self.parseTypeExpr();
-            errdefer {
-                value.deinit(self.allocator);
-                self.allocator.destroy(value);
-            }
+
+            const alias_node = try self.allocator.create(ast.TypeAliasNode);
+            errdefer alias_node.deinit(self.allocator);
+
+            alias_node.* = .{
+                .name = try self.allocator.dupe(u8, type_ident.identifier),
+                .type_params = type_params,
+                .value = value,
+                .token = start_token,
+            };
 
             const node = try self.allocator.create(ast.Node);
-            errdefer self.allocator.destroy(node);
+            errdefer node.deinit(self.allocator);
 
-            node.* = .{
-                .type_alias = .{
-                    .name = try self.allocator.dupe(u8, type_ident.name),
-                    .type_params = type_params,
-                    .value = value,
-                    .token = type_token,
-                },
-            };
+            node.* = .{ .type_alias = alias_node };
 
             return node;
         }
 
         // Handle record and variant types - parse common prefix first
         const type_ident = try self.parseUpperIdentifier();
+        defer type_ident.deinit(self.allocator);
 
         var type_params = std.ArrayList([]const u8).init(self.allocator);
         errdefer {
@@ -822,46 +837,43 @@ pub const Parser = struct {
 
         while (self.check(lexer.TokenKind{ .identifier = .Lower })) {
             const param = try self.parseLowerIdentifier();
+            defer param.deinit(self.allocator);
 
-            const duped = try self.allocator.dupe(u8, param.name);
-            errdefer self.allocator.free(duped);
-
-            try type_params.append(duped);
+            try type_params.append(try self.allocator.dupe(u8, param.identifier));
         }
 
         _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
 
-        // Branch based on what follows the equals sign
         if (try self.match(lexer.TokenKind{ .delimiter = .LeftBrace })) {
-            // Parse record type fields
-            var fields = std.ArrayList(ast.RecordFieldNode).init(self.allocator);
+            var fields = std.ArrayList(*ast.RecordFieldNode).init(self.allocator);
             errdefer {
                 for (fields.items) |field| {
-                    field.type.deinit(self.allocator);
-                    self.allocator.destroy(field.type);
+                    field.deinit(self.allocator);
+                    self.allocator.destroy(field);
                 }
 
                 fields.deinit();
             }
 
-            // Parse fields until we hit closing brace
             while (!self.check(lexer.TokenKind{ .delimiter = .RightBrace })) {
                 const field_name = try self.parseLowerIdentifier();
+                defer field_name.deinit(self.allocator);
+
                 _ = try self.expect(lexer.TokenKind{ .delimiter = .Colon });
 
                 const field_type = try self.parseTypeExpr();
-                errdefer {
-                    field_type.deinit(self.allocator);
-                    self.allocator.destroy(field_type);
-                }
 
-                try fields.append(.{
-                    .name = try self.allocator.dupe(u8, field_name.name),
+                const field_node = try self.allocator.create(ast.RecordFieldNode);
+                errdefer field_node.deinit(self.allocator);
+
+                field_node.* = .{
+                    .name = try self.allocator.dupe(u8, field_name.identifier),
                     .type = field_type,
                     .token = field_name.token,
-                });
+                };
 
-                // Handle comma between fields
+                try fields.append(field_node);
+
                 if (!self.check(lexer.TokenKind{ .delimiter = .RightBrace })) {
                     _ = try self.expect(lexer.TokenKind{ .delimiter = .Comma });
                 }
@@ -869,26 +881,30 @@ pub const Parser = struct {
 
             _ = try self.expect(lexer.TokenKind{ .delimiter = .RightBrace });
 
-            const node = try self.allocator.create(ast.Node);
-            errdefer self.allocator.destroy(node);
+            const rtype_node = try self.allocator.create(ast.RecordTypeNode);
+            errdefer rtype_node.deinit(self.allocator);
 
-            node.* = .{
-                .record_type = .{
-                    .name = try self.allocator.dupe(u8, type_ident.name),
-                    .type_params = type_params,
-                    .fields = fields,
-                    .token = type_token,
-                },
+            rtype_node.* = .{
+                .name = try self.allocator.dupe(u8, type_ident.identifier),
+                .type_params = type_params,
+                .fields = fields,
+                .token = start_token,
             };
+
+            const node = try self.allocator.create(ast.Node);
+            errdefer node.deinit(self.allocator);
+
+            node.* = .{ .record_type = rtype_node };
 
             return node;
         }
 
         if (try self.match(lexer.TokenKind{ .symbol = .Pipe })) {
-            var constructors = std.ArrayList(ast.VariantConstructorNode).init(self.allocator);
+            var constructors = std.ArrayList(*ast.VariantConstructorNode).init(self.allocator);
             errdefer {
-                for (constructors.items) |*constructor| {
-                    constructor.params.deinit();
+                for (constructors.items) |constructor| {
+                    constructor.deinit(self.allocator);
+                    self.allocator.destroy(constructor);
                 }
 
                 constructors.deinit();
@@ -896,15 +912,16 @@ pub const Parser = struct {
 
             // Parse first constructor
             const constructor = try self.parseUpperIdentifier();
+            defer constructor.deinit(self.allocator);
 
-            var params = std.ArrayList(*ast.Node).init(self.allocator);
+            var parameters = std.ArrayList(*ast.Node).init(self.allocator);
             errdefer {
-                for (params.items) |param| {
+                for (parameters.items) |param| {
                     param.deinit(self.allocator);
                     self.allocator.destroy(param);
                 }
 
-                params.deinit();
+                parameters.deinit();
             }
 
             // Parse any parameters that follow this constructor
@@ -912,18 +929,24 @@ pub const Parser = struct {
                 !self.check(lexer.TokenKind{ .special = .Eof }))
             {
                 const param = try self.parseTypeExpr();
-                try params.append(param);
+                try parameters.append(param);
             }
 
-            try constructors.append(.{
-                .name = constructor.name,
-                .params = params,
+            const constructor_node = try self.allocator.create(ast.VariantConstructorNode);
+            errdefer constructor_node.deinit(self.allocator);
+
+            constructor_node.* = .{
+                .name = constructor.identifier,
+                .parameters = parameters,
                 .token = constructor.token,
-            });
+            };
+
+            try constructors.append(constructor_node);
 
             // Parse remaining constructors
             while (try self.match(lexer.TokenKind{ .symbol = .Pipe })) {
                 const next_constructor = try self.parseUpperIdentifier();
+                defer next_constructor.deinit(self.allocator);
 
                 var next_params = std.ArrayList(*ast.Node).init(self.allocator);
                 errdefer {
@@ -954,24 +977,32 @@ pub const Parser = struct {
                     try next_params.append(param);
                 }
 
-                try constructors.append(.{
-                    .name = next_constructor.name,
-                    .params = next_params,
+                const next_constructor_node = try self.allocator.create(ast.VariantConstructorNode);
+                errdefer next_constructor_node.deinit(self.allocator);
+
+                next_constructor_node.* = .{
+                    .name = try self.allocator.dupe(u8, next_constructor.identifier),
+                    .parameters = next_params,
                     .token = next_constructor.token,
-                });
+                };
+
+                try constructors.append(next_constructor_node);
             }
 
-            const node = try self.allocator.create(ast.Node);
-            errdefer self.allocator.destroy(node);
+            const vtype_node = try self.allocator.create(ast.VariantTypeNode);
+            errdefer vtype_node.deinit(self.allocator);
 
-            node.* = .{
-                .variant_type = .{
-                    .name = try self.allocator.dupe(u8, type_ident.name),
-                    .type_params = type_params,
-                    .constructors = constructors,
-                    .token = type_token,
-                },
+            vtype_node.* = .{
+                .name = try self.allocator.dupe(u8, type_ident.identifier),
+                .type_params = type_params,
+                .constructors = constructors,
+                .token = start_token,
             };
+
+            const node = try self.allocator.create(ast.Node);
+            errdefer node.deinit(self.allocator);
+
+            node.* = .{ .variant_type = vtype_node };
 
             return node;
         }
@@ -986,44 +1017,42 @@ pub const Parser = struct {
     /// - `let factorial : Int -> Int = \n => if n == 0 then 1 else n * factorial (n - 1)`
     /// - `let const : a -> b -> a = \x y => x`
     fn parseFunctionDecl(self: *Parser) ParserError!*ast.Node {
-        const token = try self.expect(lexer.TokenKind{ .keyword = .Let });
-        const name = try self.expect(lexer.TokenKind{ .identifier = .Lower });
+        const start_token = try self.expect(lexer.TokenKind{ .keyword = .Let });
 
-        var type_annotation: ?*ast.Node = null;
-        if (self.check(lexer.TokenKind{ .delimiter = .Colon })) {
-            try self.advance();
+        const fn_name = try self.parseLowerIdentifier();
+        defer fn_name.deinit(self.allocator);
 
-            type_annotation = try self.parseTypeExpr();
-            errdefer {
-                type_annotation.deinit(self.allocator);
-                self.allocator.destroy(type_annotation);
+        var type_annotation: ?*ast.FunctionTypeNode = null;
+        if (try self.match(lexer.TokenKind{ .delimiter = .Colon })) {
+            const type_expr = try self.parseTypeExpr();
+            errdefer type_expr.deinit(self.allocator);
+
+            if (type_expr.* != .function_type) {
+                return error.UnexpectedToken;
             }
+
+            type_annotation = type_expr.function_type;
+            self.allocator.destroy(type_expr);
         }
 
         _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
 
         const value = try self.parseExpression();
 
-        const node = try self.allocator.create(ast.Node);
-        errdefer {
-            value.deinit(self.allocator);
+        const func_decl_node = try self.allocator.create(ast.FunctionDeclNode);
+        errdefer func_decl_node.deinit(self.allocator);
 
-            if (type_annotation) |ta| {
-                ta.deinit(self.allocator);
-                self.allocator.destroy(ta);
-            }
-
-            self.allocator.destroy(node);
-        }
-
-        node.* = .{
-            .function_decl = .{
-                .name = name.lexeme,
-                .type_annotation = type_annotation,
-                .value = value,
-                .token = token,
-            },
+        func_decl_node.* = .{
+            .name = try self.allocator.dupe(u8, fn_name.identifier),
+            .type_annotation = type_annotation,
+            .value = value,
+            .token = start_token,
         };
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer node.deinit(self.allocator);
+
+        node.* = .{ .function_decl = func_decl_node };
 
         return node;
     }
@@ -1039,30 +1068,40 @@ pub const Parser = struct {
     /// - `foreign sqrt : Float -> Float = "c_sqrt"`
     /// - `foreign print : String -> Unit = "c_print"`
     fn parseForeignFunctionDecl(self: *Parser) ParserError!*ast.Node {
-        const start_token = self.current_token;
+        const start_token = try self.expect(lexer.TokenKind{ .keyword = .Foreign });
 
-        _ = try self.expect(lexer.TokenKind{ .keyword = .Foreign });
-        const name = try self.parseLowerIdentifier();
+        const fn_name = try self.parseLowerIdentifier();
+        defer fn_name.deinit(self.allocator);
 
         _ = try self.expect(lexer.TokenKind{ .delimiter = .Colon });
 
-        const type_annotation = try self.parseTypeExpr();
-        errdefer type_annotation.deinit(self.allocator);
+        const type_expr = try self.parseTypeExpr();
+        defer self.allocator.destroy(type_expr);
+        errdefer type_expr.deinit(self.allocator);
+
+        if (type_expr.* != .function_type) {
+            return error.UnexpectedToken;
+        }
 
         _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
+
         const external_name = try self.parseStrLiteral();
+        defer external_name.deinit(self.allocator);
+
+        const foreign_node = try self.allocator.create(ast.ForeignFunctionDeclNode);
+        errdefer foreign_node.deinit(self.allocator);
+
+        foreign_node.* = .{
+            .name = try self.allocator.dupe(u8, fn_name.identifier),
+            .type_annotation = type_expr.function_type,
+            .external_name = try self.allocator.dupe(u8, external_name.value),
+            .token = start_token,
+        };
 
         const node = try self.allocator.create(ast.Node);
-        errdefer self.allocator.destroy(node);
+        errdefer node.deinit(self.allocator);
 
-        node.* = .{
-            .foreign_function_decl = .{
-                .name = name.name,
-                .type_annotation = type_annotation,
-                .external_name = external_name.value,
-                .token = start_token,
-            },
-        };
+        node.* = .{ .foreign_function_decl = foreign_node };
 
         return node;
     }
@@ -1077,25 +1116,23 @@ pub const Parser = struct {
     /// - `include Std.List`
     /// - `include Parser.Internal.Utils`
     fn parseInclude(self: *Parser) ParserError!*ast.Node {
-        const token = try self.expect(lexer.TokenKind{ .keyword = .Include });
+        const start_token = try self.expect(lexer.TokenKind{ .keyword = .Include });
 
         const path_node = try self.parseModulePath();
-        errdefer {
-            path_node.deinit(self.allocator);
-            self.allocator.destroy(path_node);
-        }
+        defer self.allocator.destroy(path_node);
 
-        const node = try self.allocator.create(ast.Node);
-        errdefer self.allocator.destroy(node);
+        const include_node = try self.allocator.create(ast.IncludeNode);
+        errdefer include_node.deinit(self.allocator);
 
-        node.* = .{
-            .include = .{
-                .path = path_node.module_path,
-                .token = token,
-            },
+        include_node.* = .{
+            .path = path_node.module_path,
+            .token = start_token,
         };
 
-        self.allocator.destroy(path_node);
+        const node = try self.allocator.create(ast.Node);
+        errdefer node.deinit(self.allocator);
+
+        node.* = .{ .include = include_node };
 
         return node;
     }
@@ -1105,13 +1142,7 @@ pub const Parser = struct {
     /// parsing any expression.
     fn parseExpression(self: *Parser) ParserError!*ast.Node {
         // Start at highest precedence level
-        const expr = try self.parseBinaryExpr(0);
-        errdefer {
-            expr.deinit(self.allocator);
-            self.allocator.destroy(expr);
-        }
-
-        return expr;
+        return try self.parseBinaryExpr(0);
     }
 
     /// Implements precedence climbing to parse binary operator expressions.
@@ -1119,10 +1150,6 @@ pub const Parser = struct {
     /// correctly structured expression trees.
     fn parseBinaryExpr(self: *Parser, min_precedence: u8) ParserError!*ast.Node {
         var left = try self.parseSimpleExpr();
-        errdefer {
-            left.deinit(self.allocator);
-            self.allocator.destroy(left);
-        }
 
         while (true) {
             const op_info = if (Parser.getOperatorInfo(self.current_token.kind)) |info| info else break;
@@ -1140,69 +1167,79 @@ pub const Parser = struct {
             };
 
             const right = try self.parseBinaryExpr(next_min);
-            errdefer {
-                right.deinit(self.allocator);
-                self.allocator.destroy(right);
-            }
+            errdefer right.deinit(self.allocator);
 
             const node = try self.allocator.create(ast.Node);
-            errdefer {
-                right.deinit(self.allocator);
-                self.allocator.destroy(right);
-                self.allocator.destroy(node);
-            }
+            errdefer node.deinit(self.allocator);
 
-            node.* = switch (operator.kind) {
-                .operator => |op| switch (op) {
-                    .Exp,
-                    .FloatAdd,
-                    .FloatDiv,
-                    .FloatMul,
-                    .FloatSub,
-                    .IntAdd,
-                    .IntDiv,
-                    .IntMul,
-                    .IntSub,
-                    => .{
-                        .arithmetic_expr = .{
+            switch (operator.kind) {
+                .operator => |op| {
+                    if (op == .Exp or op == .FloatAdd or op == .FloatDiv or
+                        op == .FloatMul or op == .FloatSub or op == .IntAdd or
+                        op == .IntDiv or op == .IntMul or op == .IntSub)
+                    {
+                        const arithmetic_node = try self.allocator.create(ast.ArithmeticExprNode);
+                        errdefer arithmetic_node.deinit(self.allocator);
+
+                        arithmetic_node.* = .{
                             .left = left,
-                            .operator = operator,
                             .right = right,
-                        },
-                    },
-                    .LogicalAnd,
-                    .LogicalOr,
-                    => .{
-                        .logical_expr = .{
+                            .operator = operator,
+                        };
+
+                        node.* = .{ .arithmetic_expr = arithmetic_node };
+                    } else if (op == .LogicalAnd or op == .LogicalOr) {
+                        const logical_node = try self.allocator.create(ast.LogicalExprNode);
+                        errdefer logical_node.deinit(self.allocator);
+
+                        logical_node.* = .{
                             .left = left,
-                            .operator = operator,
                             .right = right,
-                        },
-                    },
-                    .Equality,
-                    .GreaterThan,
-                    .GreaterThanEqual,
-                    .LessThan,
-                    .LessThanEqual,
-                    .NotEqual,
-                    => .{
-                        .comparison_expr = .{
+                            .operator = operator,
+                        };
+
+                        node.* = .{ .logical_expr = logical_node };
+                    } else if (op == .Equality or op == .GreaterThan or op == .GreaterThanEqual or
+                        op == .LessThan or op == .LessThanEqual or op == .NotEqual)
+                    {
+                        const comparison_node = try self.allocator.create(ast.ComparisonExprNode);
+                        errdefer comparison_node.deinit(self.allocator);
+
+                        comparison_node.* = .{
                             .left = left,
-                            .operator = operator,
                             .right = right,
-                        },
-                    },
-                    .StrConcat => .{
-                        .str_concat_expr = .{
+                            .operator = operator,
+                        };
+
+                        node.* = .{ .comparison_expr = comparison_node };
+                    } else if (op == .StrConcat) {
+                        const str_concat_node = try self.allocator.create(ast.StrConcatExprNode);
+                        errdefer str_concat_node.deinit(self.allocator);
+
+                        str_concat_node.* = .{
                             .left = left,
-                            .operator = operator,
                             .right = right,
-                        },
-                    },
-                    else => unreachable,
+                            .operator = operator,
+                        };
+
+                        node.* = .{ .str_concat_expr = str_concat_node };
+                    } else if (op == .ListConcat) {
+                        const list_concat_node = try self.allocator.create(ast.ListConcatExprNode);
+                        errdefer list_concat_node.deinit(self.allocator);
+
+                        list_concat_node.* = .{
+                            .left = left,
+                            .right = right,
+                            .operator = operator,
+                        };
+
+                        node.* = .{ .list_concat_expr = list_concat_node };
+                    } else {
+                        unreachable;
+                    }
                 },
                 else => unreachable,
-            };
+            }
 
             left = node;
         }
@@ -1220,24 +1257,23 @@ pub const Parser = struct {
     /// Otherwise, delegates to `parsePrimaryExpr` for parsing primary expressions.
     fn parseSimpleExpr(self: *Parser) ParserError!*ast.Node {
         if (self.isUnaryOp()) {
-            const node = try self.allocator.create(ast.Node);
-            errdefer self.allocator.destroy(node);
-
             const operator = self.current_token;
             try self.advance();
 
             const operand = try self.parseSimpleExpr();
-            errdefer {
-                operand.deinit(self.allocator);
-                self.allocator.destroy(operand);
-            }
 
-            node.* = .{
-                .unary_expr = .{
-                    .operator = operator,
-                    .operand = operand,
-                },
+            const unary_node = try self.allocator.create(ast.UnaryExprNode);
+            errdefer unary_node.deinit(self.allocator);
+
+            unary_node.* = .{
+                .operand = operand,
+                .operator = operator,
             };
+
+            const node = try self.allocator.create(ast.Node);
+            errdefer node.deinit(self.allocator);
+
+            node.* = .{ .unary_expr = unary_node };
 
             return node;
         }
@@ -1252,7 +1288,7 @@ pub const Parser = struct {
         switch (self.current_token.kind) {
             .delimiter => |delim| switch (delim) {
                 .LeftBracket => {
-                    return self.parseList();
+                    return try self.parseList();
                 },
                 .LeftParen => {
                     try self.advance();
@@ -1267,22 +1303,18 @@ pub const Parser = struct {
             },
             .identifier => |ident| {
                 const node = try self.allocator.create(ast.Node);
-                errdefer self.allocator.destroy(node);
+                errdefer node.deinit(self.allocator);
 
                 switch (ident) {
                     .Lower => {
                         const identifier = try self.parseLowerIdentifier();
 
-                        node.* = .{
-                            .lower_identifier = identifier,
-                        };
+                        node.* = .{ .lower_identifier = identifier };
                     },
                     .Upper => {
                         const identifier = try self.parseUpperIdentifier();
 
-                        node.* = .{
-                            .upper_identifier = identifier,
-                        };
+                        node.* = .{ .upper_identifier = identifier };
                     },
                 }
 
@@ -1296,36 +1328,28 @@ pub const Parser = struct {
             },
             .literal => |lit| {
                 const node = try self.allocator.create(ast.Node);
-                errdefer self.allocator.destroy(node);
+                errdefer node.deinit(self.allocator);
 
                 switch (lit) {
                     .Char => {
                         const char_literal = try self.parseCharLiteral();
 
-                        node.* = .{
-                            .char_literal = char_literal,
-                        };
+                        node.* = .{ .char_literal = char_literal };
                     },
                     .Float => {
                         const float_literal = try self.parseFloatLiteral();
 
-                        node.* = .{
-                            .float_literal = float_literal,
-                        };
+                        node.* = .{ .float_literal = float_literal };
                     },
                     .Int => {
                         const int_literal = try self.parseIntLiteral();
 
-                        node.* = .{
-                            .int_literal = int_literal,
-                        };
+                        node.* = .{ .int_literal = int_literal };
                     },
                     .String => {
                         const str_literal = try self.parseStrLiteral();
 
-                        node.* = .{
-                            .str_literal = str_literal,
-                        };
+                        node.* = .{ .str_literal = str_literal };
                     },
                     .MultilineString => return error.UnexpectedToken,
                 }
@@ -1355,10 +1379,16 @@ pub const Parser = struct {
     /// - `\x y => x * y`
     /// - `\a b c => a + b + c`
     fn parseLambdaExpr(self: *Parser) ParserError!*ast.Node {
-        const token = try self.expect(lexer.TokenKind{ .operator = .Lambda });
+        const start_token = try self.expect(lexer.TokenKind{ .operator = .Lambda });
 
-        var params = std.ArrayList([]const u8).init(self.allocator);
-        errdefer params.deinit();
+        var param_names = std.ArrayList([]const u8).init(self.allocator);
+        errdefer {
+            for (param_names.items) |param| {
+                self.allocator.free(param);
+            }
+
+            param_names.deinit();
+        }
 
         while (self.check(lexer.TokenKind{ .identifier = .Lower }) or
             self.check(lexer.TokenKind{ .symbol = .Underscore }))
@@ -1367,36 +1397,30 @@ pub const Parser = struct {
 
             try self.advance();
 
-            try params.append(param.lexeme);
+            try param_names.append(try self.allocator.dupe(u8, param.lexeme));
         }
 
-        if (params.items.len == 0) {
+        if (param_names.items.len == 0) {
             return error.EmptyLambdaParams;
         }
 
         _ = try self.expect(lexer.TokenKind{ .symbol = .DoubleArrowRight });
+
         const body = try self.parseExpression();
-        errdefer {
-            params.deinit();
-            body.deinit(self.allocator);
-            self.allocator.destroy(body);
-        }
+
+        const lambda_node = try self.allocator.create(ast.LambdaExprNode);
+        errdefer lambda_node.deinit(self.allocator);
+
+        lambda_node.* = .{
+            .param_names = param_names,
+            .body = body,
+            .token = start_token,
+        };
 
         const node = try self.allocator.create(ast.Node);
-        errdefer {
-            params.deinit();
-            body.deinit(self.allocator);
-            self.allocator.destroy(body);
-            self.allocator.destroy(node);
-        }
+        errdefer node.deinit(self.allocator);
 
-        node.* = .{
-            .lambda_expr = .{
-                .params = params,
-                .body = body,
-                .token = token,
-            },
-        };
+        node.* = .{ .lambda_expr = lambda_node };
 
         return node;
     }
@@ -1415,32 +1439,36 @@ pub const Parser = struct {
     fn parseList(self: *Parser) ParserError!*ast.Node {
         const start_token = try self.expect(lexer.TokenKind{ .delimiter = .LeftBracket });
 
-        // Handle empty list case
-        if (try self.match(lexer.TokenKind{ .delimiter = .RightBracket })) {
-            const node = try self.allocator.create(ast.Node);
-            errdefer self.allocator.destroy(node);
-
-            node.* = .{
-                .list = .{
-                    .elements = std.ArrayList(*ast.Node).init(self.allocator),
-                    .token = start_token,
-                },
-            };
-
-            return node;
-        }
-
-        // Parse first element (required)
         var elements = std.ArrayList(*ast.Node).init(self.allocator);
         errdefer {
-            for (elements.items) |element| {
-                element.deinit(self.allocator);
-                self.allocator.destroy(element);
+            for (elements.items) |elem| {
+                elem.deinit(self.allocator);
+                self.allocator.destroy(elem);
             }
 
             elements.deinit();
         }
 
+        // Handle empty list case
+        if (try self.match(lexer.TokenKind{ .delimiter = .RightBracket })) {
+            const empty_list = try self.allocator.create(ast.ListNode);
+            empty_list.* = .{
+                .elements = elements,
+                .token = start_token,
+            };
+
+            const node = try self.allocator.create(ast.Node);
+            errdefer {
+                node.deinit(self.allocator);
+                self.allocator.destroy(node);
+            }
+
+            node.* = .{ .list = empty_list };
+
+            return node;
+        }
+
+        // Parse first element (required)
         const first_element = try self.parseExpression();
         try elements.append(first_element);
 
@@ -1451,15 +1479,19 @@ pub const Parser = struct {
 
         _ = try self.expect(lexer.TokenKind{ .delimiter = .RightBracket });
 
-        const node = try self.allocator.create(ast.Node);
-        errdefer self.allocator.destroy(node);
-
-        node.* = .{
-            .list = .{
-                .elements = elements,
-                .token = start_token,
-            },
+        const list_node = try self.allocator.create(ast.ListNode);
+        list_node.* = .{
+            .elements = elements,
+            .token = start_token,
         };
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer {
+            node.deinit(self.allocator);
+            self.allocator.destroy(node);
+        }
+
+        node.* = .{ .list = list_node };
 
         return node;
     }
@@ -1489,7 +1521,7 @@ pub const Parser = struct {
     ///    else
     ///      "positive"`
     fn parseIfThenElse(self: *Parser) ParserError!*ast.Node {
-        _ = try self.expect(lexer.TokenKind{ .keyword = .If });
+        const start_token = try self.expect(lexer.TokenKind{ .keyword = .If });
         const condition = try self.parseExpression();
 
         _ = try self.expect(lexer.TokenKind{ .keyword = .Then });
@@ -1498,21 +1530,20 @@ pub const Parser = struct {
         _ = try self.expect(lexer.TokenKind{ .keyword = .Else });
         const else_branch = try self.parseExpression();
 
-        const node = try self.allocator.create(ast.Node);
-        errdefer {
-            condition.deinit(self.allocator);
-            then_branch.deinit(self.allocator);
-            else_branch.deinit(self.allocator);
-            self.allocator.destroy(node);
-        }
+        const if_node = try self.allocator.create(ast.IfThenElseStmtNode);
+        errdefer if_node.deinit(self.allocator);
 
-        node.* = .{
-            .if_then_else_stmt = .{
-                .condition = condition,
-                .then_branch = then_branch,
-                .else_branch = else_branch,
-            },
+        if_node.* = .{
+            .condition = condition,
+            .then_branch = then_branch,
+            .else_branch = else_branch,
+            .token = start_token,
         };
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer node.deinit(self.allocator);
+
+        node.* = .{ .if_then_else_stmt = if_node };
 
         return node;
     }
@@ -1527,54 +1558,55 @@ pub const Parser = struct {
     fn parseTypeExpr(self: *Parser) ParserError!*ast.Node {
         const start_token = self.current_token;
 
-        var first_type = try self.parseSimpleType();
-        errdefer {
-            first_type.deinit(self.allocator);
-            self.allocator.destroy(first_type);
-        }
+        const first_type = try self.parseSimpleType();
 
         if (!try self.match(lexer.TokenKind{ .symbol = .ArrowRight })) {
             return first_type;
         }
 
-        const second_type = try self.parseTypeExpr();
+        var signature_types = std.ArrayList(*ast.Node).init(self.allocator);
         errdefer {
-            second_type.deinit(self.allocator);
-            self.allocator.destroy(second_type);
-        }
-
-        var param_types = std.ArrayList(*ast.Node).init(self.allocator);
-        errdefer {
-            for (param_types.items) |param| {
-                param.deinit(self.allocator);
-                self.allocator.destroy(param);
+            for (signature_types.items) |stype| {
+                stype.deinit(self.allocator);
             }
 
-            param_types.deinit();
+            signature_types.deinit();
         }
 
-        try param_types.append(first_type);
+        try signature_types.append(first_type);
+
+        const second_type = try self.parseTypeExpr();
 
         if (second_type.* == .function_type) {
-            for (second_type.function_type.param_types.items) |param| {
-                try param_types.append(param);
+            for (second_type.function_type.signature_types.items) |stype| {
+                try signature_types.append(stype);
             }
 
-            second_type.function_type.param_types.deinit();
+            if (second_type.* == .function_type) {
+                second_type.function_type.signature_types.deinit();
+                self.allocator.destroy(second_type.function_type);
+            }
+
             self.allocator.destroy(second_type);
         } else {
-            try param_types.append(second_type);
+            try signature_types.append(second_type);
         }
 
-        const node = try self.allocator.create(ast.Node);
-        errdefer self.allocator.destroy(node);
+        const ftype_node = try self.allocator.create(ast.FunctionTypeNode);
+        errdefer {
+            ftype_node.deinit(self.allocator);
+            self.allocator.destroy(ftype_node);
+        }
 
-        node.* = .{
-            .function_type = .{
-                .param_types = param_types,
-                .token = start_token,
-            },
+        ftype_node.* = .{
+            .signature_types = signature_types,
+            .token = start_token,
         };
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer node.deinit(self.allocator);
+
+        node.* = .{ .function_type = ftype_node };
 
         return node;
     }
@@ -1582,22 +1614,16 @@ pub const Parser = struct {
     /// Helper function to parse non-function types
     fn parseSimpleType(self: *Parser) ParserError!*ast.Node {
         if (self.check(lexer.TokenKind{ .identifier = .Upper })) {
-            const type_token = self.current_token;
+            const start_token = self.current_token;
+
             const base_type = try self.parseUpperIdentifier();
-
-            const base_node = try self.allocator.create(ast.Node);
-            errdefer self.allocator.destroy(base_node);
-
-            base_node.* = .{
-                .upper_identifier = base_type,
-            };
 
             // Check for type arguments
             var type_args = std.ArrayList(*ast.Node).init(self.allocator);
             errdefer {
-                for (type_args.items) |arg| {
-                    arg.deinit(self.allocator);
-                    self.allocator.destroy(arg);
+                for (type_args.items) |t| {
+                    t.deinit(self.allocator);
+                    self.allocator.destroy(t);
                 }
 
                 type_args.deinit();
@@ -1614,28 +1640,24 @@ pub const Parser = struct {
                     // Handle type variables (e.g., 'a' in 'List a')
                     has_args = true;
 
-                    const arg_node = try self.allocator.create(ast.Node);
-                    errdefer self.allocator.destroy(arg_node);
-
                     const arg = try self.parseLowerIdentifier();
 
-                    arg_node.* = .{
-                        .lower_identifier = arg,
-                    };
+                    const arg_node = try self.allocator.create(ast.Node);
+                    errdefer arg_node.deinit(self.allocator);
+
+                    arg_node.* = .{ .lower_identifier = arg };
 
                     try type_args.append(arg_node);
                 } else if (self.check(lexer.TokenKind{ .identifier = .Upper })) {
                     // Handle concrete types (e.g., 'String' in 'List String')
                     has_args = true;
 
-                    const arg_node = try self.allocator.create(ast.Node);
-                    errdefer self.allocator.destroy(arg_node);
-
                     const arg = try self.parseUpperIdentifier();
 
-                    arg_node.* = .{
-                        .upper_identifier = arg,
-                    };
+                    const arg_node = try self.allocator.create(ast.Node);
+                    errdefer arg_node.deinit(self.allocator);
+
+                    arg_node.* = .{ .upper_identifier = arg };
 
                     try type_args.append(arg_node);
                 } else if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
@@ -1643,10 +1665,6 @@ pub const Parser = struct {
                     has_args = true;
 
                     const inner_type = try self.parseTypeExpr();
-                    errdefer {
-                        inner_type.deinit(self.allocator);
-                        self.allocator.destroy(inner_type);
-                    }
 
                     _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
 
@@ -1656,29 +1674,28 @@ pub const Parser = struct {
                 }
             }
 
-            if (!has_args) return base_node;
+            if (!has_args) {
+                const node = try self.allocator.create(ast.Node);
+                errdefer node.deinit(self.allocator);
 
-            const node = try self.allocator.create(ast.Node);
-            errdefer {
-                base_node.deinit(self.allocator);
-                self.allocator.destroy(base_node);
+                node.* = .{ .upper_identifier = base_type };
 
-                for (type_args.items) |arg| {
-                    arg.deinit(self.allocator);
-                    self.allocator.destroy(arg);
-                }
-
-                type_args.deinit();
-                self.allocator.destroy(node);
+                return node;
             }
 
-            node.* = .{
-                .type_application = .{
-                    .base = base_node,
-                    .args = type_args,
-                    .token = type_token,
-                },
+            const type_app = try self.allocator.create(ast.TypeApplicationNode);
+            errdefer type_app.deinit(self.allocator);
+
+            type_app.* = .{
+                .constructor = base_type,
+                .args = type_args,
+                .token = start_token,
             };
+
+            const node = try self.allocator.create(ast.Node);
+            errdefer node.deinit(self.allocator);
+
+            node.* = .{ .type_application = type_app };
 
             return node;
         }
@@ -1687,15 +1704,15 @@ pub const Parser = struct {
         if (self.check(lexer.TokenKind{ .identifier = .Lower })) {
             const type_var = try self.expect(lexer.TokenKind{ .identifier = .Lower });
 
-            const node = try self.allocator.create(ast.Node);
-            errdefer self.allocator.destroy(node);
-
-            node.* = .{
-                .lower_identifier = .{
-                    .name = type_var.lexeme,
-                    .token = type_var,
-                },
+            const ident = ast.LowerIdentifierNode{
+                .identifier = try self.allocator.dupe(u8, type_var.lexeme),
+                .token = type_var,
             };
+
+            const node = try self.allocator.create(ast.Node);
+            errdefer node.deinit(self.allocator);
+
+            node.* = .{ .lower_identifier = ident };
 
             return node;
         }
@@ -1703,10 +1720,6 @@ pub const Parser = struct {
         // Handle parenthesized type expressions
         if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
             const inner_type = try self.parseTypeExpr();
-            errdefer {
-                inner_type.deinit(self.allocator);
-                self.allocator.destroy(inner_type);
-            }
 
             _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
 
@@ -1728,81 +1741,87 @@ pub const Parser = struct {
     /// - `Parser.Internal.Utils`
     fn parseModulePath(self: *Parser) ParserError!*ast.Node {
         var segments = std.ArrayList([]const u8).init(self.allocator);
-        errdefer {
-            for (segments.items) |seg| {
-                self.allocator.free(seg);
-            }
-
-            segments.deinit();
-        }
 
         const first_segment = try self.parseUpperIdentifier();
-        const first_duped = try self.allocator.dupe(u8, first_segment.name);
-        try segments.append(first_duped);
+        try segments.append(try self.allocator.dupe(u8, first_segment.identifier));
+        first_segment.deinit(self.allocator);
 
         while (try self.match(lexer.TokenKind{ .delimiter = .Dot })) {
             const next_segment = try self.parseUpperIdentifier();
-            const next_duped = try self.allocator.dupe(u8, next_segment.name);
-            try segments.append(next_duped);
+            try segments.append(try self.allocator.dupe(u8, next_segment.identifier));
+            next_segment.deinit(self.allocator);
         }
 
-        const node = try self.allocator.create(ast.Node);
-        errdefer self.allocator.destroy(node);
-
-        node.* = .{
-            .module_path = .{
-                .segments = segments,
-                .token = first_segment.token,
-            },
+        const path_node = try self.allocator.create(ast.ModulePathNode);
+        path_node.* = .{
+            .segments = segments,
+            .token = first_segment.token,
         };
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer {
+            node.deinit(self.allocator);
+            self.allocator.destroy(path_node.module_path);
+            self.allocator.destroy(node);
+        }
+
+        node.* = .{ .module_path = path_node };
 
         return node;
     }
 
     /// Parses a regular comment node from the input.
     fn parseComment(self: *Parser) ParserError!*ast.Node {
-        const token = try self.expect(lexer.TokenKind{ .comment = .Regular });
-
-        const node = try self.allocator.create(ast.Node);
-        errdefer self.allocator.destroy(node);
+        const start_token = try self.expect(lexer.TokenKind{ .comment = .Regular });
 
         // Content starts after '# ' prefix
-        var content_start: usize = 1;
-        while (content_start < token.lexeme.len and std.ascii.isWhitespace(token.lexeme[content_start])) {
-            content_start += 1;
+        var i: usize = 1;
+        while (i < start_token.lexeme.len and std.ascii.isWhitespace(start_token.lexeme[i])) {
+            i += 1;
         }
-        const trimmed = std.mem.trimRight(u8, token.lexeme[content_start..], &std.ascii.whitespace);
 
-        node.* = .{
-            .comment = .{
-                .content = trimmed,
-                .token = token,
-            },
+        const trimmed = std.mem.trimRight(u8, start_token.lexeme[i..], &std.ascii.whitespace);
+
+        const comment_node = try self.allocator.create(ast.CommentNode);
+        errdefer comment_node.deinit(self.allocator);
+
+        comment_node.* = .{
+            .text = try self.allocator.dupe(u8, trimmed),
+            .token = start_token,
         };
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer node.deinit(self.allocator);
+
+        node.* = .{ .comment = comment_node };
 
         return node;
     }
 
     /// Parses a documentation comment node from the input.
     fn parseDocComment(self: *Parser) ParserError!*ast.Node {
-        const token = try self.expect(lexer.TokenKind{ .comment = .Doc });
-
-        const node = try self.allocator.create(ast.Node);
-        errdefer self.allocator.destroy(node);
+        const start_token = try self.expect(lexer.TokenKind{ .comment = .Doc });
 
         // Content starts after '## ' prefix
-        var content_start: usize = 2;
-        while (content_start < token.lexeme.len and std.ascii.isWhitespace(token.lexeme[content_start])) {
-            content_start += 1;
+        var i: usize = 2;
+        while (i < start_token.lexeme.len and std.ascii.isWhitespace(start_token.lexeme[i])) {
+            i += 1;
         }
-        const trimmed = std.mem.trimRight(u8, token.lexeme[content_start..], &std.ascii.whitespace);
 
-        node.* = .{
-            .doc_comment = .{
-                .content = trimmed,
-                .token = token,
-            },
+        const trimmed = std.mem.trimRight(u8, start_token.lexeme[i..], &std.ascii.whitespace);
+
+        const comment_node = try self.allocator.create(ast.DocCommentNode);
+        errdefer comment_node.deinit(self.allocator);
+
+        comment_node.* = .{
+            .text = try self.allocator.dupe(u8, trimmed),
+            .token = start_token,
         };
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer node.deinit(self.allocator);
+
+        node.* = .{ .doc_comment = comment_node };
 
         return node;
     }
@@ -1819,7 +1838,8 @@ test "[comment]" {
     const allocator = gpa.allocator();
 
     const source = "# This is a regular comment";
-    const expected_content = "This is a regular comment";
+    const text = "This is a regular comment";
+
     var l = lexer.Lexer.init(source, TEST_FILE);
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
@@ -1832,15 +1852,16 @@ test "[comment]" {
     }
 
     // Assertions
-    // Check the node type is correctly identified as a comment
+    // Verify the node is a regular comment
     try testing.expect(node.* == .comment);
 
-    // Validate the comment token and its properties
     const comment = node.comment;
+
+    // Validate the comment token and its properties
     try testing.expectEqual(lexer.TokenKind{ .comment = .Regular }, comment.token.kind);
 
     // Ensure the content of the comment matches the source
-    try testing.expectEqualStrings(expected_content, comment.content);
+    try testing.expectEqualStrings(text, comment.text);
 }
 
 test "[doc_comment]" {
@@ -1850,7 +1871,8 @@ test "[doc_comment]" {
     const allocator = gpa.allocator();
 
     const source = "## This is a doc comment";
-    const expected_content = "This is a doc comment";
+    const text = "This is a doc comment";
+
     var l = lexer.Lexer.init(source, TEST_FILE);
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
@@ -1863,15 +1885,16 @@ test "[doc_comment]" {
     }
 
     // Assertions
-    // Check the node type is correctly identified as a doc comment
+    // Verify the node is a doc comment
     try testing.expect(node.* == .doc_comment);
 
-    // Validate the comment token and its properties
     const comment = node.doc_comment;
+
+    // Validate the comment token and its properties
     try testing.expectEqual(lexer.TokenKind{ .comment = .Doc }, comment.token.kind);
 
     // Ensure the content of the comment matches the source
-    try testing.expectEqualStrings(expected_content, comment.content);
+    try testing.expectEqualStrings(text, comment.text);
 }
 
 test "[int_literal]" {
@@ -1907,17 +1930,17 @@ test "[int_literal]" {
         defer parser.deinit();
 
         // Action
-        const lit = try parser.parseIntLiteral();
+        const literal = try parser.parseIntLiteral();
 
         // Assertions
         // Validate the literal token and its properties
-        try testing.expectEqual(lexer.TokenKind{ .literal = .Int }, lit.token.kind);
+        try testing.expectEqual(lexer.TokenKind{ .literal = .Int }, literal.token.kind);
 
         // Ensure the lexeme matches the source string
-        try testing.expectEqualStrings(case.source, lit.token.lexeme);
+        try testing.expectEqualStrings(case.source, literal.token.lexeme);
 
         // Verify the parsed integer value matches the expected value
-        try testing.expectEqual(case.expected, lit.value);
+        try testing.expectEqual(case.expected, literal.value);
     }
 }
 
@@ -1946,17 +1969,68 @@ test "[float_literal]" {
         defer parser.deinit();
 
         // Action
-        const lit = try parser.parseFloatLiteral();
+        const literal = try parser.parseFloatLiteral();
 
         // Assertions
         // Validate the literal token and its properties
-        try testing.expectEqual(lexer.TokenKind{ .literal = .Float }, lit.token.kind);
+        try testing.expectEqual(lexer.TokenKind{ .literal = .Float }, literal.token.kind);
 
         // Ensure the lexeme matches the source string
-        try testing.expectEqualStrings(case.source, lit.token.lexeme);
+        try testing.expectEqualStrings(case.source, literal.token.lexeme);
 
         // Verify the parsed float value matches the expected value
-        try testing.expectEqual(case.expected, lit.value);
+        try testing.expectEqual(case.expected, literal.value);
+    }
+}
+
+test "[char_literal]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    const TestCase = struct {
+        source: []const u8,
+        expected: u21,
+    };
+
+    const cases = [_]TestCase{
+        // Regular characters
+        .{ .source = "'a'", .expected = 'a' },
+        .{ .source = "'Z'", .expected = 'Z' },
+        .{ .source = "'0'", .expected = '0' },
+        .{ .source = "'!'", .expected = '!' },
+
+        // Escape sequences
+        .{ .source = "'\\n'", .expected = '\n' },
+        .{ .source = "'\\r'", .expected = '\r' },
+        .{ .source = "'\\t'", .expected = '\t' },
+        .{ .source = "'\\\\'", .expected = '\\' },
+        .{ .source = "'\\''", .expected = '\'' },
+
+        // Unicode escape sequences
+        .{ .source = "'\\u{0061}'", .expected = 0x0061 }, // 'a'
+        .{ .source = "'\\u{1F600}'", .expected = 0x1F600 }, // 😀
+        .{ .source = "'😀'", .expected = 0x1F600 },
+    };
+
+    for (cases) |case| {
+        var l = lexer.Lexer.init(case.source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const literal = try parser.parseCharLiteral();
+
+        // Assertions
+        // Validate the literal token and its properties
+        try testing.expectEqual(lexer.TokenKind{ .literal = .Char }, literal.token.kind);
+
+        // Ensure the lexeme matches the source string
+        try testing.expectEqualStrings(case.source, literal.token.lexeme);
+
+        // Verify the parsed char value matches the expected value
+        try testing.expectEqual(case.expected, literal.value);
     }
 }
 
@@ -2023,71 +2097,22 @@ test "[str_literal]" {
         defer parser.deinit();
 
         // Action
-        const lit = try parser.parseStrLiteral();
-        defer allocator.free(lit.value);
+        const literal = try parser.parseStrLiteral();
+        defer literal.deinit(allocator);
 
         // Assertions
         // Validate the literal token and its properties
-        try testing.expectEqual(lexer.TokenKind{ .literal = .String }, lit.token.kind);
+        try testing.expectEqual(lexer.TokenKind{ .literal = .String }, literal.token.kind);
 
         // Ensure the lexeme matches the source string
-        try testing.expectEqualStrings(case.source, lit.token.lexeme);
+        try testing.expectEqualStrings(case.source, literal.token.lexeme);
 
         // Verify the parsed string value matches the expected value
-        try testing.expectEqualStrings(case.expected, lit.value);
+        try testing.expectEqualStrings(case.expected, literal.value);
     }
 }
 
-test "[char_literal]" {
-    // Setup
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-
-    const TestCase = struct {
-        source: []const u8,
-        expected: u21,
-    };
-
-    const cases = [_]TestCase{
-        // Regular characters
-        .{ .source = "'a'", .expected = 'a' },
-        .{ .source = "'Z'", .expected = 'Z' },
-        .{ .source = "'0'", .expected = '0' },
-        .{ .source = "'!'", .expected = '!' },
-
-        // Escape sequences
-        .{ .source = "'\\n'", .expected = '\n' },
-        .{ .source = "'\\r'", .expected = '\r' },
-        .{ .source = "'\\t'", .expected = '\t' },
-        .{ .source = "'\\\\'", .expected = '\\' },
-        .{ .source = "'\\''", .expected = '\'' },
-
-        // Unicode escape sequences
-        .{ .source = "'\\u{0061}'", .expected = 0x0061 }, // 'a'
-        .{ .source = "'\\u{1F600}'", .expected = 0x1F600 }, // 😀
-        .{ .source = "'😀'", .expected = 0x1F600 },
-    };
-
-    for (cases) |case| {
-        var l = lexer.Lexer.init(case.source, TEST_FILE);
-        var parser = try Parser.init(allocator, &l);
-        defer parser.deinit();
-
-        // Action
-        const lit = try parser.parseCharLiteral();
-
-        // Assertions
-        // Validate the literal token and its properties
-        try testing.expectEqual(lexer.TokenKind{ .literal = .Char }, lit.token.kind);
-
-        // Ensure the lexeme matches the source string
-        try testing.expectEqualStrings(case.source, lit.token.lexeme);
-
-        // Verify the parsed char value matches the expected value
-        try testing.expectEqual(case.expected, lit.value);
-    }
-}
+test "[multiline_str_literal]" {}
 
 test "[lower_identifier]" {
     // Setup
@@ -2114,6 +2139,7 @@ test "[lower_identifier]" {
 
         // Action
         const ident = try parser.parseLowerIdentifier();
+        defer ident.deinit(allocator);
 
         // Assertions
         // Verify the token is recognized as a lower identifier
@@ -2123,7 +2149,7 @@ test "[lower_identifier]" {
         try testing.expectEqualStrings(case.source, ident.token.lexeme);
 
         // Verify the parsed identifier name matches the expected name
-        try testing.expectEqualStrings(case.expected, ident.name);
+        try testing.expectEqualStrings(case.expected, ident.identifier);
     }
 }
 
@@ -2153,6 +2179,7 @@ test "[upper_identifier]" {
 
         // Action
         const ident = try parser.parseUpperIdentifier();
+        defer ident.deinit(allocator);
 
         // Assertions
         // Verify the token is recognized as an upper identifier
@@ -2162,7 +2189,7 @@ test "[upper_identifier]" {
         try testing.expectEqualStrings(case.source, ident.token.lexeme);
 
         // Verify the parsed identifier name matches the expected name
-        try testing.expectEqualStrings(case.expected, ident.name);
+        try testing.expectEqualStrings(case.expected, ident.identifier);
     }
 }
 
@@ -2379,7 +2406,7 @@ test "[logical_expr]" {
         try testing.expect(left.* == .lower_identifier);
 
         // Verify the name of the left operand matches the expected value
-        try testing.expectEqualStrings("true", left.lower_identifier.name);
+        try testing.expectEqualStrings("true", left.lower_identifier.identifier);
 
         const right = expr.logical_expr.right;
 
@@ -2387,7 +2414,7 @@ test "[logical_expr]" {
         try testing.expect(right.* == .lower_identifier);
 
         // Verify the name of the right operand matches the expected value
-        try testing.expectEqualStrings("false", right.lower_identifier.name);
+        try testing.expectEqualStrings("false", right.lower_identifier.identifier);
     }
 }
 
@@ -2636,24 +2663,29 @@ test "[lambda_expr]" {
     defer parser.deinit();
 
     // Action
-    const expr = try parser.parseExpression();
+    const node = try parser.parseExpression();
     defer {
-        expr.deinit(allocator);
-        allocator.destroy(expr);
+        node.deinit(allocator);
+        allocator.destroy(node);
     }
 
     // Assertions
     // Ensure the expression is identified as a lambda expression
-    try testing.expect(expr.* == .lambda_expr);
+    try testing.expect(node.* == .lambda_expr);
+
+    const expr = node.lambda_expr;
 
     // Validate that the lambda expression has exactly one parameter
-    try testing.expectEqual(@as(usize, 1), expr.lambda_expr.params.items.len);
+    try testing.expectEqual(@as(usize, 1), expr.param_names.items.len);
 
     // Ensure the parameter name matches the expected value ("x")
-    try testing.expectEqualStrings("x", expr.lambda_expr.params.items[0]);
+    try testing.expectEqualStrings("x", expr.param_names.items[0]);
+
+    // Verify the token kind matches
+    try testing.expectEqual(lexer.TokenKind{ .operator = .Lambda }, expr.token.kind);
 
     // Validate that the body of the lambda expression is an arithmetic expression
-    try testing.expect(expr.lambda_expr.body.* == .arithmetic_expr);
+    try testing.expect(expr.body.* == .arithmetic_expr);
 }
 
 test "[if_then_else_stmt]" {
@@ -2690,7 +2722,7 @@ test "[if_then_else_stmt]" {
 
     // Check the left-hand side of the condition (should be the identifier "x")
     try testing.expect(condition.left.* == .lower_identifier);
-    try testing.expectEqualStrings("x", condition.left.lower_identifier.name);
+    try testing.expectEqualStrings("x", condition.left.lower_identifier.identifier);
 
     // Check the right-hand side of the condition (should be the integer literal 0)
     try testing.expect(condition.right.* == .int_literal);
@@ -2750,11 +2782,11 @@ test "[function_decl] (simple)" {
     const lambda = decl.value.lambda_expr;
 
     // Check the lambda has exactly two parameters
-    try testing.expectEqual(@as(usize, 2), lambda.params.items.len);
+    try testing.expectEqual(@as(usize, 2), lambda.param_names.items.len);
 
     // Verify the parameter names are "x" and "y"
-    try testing.expectEqualStrings("x", lambda.params.items[0]);
-    try testing.expectEqualStrings("y", lambda.params.items[1]);
+    try testing.expectEqualStrings("x", lambda.param_names.items[0]);
+    try testing.expectEqualStrings("y", lambda.param_names.items[1]);
 
     // Verify the lambda body is an arithmetic expression
     try testing.expect(lambda.body.* == .arithmetic_expr);
@@ -2766,11 +2798,11 @@ test "[function_decl] (simple)" {
 
     // Verify the left operand of the addition is a lower identifier with the name "x"
     try testing.expect(body.left.* == .lower_identifier);
-    try testing.expectEqualStrings("x", body.left.lower_identifier.name);
+    try testing.expectEqualStrings("x", body.left.lower_identifier.identifier);
 
     // Verify the right operand of the addition is a lower identifier with the name "y"
     try testing.expect(body.right.* == .lower_identifier);
-    try testing.expectEqualStrings("y", body.right.lower_identifier.name);
+    try testing.expectEqualStrings("y", body.right.lower_identifier.identifier);
 }
 
 test "[function_decl] (w/ type annotation)" {
@@ -2801,20 +2833,19 @@ test "[function_decl] (w/ type annotation)" {
     // Check the function name matches
     try testing.expectEqualStrings("inc", decl.name);
 
-    // Verify type annotation exists and is correct
+    // Verify type annotation exists
     try testing.expect(decl.type_annotation != null);
-    try testing.expect(decl.type_annotation.?.* == .function_type);
 
-    const type_annotation = decl.type_annotation.?.function_type;
+    const type_annotation = decl.type_annotation.?;
 
     // Verify the function type has exactly two parameter types
-    try testing.expectEqual(@as(usize, 2), type_annotation.param_types.items.len);
+    try testing.expectEqual(@as(usize, 2), type_annotation.signature_types.items.len);
 
     // Check both parameter types are upper identifiers with the name "Int"
-    try testing.expect(type_annotation.param_types.items[0].* == .upper_identifier);
-    try testing.expectEqualStrings("Int", type_annotation.param_types.items[0].upper_identifier.name);
-    try testing.expect(type_annotation.param_types.items[1].* == .upper_identifier);
-    try testing.expectEqualStrings("Int", type_annotation.param_types.items[1].upper_identifier.name);
+    try testing.expect(type_annotation.signature_types.items[0].* == .upper_identifier);
+    try testing.expectEqualStrings("Int", type_annotation.signature_types.items[0].upper_identifier.identifier);
+    try testing.expect(type_annotation.signature_types.items[1].* == .upper_identifier);
+    try testing.expectEqualStrings("Int", type_annotation.signature_types.items[1].upper_identifier.identifier);
 
     // Verify the function's value is a lambda expression
     try testing.expect(decl.value.* == .lambda_expr);
@@ -2822,10 +2853,10 @@ test "[function_decl] (w/ type annotation)" {
     const lambda = decl.value.lambda_expr;
 
     // Check the lambda has exactly one parameter
-    try testing.expectEqual(@as(usize, 1), lambda.params.items.len);
+    try testing.expectEqual(@as(usize, 1), lambda.param_names.items.len);
 
     // Verify the parameter name matches
-    try testing.expectEqualStrings("x", lambda.params.items[0]);
+    try testing.expectEqualStrings("x", lambda.param_names.items[0]);
 
     // Verify the body of the lambda is an arithmetic expression
     try testing.expect(lambda.body.* == .arithmetic_expr);
@@ -2837,7 +2868,7 @@ test "[function_decl] (w/ type annotation)" {
 
     // Check the left operand of the addition is a lower identifier with the name "x"
     try testing.expect(body.left.* == .lower_identifier);
-    try testing.expectEqualStrings("x", body.left.lower_identifier.name);
+    try testing.expectEqualStrings("x", body.left.lower_identifier.identifier);
 
     // Check the right operand of the addition is an integer literal with the value 1
     try testing.expect(body.right.* == .int_literal);
@@ -2876,19 +2907,16 @@ test "[foreign_function_decl]" {
     // Verify the external name matches
     try testing.expectEqualStrings("c_sqrt", decl.external_name);
 
-    // Ensure the type annotation exists and is a function type
-    try testing.expect(decl.type_annotation.* == .function_type);
-
-    const type_annotation = decl.type_annotation.function_type;
-
     // Verify the function type has exactly two parameter types
-    try testing.expectEqual(@as(usize, 2), type_annotation.param_types.items.len);
+    try testing.expectEqual(@as(usize, 2), decl.type_annotation.signature_types.items.len);
+
+    const signature_types = decl.type_annotation.signature_types.items;
 
     // Check both parameter types are upper identifiers with the name "Float"
-    try testing.expect(type_annotation.param_types.items[0].* == .upper_identifier);
-    try testing.expect(type_annotation.param_types.items[1].* == .upper_identifier);
-    try testing.expectEqualStrings("Float", type_annotation.param_types.items[0].upper_identifier.name);
-    try testing.expectEqualStrings("Float", type_annotation.param_types.items[1].upper_identifier.name);
+    try testing.expect(signature_types[0].* == .upper_identifier);
+    try testing.expectEqualStrings("Float", signature_types[0].upper_identifier.identifier);
+    try testing.expect(signature_types[1].* == .upper_identifier);
+    try testing.expectEqualStrings("Float", signature_types[1].upper_identifier.identifier);
 }
 
 test "[module_path]" {
@@ -2906,6 +2934,7 @@ test "[module_path]" {
     const node = try parser.parseModulePath();
     defer {
         node.deinit(allocator);
+        allocator.destroy(node.module_path);
         allocator.destroy(node);
     }
 
@@ -3081,26 +3110,34 @@ test "[import_spec]" {
         try testing.expect(import_spec.items.?.items.len == 4);
 
         // Check first function import (map)
-        try testing.expect(import_spec.items.?.items[0] == .function);
-        try testing.expectEqualStrings("map", import_spec.items.?.items[0].function.name);
-        try testing.expect(import_spec.items.?.items[0].function.alias == null);
+        const item1 = import_spec.items.?.items[0];
+
+        try testing.expect(item1.* == .function);
+        try testing.expectEqualStrings("map", item1.function.name);
+        try testing.expect(item1.function.alias == null);
 
         // Check second function import (filter)
-        try testing.expect(import_spec.items.?.items[1] == .function);
-        try testing.expectEqualStrings("filter", import_spec.items.?.items[1].function.name);
-        try testing.expect(import_spec.items.?.items[1].function.alias == null);
+        const item2 = import_spec.items.?.items[1];
+
+        try testing.expect(item2.* == .function);
+        try testing.expectEqualStrings("filter", item2.function.name);
+        try testing.expect(item2.function.alias == null);
 
         // Check first type import (Maybe without constructors)
-        try testing.expect(import_spec.items.?.items[2] == .type);
-        try testing.expectEqualStrings("Maybe", import_spec.items.?.items[2].type.name);
-        try testing.expect(import_spec.items.?.items[2].type.alias == null);
-        try testing.expect(import_spec.items.?.items[2].type.expose_constructors == false);
+        const item3 = import_spec.items.?.items[2];
+
+        try testing.expect(item3.* == .type);
+        try testing.expectEqualStrings("Maybe", item3.type.name);
+        try testing.expect(item3.type.alias == null);
+        try testing.expect(item3.type.expose_constructors == false);
 
         // Check second type import (Either with constructors)
-        try testing.expect(import_spec.items.?.items[3] == .type);
-        try testing.expectEqualStrings("Either", import_spec.items.?.items[3].type.name);
-        try testing.expect(import_spec.items.?.items[3].type.alias == null);
-        try testing.expect(import_spec.items.?.items[3].type.expose_constructors == true);
+        const item4 = import_spec.items.?.items[3];
+
+        try testing.expect(item4.* == .type);
+        try testing.expectEqualStrings("Either", item4.type.name);
+        try testing.expect(item4.type.alias == null);
+        try testing.expect(item4.type.expose_constructors == true);
     }
 
     {
@@ -3141,14 +3178,16 @@ test "[import_spec]" {
 
         // Check first item (map as list_map)
         const item1 = import_spec.items.?.items[0];
-        try testing.expect(item1 == .function);
+
+        try testing.expect(item1.* == .function);
         try testing.expectEqualStrings("map", item1.function.name);
         try testing.expect(item1.function.alias != null);
         try testing.expectEqualStrings("list_map", item1.function.alias.?);
 
         // Check second item (filter)
         const item2 = import_spec.items.?.items[1];
-        try testing.expect(item2 == .function);
+
+        try testing.expect(item2.* == .function);
         try testing.expectEqualStrings("filter", item2.function.name);
         try testing.expect(item2.function.alias == null);
     }
@@ -3191,7 +3230,8 @@ test "[import_spec]" {
 
         // Check the hidden function
         const item = import_spec.items.?.items[0];
-        try testing.expect(item == .function);
+
+        try testing.expect(item.* == .function);
         try testing.expectEqualStrings("internal_func", item.function.name);
         try testing.expect(item.function.alias == null);
     }
@@ -3230,7 +3270,7 @@ test "[type_alias]" {
         try testing.expect(type_alias.value.* == .upper_identifier);
 
         // Verify the name of the upper identifier is "String"
-        try testing.expectEqualStrings("String", type_alias.value.upper_identifier.name);
+        try testing.expectEqualStrings("String", type_alias.value.upper_identifier.identifier);
     }
 
     {
@@ -3269,19 +3309,20 @@ test "[type_alias]" {
         const app = type_alias.value.type_application;
 
         // Verify the base type of the type application is "Map"
-        try testing.expect(app.base.* == .upper_identifier);
-        try testing.expectEqualStrings("Map", app.base.upper_identifier.name);
+        try testing.expectEqualStrings("Map", app.constructor.identifier);
 
         // Verify the type application has exactly two arguments
         try testing.expectEqual(@as(usize, 2), app.args.items.len);
 
         // Verify the first argument is a lower identifier with the name "k"
-        try testing.expect(app.args.items[0].* == .lower_identifier);
-        try testing.expectEqualStrings("k", app.args.items[0].lower_identifier.name);
+        const arg1 = app.args.items[0];
+        try testing.expect(arg1.* == .lower_identifier);
+        try testing.expectEqualStrings("k", arg1.lower_identifier.identifier);
 
         // Verify the second argument is a lower identifier with the name "v"
-        try testing.expect(app.args.items[1].* == .lower_identifier);
-        try testing.expectEqualStrings("v", app.args.items[1].lower_identifier.name);
+        const arg2 = app.args.items[1];
+        try testing.expect(arg2.* == .lower_identifier);
+        try testing.expectEqualStrings("v", arg2.lower_identifier.identifier);
     }
 
     {
@@ -3316,19 +3357,22 @@ test "[type_alias]" {
         const func_type = type_alias.value.function_type;
 
         // The function type should have three type entries: 'a -> b -> b'
-        try testing.expectEqual(@as(usize, 3), func_type.param_types.items.len);
+        try testing.expectEqual(@as(usize, 3), func_type.signature_types.items.len);
 
         // Ensure the first parameter type is 'a'
-        try testing.expect(func_type.param_types.items[0].* == .lower_identifier);
-        try testing.expectEqualStrings("a", func_type.param_types.items[0].lower_identifier.name);
+        const sig_type1 = func_type.signature_types.items[0];
+        try testing.expect(sig_type1.* == .lower_identifier);
+        try testing.expectEqualStrings("a", sig_type1.lower_identifier.identifier);
 
         // Ensure the second parameter type is 'b'
-        try testing.expect(func_type.param_types.items[1].* == .lower_identifier);
-        try testing.expectEqualStrings("b", func_type.param_types.items[1].lower_identifier.name);
+        const sig_type2 = func_type.signature_types.items[1];
+        try testing.expect(sig_type2.* == .lower_identifier);
+        try testing.expectEqualStrings("b", sig_type2.lower_identifier.identifier);
 
         // Ensure the return type is also 'b'
-        try testing.expect(func_type.param_types.items[2].* == .lower_identifier);
-        try testing.expectEqualStrings("b", func_type.param_types.items[2].lower_identifier.name);
+        const sig_type3 = func_type.signature_types.items[2];
+        try testing.expect(sig_type3.* == .lower_identifier);
+        try testing.expectEqualStrings("b", sig_type3.lower_identifier.identifier);
     }
 
     {
@@ -3363,8 +3407,8 @@ test "[type_alias]" {
         const tree_app = type_alias.value.type_application;
 
         // Validate that the base type is 'Tree'
-        try testing.expect(tree_app.base.* == .upper_identifier);
-        try testing.expectEqualStrings("Tree", tree_app.base.upper_identifier.name);
+        try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, tree_app.constructor.token.kind);
+        try testing.expectEqualStrings("Tree", tree_app.constructor.identifier);
 
         // Ensure 'Tree' has exactly two type arguments: (Pair k v) and (Compare k)
         try testing.expectEqual(@as(usize, 2), tree_app.args.items.len);
@@ -3379,19 +3423,19 @@ test "[type_alias]" {
             const pair_app = pair_arg.type_application;
 
             // Verify 'Pair' as the base type
-            try testing.expect(pair_app.base.* == .upper_identifier);
-            try testing.expectEqualStrings("Pair", pair_app.base.upper_identifier.name);
+            try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, pair_app.constructor.token.kind);
+            try testing.expectEqualStrings("Pair", pair_app.constructor.identifier);
 
             // Ensure 'Pair' takes two arguments: 'k' and 'v'
             try testing.expectEqual(@as(usize, 2), pair_app.args.items.len);
 
             // Validate first argument of Pair: 'k'
             try testing.expect(pair_app.args.items[0].* == .lower_identifier);
-            try testing.expectEqualStrings("k", pair_app.args.items[0].lower_identifier.name);
+            try testing.expectEqualStrings("k", pair_app.args.items[0].lower_identifier.identifier);
 
             // Validate second argument of Pair: 'v'
             try testing.expect(pair_app.args.items[1].* == .lower_identifier);
-            try testing.expectEqualStrings("v", pair_app.args.items[1].lower_identifier.name);
+            try testing.expectEqualStrings("v", pair_app.args.items[1].lower_identifier.identifier);
         }
 
         // Check second argument (Compare k)
@@ -3404,15 +3448,15 @@ test "[type_alias]" {
             const compare_app = compare_arg.type_application;
 
             // Verify 'Compare' as the base type
-            try testing.expect(compare_app.base.* == .upper_identifier);
-            try testing.expectEqualStrings("Compare", compare_app.base.upper_identifier.name);
+            try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, compare_app.constructor.token.kind);
+            try testing.expectEqualStrings("Compare", compare_app.constructor.identifier);
 
             // Ensure 'Compare' takes exactly one argument: 'k'
             try testing.expectEqual(@as(usize, 1), compare_app.args.items.len);
 
             // Validate argument of Compare: 'k'
             try testing.expect(compare_app.args.items[0].* == .lower_identifier);
-            try testing.expectEqualStrings("k", compare_app.args.items[0].lower_identifier.name);
+            try testing.expectEqualStrings("k", compare_app.args.items[0].lower_identifier.identifier);
         }
     }
 }
@@ -3460,7 +3504,7 @@ test "[record_type]" {
 
             // Ensure the field type is 'String'
             try testing.expect(name_field.type.* == .upper_identifier);
-            try testing.expectEqualStrings("String", name_field.type.upper_identifier.name);
+            try testing.expectEqualStrings("String", name_field.type.upper_identifier.identifier);
         }
 
         // Check second field (age)
@@ -3472,7 +3516,7 @@ test "[record_type]" {
 
             // Ensure the field type is 'Int'
             try testing.expect(age_field.type.* == .upper_identifier);
-            try testing.expectEqualStrings("Int", age_field.type.upper_identifier.name);
+            try testing.expectEqualStrings("Int", age_field.type.upper_identifier.identifier);
         }
     }
 
@@ -3514,7 +3558,7 @@ test "[record_type]" {
 
             // Ensure the field type is the generic type parameter 'a'
             try testing.expect(x_field.type.* == .lower_identifier);
-            try testing.expectEqualStrings("a", x_field.type.lower_identifier.name);
+            try testing.expectEqualStrings("a", x_field.type.lower_identifier.identifier);
         }
 
         // Check second field (y)
@@ -3526,7 +3570,7 @@ test "[record_type]" {
 
             // Ensure the field type is the generic type parameter 'a'
             try testing.expect(y_field.type.* == .lower_identifier);
-            try testing.expectEqualStrings("a", y_field.type.lower_identifier.name);
+            try testing.expectEqualStrings("a", y_field.type.lower_identifier.identifier);
         }
     }
 
@@ -3573,13 +3617,13 @@ test "[record_type]" {
             const app = keys_field.type.type_application;
 
             // Ensure the base type is 'List'
-            try testing.expect(app.base.* == .upper_identifier);
-            try testing.expectEqualStrings("List", app.base.upper_identifier.name);
+            try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, app.constructor.token.kind);
+            try testing.expectEqualStrings("List", app.constructor.identifier);
 
             // Ensure 'List' has exactly one type argument: 'k'
             try testing.expectEqual(@as(usize, 1), app.args.items.len);
             try testing.expect(app.args.items[0].* == .lower_identifier);
-            try testing.expectEqualStrings("k", app.args.items[0].lower_identifier.name);
+            try testing.expectEqualStrings("k", app.args.items[0].lower_identifier.identifier);
         }
 
         // Check second field (values)
@@ -3595,13 +3639,13 @@ test "[record_type]" {
             const app = values_field.type.type_application;
 
             // Ensure the base type is 'List'
-            try testing.expect(app.base.* == .upper_identifier);
-            try testing.expectEqualStrings("List", app.base.upper_identifier.name);
+            try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, app.constructor.token.kind);
+            try testing.expectEqualStrings("List", app.constructor.identifier);
 
             // Ensure 'List' has exactly one type argument: 'v'
             try testing.expectEqual(@as(usize, 1), app.args.items.len);
             try testing.expect(app.args.items[0].* == .lower_identifier);
-            try testing.expectEqualStrings("v", app.args.items[0].lower_identifier.name);
+            try testing.expectEqualStrings("v", app.args.items[0].lower_identifier.identifier);
         }
     }
 
@@ -3647,8 +3691,7 @@ test "[record_type]" {
             const list_app = items_field.type.type_application;
 
             // Ensure the base type is 'List'
-            try testing.expect(list_app.base.* == .upper_identifier);
-            try testing.expectEqualStrings("List", list_app.base.upper_identifier.name);
+            try testing.expectEqualStrings("List", list_app.constructor.identifier);
 
             // Ensure List has exactly one type argument
             try testing.expectEqual(@as(usize, 1), list_app.args.items.len);
@@ -3659,13 +3702,12 @@ test "[record_type]" {
             const maybe_app = list_app.args.items[0].type_application;
 
             // Ensure the base type is 'Maybe'
-            try testing.expect(maybe_app.base.* == .upper_identifier);
-            try testing.expectEqualStrings("Maybe", maybe_app.base.upper_identifier.name);
+            try testing.expectEqualStrings("Maybe", maybe_app.constructor.identifier);
 
             // Ensure Maybe has one type argument: 'a'
             try testing.expectEqual(@as(usize, 1), maybe_app.args.items.len);
             try testing.expect(maybe_app.args.items[0].* == .lower_identifier);
-            try testing.expectEqualStrings("a", maybe_app.args.items[0].lower_identifier.name);
+            try testing.expectEqualStrings("a", maybe_app.args.items[0].lower_identifier.identifier);
         }
 
         // Check second field (count: Maybe Int)
@@ -3681,13 +3723,13 @@ test "[record_type]" {
             const maybe_app = count_field.type.type_application;
 
             // Ensure the base type is 'Maybe'
-            try testing.expect(maybe_app.base.* == .upper_identifier);
-            try testing.expectEqualStrings("Maybe", maybe_app.base.upper_identifier.name);
+            try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, maybe_app.constructor.token.kind);
+            try testing.expectEqualStrings("Maybe", maybe_app.constructor.identifier);
 
             // Ensure Maybe has exactly one type argument: 'Int'
             try testing.expectEqual(@as(usize, 1), maybe_app.args.items.len);
             try testing.expect(maybe_app.args.items[0].* == .upper_identifier);
-            try testing.expectEqualStrings("Int", maybe_app.args.items[0].upper_identifier.name);
+            try testing.expectEqualStrings("Int", maybe_app.args.items[0].upper_identifier.identifier);
         }
 
         // Check third field (names: List String)
@@ -3703,13 +3745,13 @@ test "[record_type]" {
             const list_app = names_field.type.type_application;
 
             // Ensure the base type is 'List'
-            try testing.expect(list_app.base.* == .upper_identifier);
-            try testing.expectEqualStrings("List", list_app.base.upper_identifier.name);
+            try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, list_app.constructor.token.kind);
+            try testing.expectEqualStrings("List", list_app.constructor.identifier);
 
             // Ensure List has exactly one type argument: 'String'
             try testing.expectEqual(@as(usize, 1), list_app.args.items.len);
             try testing.expect(list_app.args.items[0].* == .upper_identifier);
-            try testing.expectEqualStrings("String", list_app.args.items[0].upper_identifier.name);
+            try testing.expectEqualStrings("String", list_app.args.items[0].upper_identifier.identifier);
         }
     }
 }
@@ -3756,7 +3798,7 @@ test "[variant_type]" {
             try testing.expectEqualStrings("True", true_constructor.name);
 
             // Ensure 'True' has no associated parameters
-            try testing.expectEqual(@as(usize, 0), true_constructor.params.items.len);
+            try testing.expectEqual(@as(usize, 0), true_constructor.parameters.items.len);
         }
 
         // Check second constructor (False)
@@ -3767,7 +3809,7 @@ test "[variant_type]" {
             try testing.expectEqualStrings("False", false_constructor.name);
 
             // Ensure 'False' has no associated parameters
-            try testing.expectEqual(@as(usize, 0), false_constructor.params.items.len);
+            try testing.expectEqual(@as(usize, 0), false_constructor.parameters.items.len);
         }
     }
 
@@ -3808,7 +3850,7 @@ test "[variant_type]" {
             try testing.expectEqualStrings("None", none_constructor.name);
 
             // Ensure 'None' has no associated parameters
-            try testing.expectEqual(@as(usize, 0), none_constructor.params.items.len);
+            try testing.expectEqual(@as(usize, 0), none_constructor.parameters.items.len);
         }
 
         // Check second constructor (Some a)
@@ -3819,13 +3861,13 @@ test "[variant_type]" {
             try testing.expectEqualStrings("Some", some_constructor.name);
 
             // Ensure 'Some' has exactly one associated parameter
-            try testing.expectEqual(@as(usize, 1), some_constructor.params.items.len);
+            try testing.expectEqual(@as(usize, 1), some_constructor.parameters.items.len);
 
-            const param = some_constructor.params.items[0];
+            const param = some_constructor.parameters.items[0];
 
             // Validate that the parameter is the type variable 'a'
             try testing.expect(param.* == .lower_identifier);
-            try testing.expectEqualStrings("a", param.lower_identifier.name);
+            try testing.expectEqualStrings("a", param.lower_identifier.identifier);
         }
     }
 
@@ -3866,7 +3908,7 @@ test "[variant_type]" {
             try testing.expectEqualStrings("Leaf", leaf_constructor.name);
 
             // Ensure 'Leaf' has no associated parameters
-            try testing.expectEqual(@as(usize, 0), leaf_constructor.params.items.len);
+            try testing.expectEqual(@as(usize, 0), leaf_constructor.parameters.items.len);
         }
 
         // Check second constructor (Branch (Tree a) a (Tree a))
@@ -3877,11 +3919,11 @@ test "[variant_type]" {
             try testing.expectEqualStrings("Branch", branch_constructor.name);
 
             // Ensure 'Branch' has exactly three parameters
-            try testing.expectEqual(@as(usize, 3), branch_constructor.params.items.len);
+            try testing.expectEqual(@as(usize, 3), branch_constructor.parameters.items.len);
 
             // First parameter (Tree a)
             {
-                const param1 = branch_constructor.params.items[0];
+                const param1 = branch_constructor.parameters.items[0];
 
                 // Ensure 'param1' is a type application
                 try testing.expect(param1.* == .type_application);
@@ -3889,27 +3931,27 @@ test "[variant_type]" {
                 const app = param1.type_application;
 
                 // Ensure the base type is 'Tree'
-                try testing.expect(app.base.* == .upper_identifier);
-                try testing.expectEqualStrings("Tree", app.base.upper_identifier.name);
+                try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, app.constructor.token.kind);
+                try testing.expectEqualStrings("Tree", app.constructor.identifier);
 
                 // Ensure 'Tree' is applied to one argument ('a')
                 try testing.expectEqual(@as(usize, 1), app.args.items.len);
                 try testing.expect(app.args.items[0].* == .lower_identifier);
-                try testing.expectEqualStrings("a", app.args.items[0].lower_identifier.name);
+                try testing.expectEqualStrings("a", app.args.items[0].lower_identifier.identifier);
             }
 
             // Second parameter (a)
             {
-                const param2 = branch_constructor.params.items[1];
+                const param2 = branch_constructor.parameters.items[1];
 
                 // Ensure 'param2' is the type variable 'a'
                 try testing.expect(param2.* == .lower_identifier);
-                try testing.expectEqualStrings("a", param2.lower_identifier.name);
+                try testing.expectEqualStrings("a", param2.lower_identifier.identifier);
             }
 
             // Third parameter (Tree a)
             {
-                const param3 = branch_constructor.params.items[2];
+                const param3 = branch_constructor.parameters.items[2];
 
                 // Ensure 'param3' is a type application
                 try testing.expect(param3.* == .type_application);
@@ -3917,13 +3959,13 @@ test "[variant_type]" {
                 const app = param3.type_application;
 
                 // Ensure the base type is 'Tree'
-                try testing.expect(app.base.* == .upper_identifier);
-                try testing.expectEqualStrings("Tree", app.base.upper_identifier.name);
+                try testing.expectEqual(lexer.TokenKind{ .identifier = .Upper }, app.constructor.token.kind);
+                try testing.expectEqualStrings("Tree", app.constructor.identifier);
 
                 // Ensure 'Tree' is applied to one argument ('a')
                 try testing.expectEqual(@as(usize, 1), app.args.items.len);
                 try testing.expect(app.args.items[0].* == .lower_identifier);
-                try testing.expectEqualStrings("a", app.args.items[0].lower_identifier.name);
+                try testing.expectEqualStrings("a", app.args.items[0].lower_identifier.identifier);
             }
         }
     }
@@ -3936,132 +3978,62 @@ test "[list]" {
     const allocator = gpa.allocator();
 
     {
-        // []
+        // Test input: []
+
+        var l = lexer.Lexer.init("[]", TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
 
         // Action
-        var empty_list = try allocator.create(ast.Node);
+        const node = try parser.parseList();
         defer {
-            empty_list.deinit(allocator);
-            allocator.destroy(empty_list);
+            node.deinit(allocator);
+            allocator.destroy(node);
         }
-
-        empty_list.* = .{
-            .list = .{
-                .elements = std.ArrayList(*ast.Node).init(allocator),
-                .token = lexer.Token{
-                    .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
-                    .lexeme = "[",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 0, .end = 1 },
-                        .src = .{ .line = 1, .col = 1 },
-                    },
-                },
-            },
-        };
 
         // Assertions
         // Verify that the node type is a list.
-        try testing.expect(empty_list.* == .list);
+        try testing.expect(node.* == .list);
+
+        const list = node.list;
+
         // Ensure the list has no elements.
-        try testing.expectEqual(@as(usize, 0), empty_list.list.elements.items.len);
+        try testing.expectEqual(@as(usize, 0), list.elements.items.len);
     }
 
     {
-        // [1, 2, 3]
+        // Test input: [1, 2, 3]
+
+        var l = lexer.Lexer.init("[1, 2, 3]", TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
 
         // Action
-        var elements = std.ArrayList(*ast.Node).init(allocator);
-
-        const one = try allocator.create(ast.Node);
-        one.* = .{
-            .int_literal = .{
-                .value = 1,
-                .token = lexer.Token{
-                    .kind = lexer.TokenKind{ .literal = .Int },
-                    .lexeme = "1",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 1, .end = 2 },
-                        .src = .{ .line = 1, .col = 2 },
-                    },
-                },
-            },
-        };
-
-        const two = try allocator.create(ast.Node);
-        two.* = .{
-            .int_literal = .{
-                .value = 2,
-                .token = lexer.Token{
-                    .kind = lexer.TokenKind{ .literal = .Int },
-                    .lexeme = "2",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 4, .end = 5 },
-                        .src = .{ .line = 1, .col = 5 },
-                    },
-                },
-            },
-        };
-
-        const three = try allocator.create(ast.Node);
-        three.* = .{
-            .int_literal = .{
-                .value = 3,
-                .token = lexer.Token{
-                    .kind = lexer.TokenKind{ .literal = .Int },
-                    .lexeme = "3",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 7, .end = 8 },
-                        .src = .{ .line = 1, .col = 8 },
-                    },
-                },
-            },
-        };
-
-        try elements.append(one);
-        try elements.append(two);
-        try elements.append(three);
-
-        var populated_list = try allocator.create(ast.Node);
+        const node = try parser.parseList();
         defer {
-            populated_list.deinit(allocator);
-            allocator.destroy(populated_list);
+            node.deinit(allocator);
+            allocator.destroy(node);
         }
-
-        populated_list.* = .{
-            .list = .{
-                .elements = elements,
-                .token = lexer.Token{
-                    .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
-                    .lexeme = "[",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 0, .end = 1 },
-                        .src = .{ .line = 1, .col = 1 },
-                    },
-                },
-            },
-        };
 
         // Assertions
         // Verify that the node type is a list.
-        try testing.expect(populated_list.* == .list);
+        try testing.expect(node.* == .list);
+
+        const list = node.list;
+
         // Ensure the list contains exactly 3 elements.
-        try testing.expectEqual(@as(usize, 3), populated_list.list.elements.items.len);
+        try testing.expectEqual(@as(usize, 3), list.elements.items.len);
 
         // Test first element (1)
-        try testing.expect(populated_list.list.elements.items[0].* == .int_literal);
-        try testing.expectEqual(@as(i64, 1), populated_list.list.elements.items[0].int_literal.value);
+        try testing.expect(list.elements.items[0].* == .int_literal);
+        try testing.expectEqual(@as(i64, 1), list.elements.items[0].int_literal.value);
 
         // Test second element (2)
-        try testing.expect(populated_list.list.elements.items[1].* == .int_literal);
-        try testing.expectEqual(@as(i64, 2), populated_list.list.elements.items[1].int_literal.value);
+        try testing.expect(list.elements.items[1].* == .int_literal);
+        try testing.expectEqual(@as(i64, 2), list.elements.items[1].int_literal.value);
 
         // Test third element (3)
-        try testing.expect(populated_list.list.elements.items[2].* == .int_literal);
-        try testing.expectEqual(@as(i64, 3), populated_list.list.elements.items[2].int_literal.value);
+        try testing.expect(list.elements.items[2].* == .int_literal);
+        try testing.expectEqual(@as(i64, 3), list.elements.items[2].int_literal.value);
     }
 }

@@ -31,13 +31,13 @@ pub const AstPrinter = struct {
             .comment => |comment| {
                 try self.writer.styled(term.Color.Bold, "Comment");
                 try self.writer.plain("(");
-                try self.writer.styled(term.Color.Green, comment.content);
+                try self.writer.styled(term.Color.Green, comment.text);
                 try self.writer.plain(")\n");
             },
             .doc_comment => |comment| {
                 try self.writer.styled(term.Color.Bold, "DocComment");
                 try self.writer.plain("(");
-                try self.writer.styled(term.Color.Green, comment.content);
+                try self.writer.styled(term.Color.Green, comment.text);
                 try self.writer.plain(")\n");
             },
             .int_literal => |lit| {
@@ -94,16 +94,16 @@ pub const AstPrinter = struct {
             },
 
             // Identifiers
-            .lower_identifier => |id| {
+            .lower_identifier => |ident| {
                 try self.writer.styled(term.Color.Bold, "LowerIdent");
                 try self.writer.plain("(");
-                try self.writer.styled(term.Color.Magenta, id.name);
+                try self.writer.styled(term.Color.Magenta, ident.identifier);
                 try self.writer.plain(")\n");
             },
-            .upper_identifier => |id| {
+            .upper_identifier => |ident| {
                 try self.writer.styled(term.Color.Bold, "UpperIdent");
                 try self.writer.plain("(");
-                try self.writer.styled(term.Color.Magenta, id.name);
+                try self.writer.styled(term.Color.Magenta, ident.identifier);
                 try self.writer.plain(")\n");
             },
 
@@ -212,7 +212,6 @@ pub const AstPrinter = struct {
                 try self.writer.styled(term.Color.Dim, "}\n");
             },
             .logical_expr => |expr| {
-                try self.printIndent();
                 try self.writer.styled(term.Color.Bold, "LogicalExpr");
                 try self.writer.styled(term.Color.Dim, " {\n");
 
@@ -267,7 +266,7 @@ pub const AstPrinter = struct {
 
             // Pattern Matching
             .pattern => |pat| {
-                try self.printPattern(&pat);
+                try self.printPattern(pat);
             },
             .match_expr => |expr| {
                 try self.writer.styled(term.Color.Bold, "MatchExpr");
@@ -276,8 +275,8 @@ pub const AstPrinter = struct {
                 self.indent_level += 1;
 
                 try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "value: ");
-                try self.printNode(expr.value);
+                try self.writer.styled(term.Color.Cyan, "subject: ");
+                try self.printNode(expr.subject);
 
                 try self.printIndent();
                 try self.writer.styled(term.Color.Cyan, "cases: [\n");
@@ -330,13 +329,13 @@ pub const AstPrinter = struct {
                 self.indent_level += 1;
 
                 try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "params: [\n");
+                try self.writer.styled(term.Color.Cyan, "signature_types: [\n");
 
                 self.indent_level += 1;
 
-                for (ftype.param_types.items) |param_type| {
+                for (ftype.signature_types.items) |stype| {
                     try self.printIndent();
-                    try self.printNode(param_type);
+                    try self.printNode(stype);
                 }
 
                 self.indent_level -= 1;
@@ -358,7 +357,7 @@ pub const AstPrinter = struct {
                 try self.printIndent();
                 try self.writer.styled(term.Color.Cyan, "params: [");
 
-                for (expr.params.items, 0..) |param, i| {
+                for (expr.param_names.items, 0..) |param, i| {
                     if (i > 0) {
                         try self.writer.plain(", ");
                     }
@@ -545,8 +544,11 @@ pub const AstPrinter = struct {
                 self.indent_level += 1;
 
                 try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "base: ");
-                try self.printNode(app.base);
+                try self.writer.styled(term.Color.Cyan, "constructor: ");
+                try self.writer.styled(term.Color.Bold, "UpperIdent");
+                try self.writer.plain("(");
+                try self.writer.styled(term.Color.Magenta, app.constructor.identifier);
+                try self.writer.plain(")\n");
 
                 try self.printIndent();
                 try self.writer.styled(term.Color.Cyan, "args: [\n");
@@ -647,7 +649,7 @@ pub const AstPrinter = struct {
 
                     self.indent_level += 1;
 
-                    for (constructor.params.items) |param| {
+                    for (constructor.parameters.items) |param| {
                         try self.printIndent();
                         try self.printNode(param);
                     }
@@ -851,7 +853,7 @@ pub const AstPrinter = struct {
                     for (items.items) |item| {
                         try self.printIndent();
 
-                        switch (item) {
+                        switch (item.*) {
                             .function => |f| {
                                 try self.writer.styled(term.Color.Bold, "Function");
                                 try self.writer.styled(term.Color.Dim, " {\n");
@@ -988,7 +990,8 @@ pub const AstPrinter = struct {
                 if (decl.type_annotation) |type_annot| {
                     try self.printIndent();
                     try self.writer.styled(term.Color.Cyan, "type: ");
-                    try self.printNode(type_annot);
+                    const type_node = ast.Node{ .function_type = type_annot };
+                    try self.printNode(&type_node);
                 }
 
                 try self.printIndent();
@@ -1018,7 +1021,8 @@ pub const AstPrinter = struct {
 
                 try self.printIndent();
                 try self.writer.styled(term.Color.Cyan, "type: ");
-                try self.printNode(decl.type_annotation);
+                const type_node = ast.Node{ .function_type = decl.type_annotation };
+                try self.printNode(&type_node);
 
                 self.indent_level -= 1;
 
@@ -1143,9 +1147,9 @@ pub const AstPrinter = struct {
 
                 self.indent_level += 1;
 
-                for (list.elements.items) |element| {
+                for (list.patterns.items) |pat| {
                     try self.printIndent();
-                    try self.printPattern(element);
+                    try self.printPattern(pat);
                 }
 
                 self.indent_level -= 1;
@@ -1170,15 +1174,15 @@ pub const AstPrinter = struct {
                 try self.writer.styled(term.Color.Magenta, con.name);
                 try self.writer.plain("\n");
 
-                if (con.args.items.len > 0) {
+                if (con.parameters.items.len > 0) {
                     try self.printIndent();
                     try self.writer.styled(term.Color.Cyan, "args: [\n");
 
                     self.indent_level += 1;
 
-                    for (con.args.items) |arg| {
+                    for (con.parameters.items) |param| {
                         try self.printIndent();
-                        try self.printPattern(arg);
+                        try self.printPattern(param);
                     }
 
                     self.indent_level -= 1;

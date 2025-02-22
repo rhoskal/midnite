@@ -18,7 +18,10 @@ pub fn format(allocator: std.mem.Allocator, filepath: []const u8) ![]const u8 {
     defer parser.deinit();
 
     const ast = try parser.parseProgram();
-    defer ast.deinit(allocator);
+    defer {
+        ast.deinit(allocator);
+        allocator.destroy(ast);
+    }
 
     var formatter = Formatter.init(allocator);
 
