@@ -2,7 +2,7 @@
 
 ## Overview
 
-Mox takes a systematic approach to error handling through the type system. There are no null values or exceptions. Instead, the language provides three core types for handling different error scenarios:
+Midnite takes a systematic approach to error handling through the type system. There are no null values or exceptions. Instead, the language provides three core types for handling different error scenarios:
 - `Maybe` - For optional values
 - `Result` - For operations that can fail
 - `Validation` - For accumulating multiple errors
@@ -11,7 +11,7 @@ Mox takes a systematic approach to error handling through the type system. There
 
 Used when a value might or might not be present.
 
-```mox
+```mn
 type Maybe(a) = 
     | None 
     | Some(a)
@@ -33,7 +33,7 @@ match user on
 
 Used when an operation can fail with a specific error.
 
-```mox
+```mn
 type Result(e, a) =
     | Err(e)
     | Ok(a)
@@ -58,7 +58,7 @@ match result on
 
 Used when you need to accumulate multiple errors rather than fail fast.
 
-```mox
+```mn
 # Example: Form validation
 type ValidationError =
     | InvalidEmail(String)
@@ -73,7 +73,7 @@ let validate_form(form : Form) -> Validation(ValidationError, ValidForm) =
 
 The language provides explicit ways to handle incomplete functions:
 
-```mox
+```mn
 # Explicitly mark incomplete code
 let todo(message : String) -> a =
     Partials.todo(message)
@@ -101,7 +101,7 @@ let impossible(message : String) -> a =
 
 ## Pattern Matching with Error Types
 
-```mox
+```mn
 # Combining Maybe values
 match (first_name, last_name) on
 | (Some(first), Some(last)) => full_name(first, last)
@@ -116,7 +116,7 @@ match (validate_email, validate_age) on
 
 ## Error Propagation
 
-```mox
+```mn
 # Using pipe operators with error handling
 input
 |> validate_email
@@ -127,6 +127,6 @@ input
 ## FFI Error Handling
 
 When interfacing with Zig through FFI:
-- Zig errors must be mapped to appropriate Mox error types
+- Zig errors must be mapped to appropriate Midnite error types
 - FFI boundaries should have clear error contracts
 - Consider using custom error types for FFI-specific errors

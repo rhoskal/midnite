@@ -2017,7 +2017,7 @@ pub const Lexer = struct {
 
 const testing = std.testing;
 
-const TEST_FILE = "test.mox";
+const TEST_FILE = "test.mn";
 
 const TestCase = struct {
     source: []const u8,

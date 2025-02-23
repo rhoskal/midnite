@@ -92,12 +92,12 @@ pub fn executeCommand(allocator: std.mem.Allocator, command: Command) !void {
 pub const version = "0.1.0";
 
 pub fn printVersion() void {
-    std.debug.print("mox v{s}\n", .{version});
+    std.debug.print("midnite v{s}\n", .{version});
 }
 
 pub fn printUsage() void {
     std.debug.print(
-        \\Usage: mox <command>
+        \\Usage: midnite <command>
         \\
         \\Options:
         \\    -h, --help       Print help information

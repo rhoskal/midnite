@@ -1396,7 +1396,7 @@ pub const Node = union(enum) {
 
 const testing = std.testing;
 
-const TEST_FILE = "test.mox";
+const TEST_FILE = "test.mn";
 
 // AST node tests verify:
 // 1. Construction - Node fields are properly initialized with correct types/values

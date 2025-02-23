@@ -11,7 +11,7 @@ Core functions and types that are automatically imported.
 #### Maybe
 
 Optional values:
-```mox
+```mn
 type Maybe(a) = 
     | None 
     | Some(a)
@@ -20,7 +20,7 @@ type Maybe(a) =
 #### Result
 
 Error handling:
-```mox
+```mn
 type Result(e, a) = 
     | Err(e)
     | Ok(a)
@@ -29,14 +29,14 @@ type Result(e, a) =
 #### Validation
 
 Error accumulation:
-```mox
+```mn
 type Validation(e, a)
 ```
 
 #### List
 
 Immutable linked lists:
-```mox
+```mn
 type List(a) =
     | Nil
     | a :: List(a)
@@ -45,7 +45,7 @@ type List(a) =
 #### NonEmpty
 
 Non-empty collections:
-```mox
+```mn
 type NonEmpty(a) =
     | [a]
     | a :: List(a)
@@ -54,7 +54,7 @@ type NonEmpty(a) =
 #### Set
 
 Unique collections:
-```mox
+```mn
 type Set ...
 ```
 
@@ -63,14 +63,14 @@ type Set ...
 #### Eff
 
 Synchronous effects handling:
-```mox
+```mn
 type Eff(e, a)
 ```
 
 #### Aff
 
 Asynchronous effects handling:
-```mox
+```mn
 type Aff(e, a)
 ```
 
@@ -79,28 +79,28 @@ type Aff(e, a)
 #### Boolean
 
 Boolean operations and combinators:
-```mox
+```mn
 ...
 ```
 
 #### Float
 
 Floating point operations:
-```mox
+```mn
 ...
 ```
 
 #### String
 
 String manipulation and processing:
-```mox
+```mn
 ...
 ```
 
 #### Unit
 
 Unit type and operations:
-```mox
+```mn
 type Unit = Unit
 ```
 
@@ -109,7 +109,7 @@ type Unit = Unit
 #### Tuple
 
 Tuple types and operations:
-```mox
+```mn
 ...
 ```
 
@@ -118,7 +118,7 @@ Tuple types and operations:
 #### Comparable
 
 Interface for orderable types:
-```mox
+```mn
 ...
 ```
 
@@ -127,7 +127,7 @@ Interface for orderable types:
 #### Bitwise
 
 Low-level bitwise operations:
-```mox
+```mn
 ...
 ```
 
@@ -141,7 +141,7 @@ Low-level bitwise operations:
 ### Usage Guidelines
 
 1. **Importing**
-   ```mox
+   ```mn
    # Most common modules available in prelude
    # Import others explicitly
    open List
@@ -149,7 +149,7 @@ Low-level bitwise operations:
    ```
 
 2. **Effect Handling**
-   ```mox
+   ```mn
    # Synchronous effects
    let io() : Eff(IO, a)
 
@@ -158,7 +158,7 @@ Low-level bitwise operations:
    ```
 
 3. **Error Handling**
-   ```mox
+   ```mn
    # Optional values
    let find(list : List(a), x : a) -> Maybe(a)
 

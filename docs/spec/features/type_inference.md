@@ -2,7 +2,7 @@
 
 ## Overview
 
-Mox implements complete type inference using an extended Hindley-Milner type system. Type annotations are optional but supported for documentation and clarity.
+Midnite implements complete type inference using an extended Hindley-Milner type system. Type annotations are optional but supported for documentation and clarity.
 
 ## Core Principles
 
@@ -15,7 +15,7 @@ Mox implements complete type inference using an extended Hindley-Milner type sys
 
 ### Basic Inference
 
-```mox
+```mn
 # Inferred: (Int, Int) -> Int
 let add = 
     fn(x, y) => x + y
@@ -34,7 +34,7 @@ let prepend =
 
 ### Record Type Inference
 
-```mox
+```mn
 # Inferred: { name : String, age : Int } -> String
 let get_name(record) = record.name
 
@@ -44,7 +44,7 @@ let person = { name = "Alice", age = 30 }
 
 ### Function Composition
 
-```mox
+```mn
 # Inferred: ((b -> c), (a -> b), a) -> c
 let compose(f, g, x) =
     f(g(x))
@@ -58,7 +58,7 @@ let map(xs, f) =
 
 ### Generic Types
 
-```mox
+```mn
 # Inferred: (Maybe(a), b) -> b
 let maybe(opt, default) =
     match opt on
@@ -76,7 +76,7 @@ let either(result, success, error) =
 
 While never required, type annotations can be added for clarity:
 
-```mox
+```mn
 # Inferred: (Int) -> Int  
 let increment(x) = x + 1  
 
@@ -104,7 +104,7 @@ let map(xs, f) =
 
 ### Pipeline Inference
 
-```mox
+```mn
 # Types are inferred through the pipeline
 data
 |> transform    # a -> b
@@ -114,7 +114,7 @@ data
 
 ### Higher-Order Function Inference
 
-```mox
+```mn
 # Type parameters are properly propagated
 let apply(x, f) = f(x)
 let double(n) = n * 2

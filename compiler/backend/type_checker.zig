@@ -294,7 +294,7 @@ const TypeChecker = struct {
 
 const testing = std.testing;
 
-const TEST_FILE = "test.mox";
+const TEST_FILE = "test.mn";
 
 test "[char_literal]" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};

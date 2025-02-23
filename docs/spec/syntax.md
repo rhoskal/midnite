@@ -175,7 +175,7 @@ Operators are listed in descending order of precedence:
 
 ### Syntax
 The syntax for conditional statements is:
-```mox
+```mn
 if <condition> then
   <expression>
 else if <condition> then
