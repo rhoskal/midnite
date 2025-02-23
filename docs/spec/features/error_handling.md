@@ -12,18 +12,21 @@ Mox takes a systematic approach to error handling through the type system. There
 Used when a value might or might not be present.
 
 ```mox
-type Maybe a = 
+type Maybe(a) = 
     | None 
-    | Some a
+    | Some(a)
 
 # Examples
-let find_user : String -> Maybe User
-let parse_age : String -> Maybe Int
+let find_user(username : String) -> Maybe(User) =
+    ...
+
+let parse_age(input : String) -> Maybe(Int) =
+    ...
 
 # Pattern matching with Maybe
 match user on
 | None => show_login_prompt
-| Some u => greet_user u
+| Some(u) => greet_user(u)
 ```
 
 ## Result Type
@@ -31,18 +34,24 @@ match user on
 Used when an operation can fail with a specific error.
 
 ```mox
-type Result e a = 
-    | Err e 
-    | Ok a
+type Result(e, a) =
+    | Err(e)
+    | Ok(a)
 
 # Examples
-let divide : Int -> Int -> Result String Int
-let read_file : String -> Result IOError String
+let divide(dividend : Int, divisor : Int) -> Result(String, Int) =
+    if divisor == 0 then
+        Err("Division by zero")
+    else
+        Ok(dividend / divisor)
+
+let read_file(path : String) -> Result(IOError, String) =
+    ...
 
 # Pattern matching with Result
 match result on
-| Err msg => handle_error msg
-| Ok value => process_value value
+| Err(msg) => handle_error(msg)
+| Ok(value) => process_value(value)
 ```
 
 ## Validation Type
@@ -51,12 +60,13 @@ Used when you need to accumulate multiple errors rather than fail fast.
 
 ```mox
 # Example: Form validation
-type ValidationError = 
-    | InvalidEmail String
-    | InvalidAge Int
+type ValidationError =
+    | InvalidEmail(String)
+    | InvalidAge(Int)
     | PasswordTooShort
 
-let validate_form : Form -> Validation ValidationError ValidForm
+let validate_form(form : Form) -> Validation(ValidationError, ValidForm) =
+    ...
 ```
 
 ## Partial Functions
@@ -65,10 +75,12 @@ The language provides explicit ways to handle incomplete functions:
 
 ```mox
 # Explicitly mark incomplete code
-let todo = Partials.todo "Not implemented yet"
+let todo(message : String) -> a =
+    Partials.todo(message)
 
 # Mark impossible cases
-let impossible = Partials.panic "This should never happen"
+let impossible(message : String) -> a =
+    Partials.panic(message)
 ```
 
 ## Error Handling Guidelines
@@ -92,14 +104,14 @@ let impossible = Partials.panic "This should never happen"
 ```mox
 # Combining Maybe values
 match (first_name, last_name) on
-| (Some first, Some last) => full_name first last
+| (Some(first), Some(last)) => full_name(first, last)
 | _ => default_name
 
 # Combining Results
 match (validate_email, validate_age) on
-| (Err e, _) => handle_error e
-| (_, Err e) => handle_error e
-| (Ok email, Ok age) => create_user email age
+| (Err(e), _) => handle_error(e)
+| (_, Err(e)) => handle_error(e)
+| (Ok(email), Ok(age)) => create_user(email, age)
 ```
 
 ## Error Propagation
@@ -108,8 +120,8 @@ match (validate_email, validate_age) on
 # Using pipe operators with error handling
 input
 |> validate_email
-|> Result.map validate_password
-|> Result.map create_user
+|> Result.map(fn(x) => validate_password(x))
+|> Result.map(fn(x) => create_user(x))
 ```
 
 ## FFI Error Handling

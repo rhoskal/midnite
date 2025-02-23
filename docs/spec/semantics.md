@@ -7,14 +7,14 @@
 - Pipeline oriented (data transformation focus)
 - Eagerly evaluated (strict evaluation)
 - Immutable data structures
-- All functions are curried
+- All functions are non-curried
 - No null values
 - Tail call optimization
 - Static typing with nominal types
 
 ### Pipeline-Oriented Programming
 
-Pipeline-oriented programming emphasizes data transformation through a series of discrete steps. Functions are designed to be composable and "data-last" to support natural pipeline construction using the pipe operators (`|>` and `<|`).
+Pipeline-oriented programming emphasizes data transformation through a series of discrete steps. Functions are designed to be composable and "data-first" to support natural pipeline construction using the pipe operator (`|>`).
 
 Example:
 ```mox
@@ -34,11 +34,9 @@ some_data
 
 ### Function Evaluation
 
-- Functions are curried by default
+- Functions are non-curried 
 - Arguments are evaluated left-to-right
 - Last expression in a block is the implicit return value
-- Partial application is supported
-- Function composition preserves type safety
 
 ### Pattern Matching
 
@@ -114,23 +112,24 @@ match value on
 
 ```mox
 # These are equivalent:
-add 1 2
-(add 1) 2      # Due to currying
-1 |> add 2     # Right pipe
-add 2 <| 1     # Left pipe
+add(1, 2)
+1 |> add(2)     # Right pipe
 ```
 
 ### Effect Handling
 
 ```mox
 # Pure function
-let pure : Int -> Int
+let pure(n : Int) -> Int =
+    ...
 
 # Function with effects
-let effectful : Int -> Eff () Int
+let effectful(n : Int) -> Eff((), Int) =
+    ...
 
 # Async function with possible errors
-let async : String -> Aff HttpErr Response
+let async(url : String) -> Aff(HttpErr, Response) =
+    ...
 ```
 
 ## Control Flow

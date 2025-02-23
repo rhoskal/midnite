@@ -1,292 +1,273 @@
 module Prelude exposing
-  ( abs
-  , always
-  , even?
-  , gcd
-  , identity
-  , lcm
-  , max
-  , min
-  , negate
-  , odd?
-  , pow
-  , (|>)
-  , (<|)
-  , (||)
-  , (&&)
-  , (^)
-  , (==)
-  , (/=)
-  , (<)
-  , (>)
-  , (<=)
-  , (>=)
-  , (..)
-  , (<>)
-  , (::)
-  , (+)
-  , (-)
-  , (+.)
-  , (-.)
-  , (.|.)
-  , (.^.)
-  , (*)
-  , (/)
-  , (*.)
-  , (/.)
-  , (.&.)
-  , (.>>.)
-  , (.<<.)
-  , (^^)
-  , (**)
-  , (.~.)
-  , (<<)
-  , (>>)
-  )
+    ( abs
+    , always
+    , even?
+    , gcd
+    , identity
+    , lcm
+    , max
+    , min
+    , negate
+    , odd?
+    , pow
+    , (|>)
+    , (||)
+    , (&&)
+    , (^)
+    , (==)
+    , (/=)
+    , (<)
+    , (>)
+    , (<=)
+    , (>=)
+    , (..)
+    , (<>)
+    , (+)
+    , (-)
+    , (+.)
+    , (-.)
+    , (.|.)
+    , (.^.)
+    , (*)
+    , (/)
+    , (*.)
+    , (/.)
+    , (.&.)
+    , (.>>.)
+    , (.<<.)
+    , (^^)
+    , (**)
+    , (.~.)
+    )
 
-  include Boolean
-  include Compareable
+    include Boolean
+    include Compareable
 
-  foreign int_add : Int -> Int -> Int = "zig_int_add"
-  foreign int_sub : Int -> Int -> Int = "zig_int_sub"
-  foreign int_mul : Int -> Int -> Int = "zig_int_mul"
-  foreign int_div : Int -> Int -> Int = "zig_int_div"
-  foreign int_pow : Int -> Int -> Int = "zig_int_pow"
-  foreign int_min : Int -> Int -> Int = "zig_int_min"
-  foreign int_max : Int -> Int -> Int = "zig_int_max"
+    foreign int_add(x : Int, y : Int) -> Int = "zig_int_add"
+    foreign int_sub(x : Int, y : Int) -> Int = "zig_int_sub"
+    foreign int_mul(x : Int, y : Int) -> Int = "zig_int_mul"
+    foreign int_div(x : Int, y : Int) -> Int = "zig_int_div"
+    foreign int_pow(x : Int, y : Int) -> Int = "zig_int_pow"
+    foreign int_min(x : Int, y : Int) -> Int = "zig_int_min"
+    foreign int_max(x : Int, y : Int) -> Int = "zig_int_max"
 
-  # HELPFUL FUNCTIONS
+    # =============================
+    #      HELPFUL FUNCTIONS
+    # =============================
 
-  ## ??
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ identity 42
-  ## 42
-  ## ```
-  let identity : a -> a =
-    \a =>
-      a
+    ## ??
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ identity(42)
+    ## 42 : Int
+    ## ```
+    let identity(x : a) -> a =
+        x
 
-  ## ??
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ always 42 0
-  ## 42 : Int
-  ## ```
-  let always : a -> b -> a =
-    \a _ =>
-      a
+    ## ??
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ always(42, 0)
+    ## 42 : Int
+    ## ```
+    let always(x : a, _ : b) -> a =
+        x
 
-  ## Reverse-application operator: `x |> f |> g` is exactly equivalent to `g (f (x))`
-  let ap_right : a -> (a -> b) -> b =
-    \x f =>
-      f x
+    ## Reverse-application operator: `x |> f |> g` is exactly equivalent to `g(f(x))`
+    let ap_right(x : a, f : (a -> b)) -> b =
+        f(x)
 
-  ## Application operator: `g <| f <| x` is exactly equivalent to `g (f (x))`
-  let ap_left : (a -> b) -> a -> b =
-    \f x =>
-      f x
+    # =============================
+    #      INTEGER ARITHMETIC
+    # =============================
 
-  let compose_left : (b -> c) -> (a -> b) -> (a -> c) =
-    \g f x =>
-      g (f x)
+    ## Calculates the addition of two integers.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ add(40, 2)
+    ## 42 : Int
+    ## ```
+    let add(x : Int, y : Int) -> Int =
+        int_add(x, y)
 
-  let compose_right : (a -> b) -> (b -> c) -> (a -> c) =
-    \f g x =>
-      g (f x)
+    ## Calculates the subtraction of two integers.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ sub(44, 2)
+    ## 42 : Int
+    ## ```
+    let sub(x : Int, y : Int) -> Int =
+        int_sub(x, y)
 
-  # INTEGER ARITHMETIC
+    ## Calculates the multiplication of two integers.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ mul(2, 21)
+    ## 42 : Int
+    ## ```
+    let mul(x : Int, y : Int) -> Int =
+        int_mul(x, y)
 
-  ## Calculates the addition of two integers.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ add 40 2
-  ## 42 : Int
-  ## ```
-  let add : Int -> Int -> Int = int_add
+    ## Calculates the division of two integers.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ div(2, 84)
+    ## 42 : Int
+    ## ```
+    let div(x : Int, y : Int) -> Int =
+        int_div(x, y)
 
-  ## Calculates the subtraction of two integers.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ sub 44 2
-  ## 42 : Int
-  ## ```
-  let sub : Int -> Int -> Int = int_sub
+    ## Determines if a number is even.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ even?(4)
+    ## True : Bool
+    ## ```
+    let even?(n : Int) -> Bool =
+        mod(n, 2) == 0
 
-  ## Calculates the multiplication of two integers.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ mul 2 21
-  ## 42 : Int
-  ## ```
-  let mul : Int -> Int -> Int = int_mul
+    ## Determines if a number is odd.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ odd?(3)
+    ## True : Bool
+    ## ```
+    let odd?(n : Int) -> Bool =
+        mod(n, 2) /= 0
 
-  ## Calculates the division of two integers.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ div 2 84
-  ## 42 : Int
-  ## ```
-  let div : Int -> Int -> Int = int_div
+    ## Returns the greatest common divisor of the two integers.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ gcd(8, 12)
+    ## 4 : Int
+    ## ```
+    let gcd(a : Int, b : Int) -> Int =
+        if b == 0 then
+            a
+        else
+            gcd(b, mod(a, b))
 
-  ## Determines if a number is even.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ even? 4
-  ## True : Bool
-  ## ```
-  let even? : Int -> Bool =
-    \n =>
-      mod n 2 == 0
+    ## Determines the smallest positive integer that is divisible by both *a* and *b*
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ lcm(21, 6)
+    ## 42 : Int
+    ## ```
+    let lcm(a : Int, b : Int) -> Int =
+        abs(a * b) / gcd(a, b)
 
-  ## Determines if a number is odd.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ odd? 3
-  ## True : Bool
-  ## ```
-  let odd? : Int -> Bool =
-    \n =>
-      mod n 2 /= 0
+    ## Calculates the value of *a* to the power of *b*.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ pow(9, 3)
+    ## 729 : Int
+    ## ```
+    let pow(x : Int, y : Int) -> Int =
+        int_pow(x, y)
 
-  ## Returns the greatest common divisor of the two integers.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ gcd 8 12
-  ## 4 : Int
-  ## ```
-  let gcd : Int -> Int -> Int =
-    \a b =>
-      if b == 0 then
-        a
-      else
-        gcd b (mod a b)
+    ## Integer remainder.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ mod(42, 8)
+    ## 2 : Int
+    ## ```
+    let mod(a : Int, b : Int) -> Int =
+        a - b * (a / b)
 
-  ## Determines the smallest positive integer that is divisible by both *a* and *b*
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ lcm 21 6
-  ## 42 : Int
-  ## ```
-  let lcm : Int -> Int -> Int =
-    \a b =>
-      abs (a * b) / gcd a b
-
-  ## Calculates the value of *a* to the power of *b*.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ pow 9 3
-  ## 729 : Int
-  ## ```
-  let pow : Int -> Int -> Int = int_pow
-
-  ## Integer remainder.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ mod 42 8
-  ## 2 : Int
-  ## ```
-  let mod : Int -> Int -> Int =
-    \a b =>
-      a - b * (a / b)
-
-  ## Negate a number.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ negate 42
-  ## -42 : Int
-  ## ```
-  let negate : Int -> Int =
-    \n =>
-      -n
-
-  ## Get the absolute value of a number.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ abs -42
-  ## 42 : Int
-  ## ```
-  let abs : Int -> Int =
-    \n =>
-      if x < 0 then
+    ## Negate a number.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ negate(42)
+    ## -42 : Int
+    ## ```
+    let negate(n : Int) -> Int =
         -n
-      else
-        n
 
-  ## Clamps a number within a given range.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ clamp 100 200 99
-  ## 100 : Int
-  ## ```
-  let clamp : Int -> Int -> Int -> Int =
-    \low high n =>
-      if n < low then
-        low
-      else if n > high then
-        high
-      else
-        n
+    ## Get the absolute value of a number.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ abs(-42)
+    ## 42 : Int
+    ## ```
+    let abs(n : Int) -> Int =
+        if x < 0 then
+            -n
+        else
+            n
 
-  let max : Int = int_max
+    ## Clamps a number within a given range.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ clamp(100, 200, 99)
+    ## 100 : Int
+    ## ```
+    let clamp(low : Int, high : Int, n : Int) -> Int =
+        if n < low then
+            low
+        else if n > high then
+            high
+        else
+            n
 
-  let min : Int = int_min
+    let max() -> Int =
+        int_max()
 
-  # INFIX OPERATORS
+    let min() -> Int =
+        int_min()
 
-  infixr 2  (<|)  = pipe_left
-  infixl 2  (|>)  = pipe_right
-  infixr 3  (||)  = logical_or
-  infixr 4  (&&)  = logical_and
-  infixn 5  (==)  = eq
-  infixn 5  (/=)  = neq
-  infixn 5  (<)   = lt
-  infixn 5  (>)   = gt
-  infixn 5  (<=)  = lte
-  infixn 5  (>=)  = gte
-  infixr 6  (++)  = List.concat
-  infixr 7  (<>)  = Str.concat
-  infixr 8  (..)  = range
-  infixr 9  (::)  = cons
-  infixl 10 (<<)  = compose_left
-  infixr 10 (>>)  = compose_right
-  infixl 11 (+)   = add
-  infixl 11 (-)   = sub
-  infixl 11 (+.)  = Float.add
-  infixl 11 (-.)  = Float.sub
-  infixl 12 (*)   = mul
-  infixl 12 (/)   = div
-  infixl 12 (*.)  = Float.mul
-  infixl 12 (/.)  = Float.div
-  infixl 13 (**)  = Float.pow
+    # =============================
+    #        INFIX OPERATORS
+    # =============================
+
+    infixl 2  (|>)  = pipe_right
+    infixr 3  (||)  = logical_or
+    infixr 4  (&&)  = logical_and
+    infixn 5  (==)  = eq
+    infixn 5  (/=)  = neq
+    infixn 5  (<)   = lt
+    infixn 5  (>)   = gt
+    infixn 5  (<=)  = lte
+    infixn 5  (>=)  = gte
+    infixr 6  (++)  = List.concat
+    infixr 7  (<>)  = Str.concat
+    infixr 8  (..)  = range
+    infixl 9  (+)   = add
+    infixl 9  (-)   = sub
+    infixl 9  (+.)  = Float.add
+    infixl 9  (-.)  = Float.sub
+    infixl 10 (*)   = mul
+    infixl 10 (/)   = div
+    infixl 10 (*.)  = Float.mul
+    infixl 10 (/.)  = Float.div
+    infixl 11 (**)  = Float.pow
 end

@@ -12,41 +12,43 @@ Core functions and types that are automatically imported.
 
 Optional values:
 ```mox
-type Maybe a = 
+type Maybe(a) = 
     | None 
-    | Some a
+    | Some(a)
 ```
 
 #### Result
 
 Error handling:
 ```mox
-type Result e a = 
-    | Err e 
-    | Ok a
+type Result(e, a) = 
+    | Err(e)
+    | Ok(a)
 ```
 
 #### Validation
 
 Error accumulation:
 ```mox
-type Validation e a
+type Validation(e, a)
 ```
 
 #### List
 
 Immutable linked lists:
 ```mox
-type List a = 
-    | [] 
-    | (::) a (List a)
+type List(a) =
+    | Nil
+    | a :: List(a)
 ```
 
 #### NonEmpty
 
 Non-empty collections:
 ```mox
-type NonEmpty a = a :: List a
+type NonEmpty(a) =
+    | [a]
+    | a :: List(a)
 ```
 
 #### Set
@@ -62,14 +64,14 @@ type Set ...
 
 Synchronous effects handling:
 ```mox
-type Eff e a
+type Eff(e, a)
 ```
 
 #### Aff
 
 Asynchronous effects handling:
 ```mox
-type Aff e a
+type Aff(e, a)
 ```
 
 ### Value Types
@@ -149,22 +151,22 @@ Low-level bitwise operations:
 2. **Effect Handling**
    ```mox
    # Synchronous effects
-   let io : Eff IO a
+   let io() : Eff(IO, a)
 
    # Asynchronous effects
-   let async : Aff Error a
+   let async() : Aff(Error, a)
    ```
 
 3. **Error Handling**
    ```mox
    # Optional values
-   let find : a -> List a -> Maybe a
+   let find(list : List(a), x : a) -> Maybe(a)
 
    # Operations that can fail
-   let parse : String -> Result Error Int
+   let parse(str : String) -> Result(Error, Int)
 
    # Accumulating errors
-   let validate : a -> Validation Error b
+   let validate(value : a) -> Validation(Error, b)
    ```
 
 ### Best Practices

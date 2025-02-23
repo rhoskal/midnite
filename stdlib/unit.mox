@@ -1,20 +1,19 @@
 module Unit exposing
-  ( Unit(..)
-  , ignore
-  )
+    ( Unit(..)
+    , ignore
+    )
 
-  type Unit =
-    Unit
+    type Unit =
+        Unit
 
-  ## Discard the value of its argument and return `Unit`.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ ignore 42
-  ## Unit : Unit
-  ## ```
-  let ignore : a -> Unit =
-    \_ =>
-      Unit
+    ## Discard the value of its argument and return `Unit`.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ ignore(42)
+    ## Unit : Unit
+    ## ```
+    let ignore(_ : a) -> Unit =
+        Unit
 end
