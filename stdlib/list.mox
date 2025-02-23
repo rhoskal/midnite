@@ -1,355 +1,340 @@
 module List exposing
-  ( List(..)
-  , all?
-  , alter_at
-  , any?
-  , collect_map
-  , cons
-  , delete_at
-  , empty?
-  , flatten
-  , fold_left
-  , fold_right
-  , head
-  , insert_at
-  , keep
-  , last
-  , map
-  , maximum
-  , member?
-  , minimum
-  , modify_at
-  , product
-  , range
-  , reject
-  , reverse
-  , singleton
-  , size
-  , sum
-  , tail
-  )
+    ( List(..)
+    , all?
+    , alter_at
+    , any?
+    , collect_map
+    , cons
+    , delete_at
+    , empty?
+    , flatten
+    , fold_left
+    , fold_right
+    , head
+    , insert_at
+    , keep
+    , last
+    , map
+    , maximum
+    , member?
+    , minimum
+    , modify_at
+    , product
+    , range
+    , reject
+    , reverse
+    , singleton
+    , size
+    , sum
+    , tail
+    )
 
-  type List a =
-    | []
-    | a :: List a
+    type List(a) =
+        | Nil
+        | a :: List(a)
 
-  let cons : a -> List a -> List a =
-    \x xs =>
-      todo "not implemented"
+    let cons(xs : List(a), x : a) -> List(a) =
+        x :: xs
 
-  ## Create a list with only one element.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ List.singleton 42
-  ## [42] : List Int
-  ## ```
-  let singleton : a -> List a =
-    \x =>
-      [x]
+    ## Create a list with only one element.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ List.singleton(42)
+    ## [42] : List(Int)
+    ## ```
+    let singleton(x : a) -> List(a) =
+        x :: Nil
 
-  ## Test whether a list is empty.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ List.empty? [42]
-  ## False : Bool
-  ##
-  ## ➢ List.empty? []
-  ## True : Bool
-  ## ```
-  let empty? : List a -> Bool =
-    \list =>
-      match list on
-      | [] => True
-      | _ => False
+    ## Test whether a list is empty.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ List.empty?([42])
+    ## False : Bool
+    ##
+    ## ➢ List.empty?(Nil)
+    ## True : Bool
+    ## ```
+    let empty?(list : List(a)) -> Bool =
+        match list on
+        | Nil => True
+        | _ => False
 
-  ## Get the size of a list.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ List.size [42]
-  ## 1 : Int
-  ##
-  ## ➢ List.size []
-  ## 0 : Int
-  ## ```
-  let size : List a -> Int =
-    \list =>
-      fold_left (\acc _ => acc + 1) 0 list
-
-  ## Determine if a list contains a value.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ List.member? 42 [42]
-  ## True : Bool
-  ##
-  ## ➢ List.member? 0 []
-  ## False : Bool
-  ## ```
-  let member? : a -> List a -> Bool =
-    \elem list =>
-      any (\x => x == elem) list
-
-  ## Determine if all elements satisfy some test.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ List.all? Math.even? [2, 4, 6]
-  ## True : Bool
-  ## ```
-  let all? : (a -> Bool) -> List a -> Bool =
-    \predicate list =>
-      not (any (not << predicate) list)
-
-  ## Determine if any elements satisfy some test.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ List.any? (== 4) [2, 4, 6]
-  ## True : Bool
-  ## ```
-  let any? : (a -> Bool) -> List a -> Bool =
-    \predicate list =>
-      match list on
-      | [] => False
-      | x :: xs =>
-          if predicate x then
-            True
-          else
-            any predicate xs
-
-  ## Reduce a list from the left.
-  let fold_left : (a -> b -> b) -> b -> List a -> b =
-    \f acc list =>
-      match list on
-      | [] => acc
-      | x :: xs => fold_left f (f x acc) xs
-
-  ## Reduce a list from the right.
-  let fold_right : (a -> b -> b) -> b -> List a -> b =
-    \f acc list =>
-      todo "not implemented"
-
-  ## Get the first element in a list, or `None` if the list is empty.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ List.head [1, 2, 3]
-  ## Some 1 : Maybe Int
-  ##
-  ## ➢ List.head ([] : List Int)
-  ## None : Maybe Int
-  ## ```
-  let head : List a -> Maybe a =
-    \list =>
-      match list on
-      | [] => None
-      | x :: _ => Some x
-
-  ## Get all but the first element of a list, or `None` if the list is empty.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ List.tail [1, 2, 3]
-  ## Some [2, 3] : Maybe (List Int)
-  ##
-  ## ➢ List.tail ([] : List Int)
-  ## None : Maybe (List Int)
-  ## ```
-  let tail : List a -> Maybe (List a) =
-    \list =>
-      match list on
-      | [] => None
-      | _ :: xs => Some xs
-
-  ## Get the last element in a list, or `None` if the list is empty.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ List.last [1, 2, 3]
-  ## Some 3 : Maybe Int
-  ##
-  ## ➢ List.last ([] : List Int)
-  ## None : Maybe Int
-  ## ```
-  let last : List a -> Maybe a =
-    \list =>
-      match list on
-      | x :: [] => Some x
-      | _ :: xs => last xs
-      | _ => None
-
-  ## Reverse a list.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ List.reverse [1, 2, 3]
-  ## [3, 2, 1] : List Int
-  ## ```
-  let reverse : List a -> List a =
-    \list =>
-      fold_left cons [] list
-
-  ## Apply a function to every element in a list.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ List.map (* 2) [1, 2, 3]
-  ## [2, 4, 6] : List Int
-  ## ```
-  let map : (a -> b) -> List a -> List b =
-    \f list =>
-      fold_right (\x acc => cons (f x) acc) [] list
-
-  ## Keep elements that satisfy the given predicate.
-  let keep : (a -> Bool) -> List a -> List a =
-    \predicate list =>
-      fold_right (\x xs =>
-        if predicate x then
-          cons x xs
-        else
-          xs
-      ) [] list
-
-  ## Exclude elements that satisfy the given predicate.
-  let reject : (a -> Bool) -> List a -> List a =
-    \predicate list =>
-      fold_right (\x xs =>
-        if predicate x then
-          xs
-        else
-          cons x xs
-      ) [] list
-
-  ## Applies filter and map simultaneously.
-  let collect_map : (a -> Maybe b) -> List a -> List b =
-    \f list =>
-      fold_right (\mx xs =>
-        match f mx on
-        | None => xs
-        | Some x => cons x xs
-      ) [] list
-
-  ## Create a list of numbers, every element increasing by one.
-  let range : Int -> Int -> List Int =
-    \start end =>
-      range_helper start end []
-
-  let range_helper : Int -> Int -> List Int -> List Int =
-    \start end list =>
-      if start <= end then
-        range_helper start (end - 1) (cons end list)
-      else
+    ## Get the size of a list.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ List.size([42])
+    ## 1 : Int
+    ##
+    ## ➢ List.size(Nil)
+    ## 0 : Int
+    ## ```
+    let size(list : List(a)) -> Int =
         list
+        |> fold_left(0, fn(acc, _) => acc + 1)
 
-  let insert_at : Int -> a -> List a -> Maybe (List a) =
-    \index elem list =>
-      match list on
-      | x :: xs when index == 0 => Some (elem :: list)
-      | x :: xs =>
-        insert_at (index - 1) elem xs
-        |> Maybe.map (\rest => x :: rest)
-      | _ => None
+    ## Determine if a list contains a value.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ List.member?([42], 42)
+    ## True : Bool
+    ##
+    ## ➢ List.member?(Nil, 0)
+    ## False : Bool
+    ## ```
+    let member?(list : List(a), elem : a) -> Bool =
+        any?(list, fn(x) => x == elem)
 
-  let delete_at : Int -> List a -> Maybe (List a) =
-    \index list =>
-      match list on
-      | x :: xs when index == 0 => Some xs
-      | x :: xs =>
-        delete_at (index - 1) xs
-        |> Maybe.map (\rest => x :: rest)
-      | _ => None
+    ## Determine if all elements satisfy some test.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ List.all?([2, 4, 6], fn(x) => Math.even?(x))
+    ## True : Bool
+    ## ```
+    let all?(list : List(a), predicate : (a -> Bool)) -> Bool =
+        not(any?(list, fn(x) => not(predicate(x))))
 
-  let modify_at : Int -> (a -> a) -> List a -> Maybe (List a) =
-    \index f list =>
-      alter_at index (Some << f)
+    ## Determine if any elements satisfy some test.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ List.any?([2, 4, 6] fn(x) => x == 4)
+    ## True : Bool
+    ## ```
+    let any?(list : List(a), predicate : (a -> Bool)) -> Bool =
+        match list on
+        | Nil => False
+        | x :: xs =>
+            if predicate(x) then
+                True
+            else
+                any?(xs, predicate)
 
-  let alter_at : Int -> (a -> Maybe a) -> List a -> Maybe (List a) =
-    \index f list =>
-      todo "not implemented"
+    ## Reduce a list from the left.
+    let fold_left(list : List(a), acc : b, f : (b, a) -> b) -> b =
+        match list on
+        | Nil => acc
+        | x :: xs => fold_left(xs, f(acc, x), f)
 
-  let flatten : List (List a) -> List a =
-    \lol =>
-      List.and_then identity lol
+    ## Reduce a list from the right.
+    let fold_right(list : List(a), acc : b, f : (a, b) -> b) -> b =
+        match list on
+        | Nil => acc
+        | x :: xs => f(x, fold_right(xs, acc, f))
 
-  ## Find the maximum element in a list.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ List.maximum [1, 4, 2]
-  ## Some 4 : Maybe Int
-  ##
-  ## ➢ List.maximum [] : Maybe Int
-  ## None : Maybe Int
-  ## ```
-  let maximum : List comparable -> Maybe comparable =
-    \list =>
-      match list on
-      | x :: xs => Some (fold_left max x xs)
-      | _ -> None
+    ## Get the first element in a list, or `None` if the list is empty.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ List.head([1, 2, 3])
+    ## Some(1) : Maybe(Int)
+    ##
+    ## ➢ List.head(Nil : List(Int))
+    ## None : Maybe(Int)
+    ## ```
+    let head(list : List(a)) -> Maybe(a) =
+        match list on
+        | Nil => None
+        | x :: _ => Some(x)
 
-  ## Find the minimum element in a non-empty list.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ List.minimum [3, 2, 1]
-  ## Some 1 : Maybe Int
-  ##
-  ## ➢ List.minimum [] : Maybe Int
-  ## None : Maybe Int
-  ## ```
-  let minimum : List comparable -> Maybe comparable =
-    \list =>
-      match list on
-      | x :: xs => Some (fold_left min x xs)
-      | _ => None
+    ## Get all but the first element of a list, or `None` if the list is empty.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ List.tail([1, 2, 3])
+    ## Some([2, 3]) : Maybe(List(Int))
+    ##
+    ## ➢ List.tail(Nil : List(Int))
+    ## None : Maybe(List(Int))
+    ## ```
+    let tail(list : List(a)) -> Maybe(List(a)) =
+        match list on
+        | Nil => None
+        | _ :: xs => Some(xs)
 
-  ## Get the sum of the list elements.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ List.sum [3, 2, 1]
-  ## 6.0 : Double
-  ##
-  ## ➢ List.sum []
-  ## 0.0 : Double
-  ## ```
-  let sum : List Number -> Number =
-    \numbers =>
-      fold_left (\num acc =>
-        match num on
-        | Int x => acc +. double_from_int x
-        | Double x => acc +. x
-      ) 0.0 numbers
+    ## Get the last element in a list, or `None` if the list is empty.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ List.last([1, 2, 3])
+    ## Some(3) : Maybe(Int)
+    ##
+    ## ➢ List.last(Nil : List(Int))
+    ## None : Maybe(Int)
+    ## ```
+    let last(list : List(a)) -> Maybe(a) =
+        match list on
+        | x :: Nil => Some(x)
+        | _ :: xs => last(xs)
+        | _ => None
 
-  ## Get the product of the list elements.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ List.product [2, 4, 6]
-  ## 48 : Int
-  ##
-  ## ➢ List.product [] : Int
-  ## 1 : Int
-  ## ```
-  let product : List Number -> Number =
-    \numbers =>
-      fold_left (*) 1 numbers
+    ## Reverse a list.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ List.reverse([1, 2, 3])
+    ## [3, 2, 1] : List(Int)
+    ## ```
+    let reverse(list : List(a)) -> List(a) =
+        fold_left(list, Nil, fn(xs, x) => cons(xs, x))
+
+    ## Apply a function to every element in a list.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ List.map([1, 2, 3], fn(x) => x * 2)
+    ## [2, 4, 6] : List(Int)
+    ## ```
+    let map(list : List(a), f : (a -> b)) -> List(b) =
+        fold_right(list, Nil, fn(x, acc) => cons(acc, f(x)))
+
+    ## Keep elements that satisfy the given predicate.
+    let keep(list : List(a), predicate : (a -> Bool)) -> List(a) =
+        list
+        |> fold_right(
+            Nil,
+            fn(x, xs) =>
+                if predicate(x) then
+                    cons(xs, x)
+                else
+                    xs
+        )
+
+    ## Exclude elements that satisfy the given predicate.
+    let reject(list : List(a), predicate : (a -> Bool)) -> List(a) =
+        keep(list, fn(x) => not(predicate(x)))
+
+    ## Applies filter and map simultaneously.
+    let collect_map(list : List(a), f : (a -> Maybe(b))) -> List(b) =
+        list
+        |> fold_right(
+            Nil,
+            fn(x, xs) =>
+                match f(x) on
+                | None => xs
+                | Some(y) => cons(xs, y)
+        )
+
+    ## Create a list of numbers, every element increasing by one.
+    let range(start : Int, end : Int) -> List(Int) =
+        if start > end then
+            Nil
+        else
+            cons(range(start + 1, end), start)
+
+    let insert_at(list : List(a), index : Int, elem : a) -> Maybe(List(a)) =
+        match list on
+        | _ when index == 0 => Some(cons(list, elem))
+        | x :: xs =>
+            insert_at(xs, index - 1, elem)
+            |> Maybe.map(fn(rest) => cons(rest, x))
+        | _ => None
+
+    let delete_at(list : List(a), index : Int) -> Maybe(List(a)) =
+        match list on
+        | _ when index == 0 =>
+            match list on
+            | _ :: xs => Some(xs)
+            | _ => None
+        | x :: xs =>
+            delete_at(xs, index - 1)
+            |> Maybe.map(fn(rest) => cons(rest, x))
+        | _ => None
+
+    let modify_at(list : List(a), index : Int, f : (a -> a)) -> Maybe(List(a)) =
+        alter_at(list, index, fn(x) => Some(f(x)))
+
+    let alter_at(list : List(a), index : Int, f : (a -> Maybe(a))) -> Maybe(List(a)) =
+        match list on
+        | _ when index == 0 =>
+            match list on
+            | x :: xs =>
+                f(x)
+                |> Maybe.map(fn(y) => cons(xs, y))
+            | _ => None
+        | x :: xs =>
+            alter_at(xs, index - 1, f)
+            |> Maybe.map(fn(rest) => cons(rest, x))
+        | _ => None
+
+    let flatten(list : List(List(a))) -> List(a) =
+        list
+        |> fold_right(Nil, fn(xs, acc) => fold_right(xs, acc, cons))
+
+    ## Find the maximum element in a list.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ List.maximum([1, 4, 2])
+    ## Some(4) : Maybe(Int)
+    ##
+    ## ➢ List.maximum(Nil : Maybe(Int))
+    ## None : Maybe(Int)
+    ## ```
+    let maximum(list : List(Comparable)) -> Maybe(Comparable) =
+        match list on
+        | x :: xs => Some(fold_left(xs, x, max))
+        | _ => None
+
+    ## Find the minimum element in a non-empty list.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ List.minimum([3, 2, 1])
+    ## Some(1) : Maybe(Int)
+    ##
+    ## ➢ List.minimum(Nil : Maybe(Int))
+    ## None : Maybe(Int)
+    ## ```
+    let minimum(list : List(Comparable)) -> Maybe(Comparable) =
+        match list on
+        | x :: xs => Some(fold_left(xs, x, min))
+        | _ => None
+
+    ## Get the sum of the list elements.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ List.sum([3, 2, 1])
+    ## 6.0 : Double
+    ##
+    ## ➢ List.sum Nil
+    ## 0.0 : Double
+    ## ```
+    let sum(list : List(Number)) -> Number =
+        list
+        |> fold_left(0, fn(acc, x) => acc + x)
+
+    ## Get the product of the list elements.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ List.product [2, 4, 6]
+    ## 48 : Int
+    ##
+    ## ➢ List.product Nil : Int
+    ## 1 : Int
+    ## ```
+    let product(list : List(Number)) -> Number =
+        list
+        |> fold_left(1, fn(acc, x) => acc * x)
 end

@@ -1,68 +1,59 @@
 module Comparable exposing
-  ( Ordering(..)
-  , compare
-  , eq
-  , gt,
-  , gte
-  , lt
-  , lte
-  , max
-  , min
-  , neq
-  )
+    ( Ordering(..)
+    , compare
+    , eq
+    , gt,
+    , gte
+    , lt
+    , lte
+    , max
+    , min
+    , neq
+    )
 
-  type Ordering =
-    | EQ
-    | LT
-    | GT
+    type Ordering =
+        | EQ
+        | LT
+        | GT
 
-  let eq : Bool -> Bool -> Bool =
-    \x y =>
-      if (x == True) and (y == True) then
-        True
-      else
-        False
+    let eq(x : Bool, y : Bool) -> Bool =
+        if (x == True) and (y == True) then
+            True
+        else
+            False
 
-  let neq : Bool -> Bool -> Bool =
-    \x y =>
-      not (eq x y)
+    let neq(x : Bool, y : Bool) -> Bool =
+        not(eq(x, y))
 
-  let lt : comparable -> comparable -> Bool =
-    \x y =>
-      todo "not implemented"
+    let lt(x : comparable, y : comparable) -> Bool =
+        todo("not implemented")
 
-  let gt : comparable -> comparable -> Bool =
-    \x y =>
-      todo "not implemented"
+    let gt(x : comparable, y : comparable) -> Bool =
+        todo("not implemented")
 
-  let lte : comparable -> comparable -> Bool =
-    \x y =>
-      todo "not implemented"
+    let lte(x : comparable, y : comparable) -> Bool =
+        todo("not implemented")
 
-  let gte : comparable -> comparable -> Bool =
-    \x y =>
-      todo "not implemented"
+    let gte(x : comparable, y : comparable) -> Bool =
+        todo("not implemented")
 
-  let compare : comparable -> comparable -> Ordering =
-    \x y =>
-      if x == y then
-        EQ
-      else if x < y then
-        LT
-      else
-        GT
+    let compare(x : comparable, y : comparable) -> Ordering =
+        if x == y then
+            EQ
+        else if x < y then
+            LT
+        else
+            GT
 
-  let min : comparable -> comparable -> comparable =
-    \x y =>
-      if lt x y then
-        x
-      else
-        y
+    let min(x : comparable, y : comparable) -> comparable =
+        if lt(x, y) then
+            x
+        else
+            y
 
-  let max : comparable -> comparable -> comparable =
-    \x y =>
-      if gt x y then
-        x
-      else
-        y
+    let max(x : comparable, y : comparable) -> comparable =
+        if gt(x, y) then
+            x
+        else
+            y
 end

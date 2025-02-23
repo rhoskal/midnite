@@ -1,161 +1,167 @@
 module Result exposing
-  ( Result(..)
-  , and_then
-  , combine
-  , compact
-  , err?
-  , from_maybe
-  , map
-  , map2
-  , map3
-  , map4
-  , map_error
-  , ok?
-  , or
-  , parition
-  , with_default
-  )
+    ( Result(..)
+    , and_then
+    , combine
+    , compact
+    , err?
+    , from_maybe
+    , map
+    , map2
+    , map3
+    , map4
+    , map_error
+    , ok?
+    , or
+    , parition
+    , with_default
+    )
 
-  ## A `Result` is either `Ok` meaning the computation succeeded,
-  ## or it is an `Err` meaning that there was some failure.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ Ok 42 : Result String Int
-  ## Ok 42 : Result String Int
-  ## ```
-  type Result e a =
-    | Err e
-    | Ok a
+    ## A `Result` is either `Ok` meaning the computation succeeded,
+    ## or it is an `Err` meaning that there was some failure.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ Ok(42) : Result(String, Int)
+    ## Ok(42) : Result(String, Int)
+    ## ```
+    type Result(e, a) =
+        | Err(e)
+        | Ok(a)
 
-  ## Check whether the result is `Ok` without unwrapping it.
-  let ok? : Result e a -> Bool =
-    \ra =>
-      match ra on
-      | Err _ => False
-      | Ok _ => True
+    ## Check whether the result is `Ok` without unwrapping it.
+    let ok?(ra : Result(e, a)) -> Bool =
+        match ra on
+        | Err(_) => False
+        | Ok(_) => True
 
-  ## Check whether the result is `Err` without unwrapping it.
-  let err? : Result e a -> Bool =
-    \ra =>
-      match ra on
-      | Err _  => True
-      | Ok _  => False
+    ## Check whether the result is `Err` without unwrapping it.
+    let err?(ra : Result(e, a)) -> Bool =
+        match ra on
+        | Err(_)  => True
+        | Ok(_)  => False
 
-  let with_default : a -> Result e a -> a =
-    \default ra =>
-      match ra on
-      | Err _ => default
-      | Ok a => a
+    let with_default(ra : Result(e, a), default : a) -> a =
+        match ra on
+        | Err(_) => default
+        | Ok(a) => a
 
-  let map : (a -> value) -> Result e a -> Result e value =
-    \f ra =>
-      match ra on
-      | Err e => Err e
-      | Ok a => Ok (f a)
+    let map(ra : Result(e, a), f : (a -> value)) -> Result(e, value) =
+        match ra on
+        | Err(e) => Err(e)
+        | Ok(a) => Ok(f(a))
 
-  let map2 : (a -> b -> value) -> Result e a -> Result e b -> Result e value =
-    \f ra rb =>
-      match ra on
-      | Err e => Err e
-      | Ok a =>
-          match rb on
-          | Err e => Err e
-          | Ok b => Ok (f a b)
+    let map2(
+        ra : Result(e, a),
+        rb : Result(e, b),
+        f : ((a, b) -> value)
+    ) -> Result(e, value) =
+        match ra on
+        | Err(e) => Err(e)
+        | Ok(a) =>
+            match rb on
+            | Err(e) => Err(e)
+            | Ok(b) => Ok(f(a, b))
 
-  let map3 : (a -> b -> c -> value) -> Result e a -> Result e b -> Result e c -> Result e value =
-    \f ra rb rc =>
-      match ra on
-      | Err e => Err e
-      | Ok a =>
-          match rb on
-          | Err e => Err e
-          | Ok b =>
-              match rc on
-              | Err e => Err e
-              | Ok c => Ok (f a b c)
+    let map3(
+        ra : Result(e, a),
+        rb : Result(e, b),
+        rc : Result(e, c),
+        f : ((a, b, c) -> value)
+    ) -> Result(e, value) =
+        match ra on
+        | Err(e) => Err(e)
+        | Ok(a) =>
+            match rb on
+            | Err(e) => Err(e)
+            | Ok(b) =>
+                match rc on
+                | Err(e) => Err(e)
+                | Ok(c) => Ok(f(a, b, c))
 
-  let map4 : (a -> b -> c -> d -> value) -> Result e a -> Result e b -> Result e c -> Result e d -> Result e value =
-    \f ra rb rc rd =>
-      match ra on
-      | Err e => Err e
-      | Ok a =>
-          match rb on
-          | Err e => Err e
-          | Ok b =>
-              match rc on
-              | Err e => Err e
-              | Ok c =>
-                  match rd on
-                  | Err e => Err e
-                  | Ok d => Ok (f a b c d)
 
-  let and_then : (a -> Result e b) -> Result e a -> Result e b =
-    \f ra =>
-      match ra on
-      | Err e => Err e
-      | Ok a => f a
+    let map4(
+        ra : Result(e, a),
+        rb : Result(e, b),
+        rc : Result(e, c),
+        rd : Result(e, d),
+        f : ((a, b, c, d) -> value)
+    ) -> Result(e, value) =
+        match ra on
+        | Err(e) => Err(e)
+        | Ok(a) =>
+            match rb on
+            | Err(e) => Err(e)
+            | Ok(b) =>
+                match rc on
+                | Err(e) => Err(e)
+                | Ok(c) =>
+                    match rd on
+                    | Err(e) => Err(e)
+                    | Ok(d) => Ok(f(a, b, c, d))
 
-  let or : Result e a -> Result e a -> Result e a =
-    \ra rb =>
-      match ra on
-      | Err _ => rb
-      | Ok _ => ra
+    let and_then(ra : Result(e, a), f : (a -> Result(e, b))) -> Result(e, b) =
+        match ra on
+        | Err(e) => Err(e)
+        | Ok(a) => f(a)
 
-  let map_error : (x -> y) -> Result x a -> Result y a =
-    \f ra =>
-      match ra on
-      | Err e => Err (f e)
-      | Ok a => Ok a
+    let or(ra : Result(e, a), rb : Result(e, a)) -> Result(e, a) =
+        match ra on
+        | Err(_) => rb
+        | Ok(_) => ra
 
-  let from_maybe : e -> Maybe a -> Result e a =
-    \e ma =>
-      match ma on
-      | None => Err e
-      | Some a => Ok a
+    let map_error(ra : Result(x, a), f : (x -> y)) -> Result(y, a) =
+        match ra on
+        | Err(e) => Err(f(e))
+        | Ok(a) => Ok(a)
 
-  ## Combine a list of results into a single result (holding a list).
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ Result.compact [Ok 1, Ok 2]
-  ## [1, 2] : List Int
-  ## ```
-  let compact : List (Result e a) -> List a =
-    \results =>
-      List.collect_map identity results
+    let from_maybe(ma : Maybe(a), err : e) -> Result(e, a) =
+        match ma on
+        | None => Err(err)
+        | Some(a) => Ok(a)
 
-  ## Combine a list of results into a single result (holding a list).
-  ## Also known as `sequence` on lists.
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ Result.combine [Ok 1, Ok 2]
-  ## Ok [1, 2] : List Int
-  ## ```
-  let combine : List (Result e a) -> Result e (List a) =
-    \results =>
-      List.fold_right (map2 (::)) (Ok []) results
+    ## Combine a list of results into a single result (holding a list).
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ Result.compact([Ok(1), Ok(2)])
+    ## [1, 2] : List(Int)
+    ## ```
+    let compact(results : List(Result(e, a)) -> List(a) =
+        List.collect_map(results, identity)
 
-  ## Partition a list of Results into two lists of values (successes and failures).
-  ##
-  ## @since 0.1.0
-  ##
-  ## ```
-  ## ➢ Result.paritition [Ok 1, Err "uh no!", Ok 2]
-  ## (["uh oh!"], [1, 2]) : (List String, List Int)
-  ## ```
-  let partition : List (Result e a) -> (List e, List a) =
-    \results =>
-      List.fold_right
-        (\r (err, succ) =>
-          match r on
-          | Err v => (v :: err, succ)
-          | Ok v => (err, v :: succ)
-        )
-        ([], [])
+    ## Combine a list of results into a single result (holding a list).
+    ## Also known as `sequence` on lists.
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ Result.combine([Ok(1), Ok(2)])
+    ## Ok([1, 2]) : List(Int)
+    ## ```
+    let combine(results : List(Result(e, a))) -> Result(e, List(a)) =
         results
+        |> List.fold_right(
+            fn(r, acc) => map2(r, acc, fn(x, xs) => x :: xs),
+            Ok(Nil)
+        )
+
+    ## Partition a list of Results into two lists of values (successes and failures).
+    ##
+    ## @since 0.1.0
+    ##
+    ## ```
+    ## ➢ Result.paritition([Ok(1), Err("uh no!"), Ok(2)]
+    ## (["uh oh!"], [1, 2]) : (List(String), List(Int))
+    ## ```
+    let partition(results : List(Result(e, a))) -> (List(e), List(a)) =
+        results
+        |> List.fold_right(
+            fn(r, (err, succ)) =>
+                match r on
+                | Err(v) => (v :: err, succ)
+                | Ok(v) => (err, v :: succ),
+            (Nil, Nil)
+        )
 end
