@@ -26,18 +26,18 @@ match c on
 ```
 match maybe on
 | None => "empty"
-| Some value => "got " <> value
+| Some(value) => "got " <> value
 
 match result on
-| Err msg => "error: " <> msg
-| Ok value => "success: " <> value
+| Err(msg) => "error: " <> msg
+| Ok(value) => "success: " <> value
 ```
 
 ### Record Patterns
 
 ```
 match person on
-| { name, age } => "Alice is " <> Maybe.with_default 0 (String.from_int age)
+| { name, age } => "Alice is " <> Maybe.with_default(String.from_int(age), 0)
 | _ -> "someone else"
 ```
 
@@ -45,9 +45,9 @@ match person on
 
 ```
 match list on
-| [] => "empty"
-| [x] => "singleton: " <> Maybe.with_default 0 (String.from_int x)
-| x :: xs => "cons: " <> Maybe.with_default 0 (String.from_int x)
+| Nil => "empty"
+| [x] => "singleton: " <> Maybe.with_default(String.from_int(x), 0)
+| x :: xs => "cons: " <> Maybe.with_default(String.from_int(x), 0)
 ```
 
 ### Guard Patterns

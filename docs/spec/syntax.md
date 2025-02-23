@@ -13,19 +13,15 @@ else,
 end,
 exposing,
 foreign,
+fn,
 hiding,
 if,
-in,
 include,
-infixl,
-infixn,
-infixr,
 let,
 match,
 module,
 on,
 open,
-renaming,
 then,
 to,
 type,
@@ -113,9 +109,8 @@ calculate123
 
 #### Function
 
-- Composition: `>>`, `<<`
-- Pipe: `|>`, `<|`
-- Lambda: `\`
+- Pipe: `|>`
+- Lambda: `fn`
 
 #### Other
 
@@ -172,10 +167,9 @@ Operators are listed in descending order of precedence:
 9. Comparison operators (`==`, `/=`, `<`, `<=`, `>`, `>=`)
 10. Logical AND (`&&`)
 11. Logical OR (`||`)
-12. Function composition (`>>`, `<<`)
-13. Pipe operators (`|>`, `<|`)
-14. Pattern match/lambda arrow (`=>`) 
-15. Assignment (`=`) (lowest)
+12. Pipe operators (`|>`)
+13. Pattern match/lambda arrow (`=>`) 
+14. Assignment (`=`) (lowest)
 
 ## Conditional Statements
 

@@ -16,24 +16,27 @@ Mox implements complete type inference using an extended Hindley-Milner type sys
 ### Basic Inference
 
 ```mox
-# Inferred: Int -> Int -> Int
-let add = \x y => x + y
+# Inferred: (Int, Int) -> Int
+let add = 
+    fn(x, y) => x + y
 
 # Inferred: List a -> Int
-let length = \xs => 
-    match xs on
-    | [] => 0
-    | x :: rest => 1 + length rest
+let length = 
+    fn(xs) => 
+        match xs on
+        | [] => 0
+        | x :: rest => 1 + length(rest)
 
-# Inferred: a -> List a -> List a
-let prepend = \x xs => x :: xs
+# Inferred: (a, List a) -> List a
+let prepend = 
+    fn(x, xs) => x :: xs
 ```
 
 ### Record Type Inference
 
 ```mox
 # Inferred: { name : String, age : Int } -> String
-let get_name record = record.name
+let get_name(record) = record.name
 
 # Inferred: { name : String, age : Int }
 let person = { name = "Alice", age = 30 }
@@ -42,30 +45,31 @@ let person = { name = "Alice", age = 30 }
 ### Function Composition
 
 ```mox
-# Inferred: (b -> c) -> (a -> b) -> a -> c
-let compose = \f g x => f (g x)
+# Inferred: ((b -> c), (a -> b), a) -> c
+let compose(f, g, x) =
+    f(g(x))
 
-# Inferred: (a -> b) -> List a -> List b
-let map = \f xs => 
+# Inferred: (List(a), (a -> b)) -> List(b)
+let map(xs, f) = 
     match xs on
-    | [] => []
-    | x :: rest => f x :: map f rest
+    | Nil => Nil
+    | x :: rest => f(x) :: map(rest, f)
 ```
 
 ### Generic Types
 
 ```mox
-# Inferred: Maybe a -> b -> b -> b
-let maybe = \default value opt =>
+# Inferred: (Maybe(a), b) -> b
+let maybe(opt, default) =
     match opt on
     | None => default
-    | Some x => value x
+    | Some(x) => value(x)
 
-# Inferred: Result e a -> (a -> b) -> (e -> b) -> b
-let either = \success error result =>
+# Inferred: (Result(e, a), (a -> b), (e -> b)) -> b
+let either(result, success, error) =
     match result on
-    | Err err => error err
-    | Ok value => success value
+    | Err(err) => error(err)
+    | Ok(value) => success(value)
 ```
 
 ## Type Annotations
@@ -73,12 +77,14 @@ let either = \success error result =>
 While never required, type annotations can be added for clarity:
 
 ```mox
-let increment : Int -> Int = \x => x + 1
+# Inferred: (Int) -> Int  
+let increment(x) = x + 1  
 
-let map : (a -> b) -> List a -> List b = \f xs => 
-    match xs on
-    | [] => []
-    | x :: rest => f x :: map f rest
+# Inferred: (List(a), (a -> b)) -> List(b)  
+let map(xs, f) =  
+    match xs on  
+    | Nil => Nil
+    | x :: rest => f(x) :: map(rest, f)  
 ```
 
 ## Inference Limitations
@@ -102,7 +108,7 @@ let map : (a -> b) -> List a -> List b = \f xs =>
 # Types are inferred through the pipeline
 data
 |> transform    # a -> b
-|> validate     # b -> Result e c
+|> validate     # b -> Result(e, c)
 |> process      # c -> d
 ```
 
@@ -110,9 +116,9 @@ data
 
 ```mox
 # Type parameters are properly propagated
-let apply f x = f x
-let double n = n * 2
-let result = apply double 21  # Inferred: Int
+let apply(x, f) = f(x)
+let double(n) = n * 2
+let result() = apply(21, double) # Inferred: Int
 ```
 
 ## Implementation Notes

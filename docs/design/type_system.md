@@ -26,7 +26,7 @@ Unit    -- Single value type ()
 type Person = 
     { name : String
     , age : Int
-    , email : Maybe String
+    , email : Maybe(String)
     }
 ```
 
@@ -35,11 +35,11 @@ type Person =
 ```
 type Maybe a =
     | None
-    | Some a
+    | Some(a)
 
-type Result e a =
-    | Err e
-    | Ok a
+type Result(e, a) =
+    | Err(e)
+    | Ok(a)
 ```
 
 ### Type Aliases
@@ -60,13 +60,13 @@ Effects are tracked in the type system:
 
 ```
 # Pure function type
-let map : (a -> b) -> List a -> List b
+let map(list : List(a), f : (a -> b)) -> List(b)
 
 # Function with sync effect
-let read_file : String -> Eff (Result Error String)
+let read_file(filename : String) -> Eff(Result(Error, String))
 
 # Function with async effect
-let read_file : String -> Aff (Result Error String)
+let read_file(filename : String) -> Aff(Result(Error, String))
 ```
 
 ## Type Inference
@@ -79,11 +79,14 @@ The type system implements bidirectional type inference:
 Example:
 ```
 # Inferred: a -> a
-let identity = \x => x
+let identity(x : a) -> a =
+    x
 
-# Inferred: Int -> Int -> Int 
-let add = \x y => x + y
+# Inferred: (Int, Int) -> Int 
+let add(x : Int, y : Int) -> Int =
+    x + y
 
 # Annotated
-let repeat : Int -> a -> List a = \n x => ...
+let repeat(n : Int, x : a) -> List(a) =
+    ...
 ```

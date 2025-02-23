@@ -52,7 +52,7 @@ open MyModule using (function1, function2)
 #### Rename Imports
 
 ```mox
-open MyModule renaming (oldName to newName)
+open MyModule using (oldName as newName)
 ```
 
 #### Hide Specific Imports

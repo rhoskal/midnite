@@ -11,7 +11,7 @@ Mox differentiates between pure and effectful computations at the type level. Th
 ### Type Definition
 
 ```mox
-type Eff e a
+type Eff(e, a)
 ```
 
 Where:
@@ -22,12 +22,18 @@ Where:
 
 ```mox
 # IO operations
-let read_line : Eff IO String
-let print : String -> Eff IO Unit
+let read_line() -> Eff(IO, String) =
+    ...
+
+let print(str : String) -> Eff(IO, Unit) =
+    ...
 
 # State operations
-let get_state : Eff (State s) s
-let set_state : s -> Eff (State s) Unit
+let get_state() -> Eff(State(s), s) =
+    ...
+
+let set_state(state : s) -> Eff(State(s), Unit) =
+    ...
 ```
 
 ## Asynchronous Effects (Aff)
@@ -35,7 +41,7 @@ let set_state : s -> Eff (State s) Unit
 ### Type Definition
 
 ```mox
-type Aff e a
+type Aff(e, a)
 ```
 
 Where:
@@ -45,11 +51,12 @@ Where:
 ### Common Async Operations
 
 ```mox
-# HTTP requests
-let fetch : String -> Aff HttpError Response
+let fetch(url : String) -> Aff(HttpError, Response) =
+    ...
 
 # Database operations
-let query : String -> Aff DbError Result
+let query(sql : String) -> Aff(DbError, Result) =
+    ...
 ```
 
 ## Effect Composition
@@ -58,11 +65,12 @@ Effects can be composed using do-notation or operators:
 
 ```mox
 # Sequential composition
-let program = 
-    Eff.and_then (\name => print ("Hello " <> name <> "!")) read_line
-    
+let program() = 
+    Eff.and_then(read_line, fn(name) => print("Hello " <> name <> "!"))
+
 # Parallel composition (for Aff)
-let parallel = Aff.all [task1, task2, task3]
+let parallel() = 
+    Aff.all([task1, task2, task3])
 ```
 
 ## Pure vs Effectful Code
@@ -71,11 +79,12 @@ The type system enforces separation between pure and effectful code:
 
 ```mox
 # Pure function
-let double : Int -> Int = x => x * 2
+let double(x : Int) -> Int =
+    x * 2
 
 # Effectful function
-let read_and_double : Eff IO Int =
-    Eff.map (\x => double (Int.parse x)) read_line 
+let read_and_double() : Eff(IO, Int) =
+    Eff.map(read_line, fn(x) => double(Int.parse(x)))
 ```
 
 ## Effect Handlers
@@ -87,7 +96,7 @@ let read_and_double : Eff IO Int =
 When using FFI with Zig:
 ```mox
 # FFI function that has effects
-foreign print_line : String -> Eff IO Unit = "zig_print_line"
+foreign print_line(str : String) -> Eff(IO, Unit) = "zig_print_line"
 ```
 
 ## Error Handling in Effects
@@ -96,10 +105,12 @@ Effects integrate with Mox's error handling types:
 
 ```mox
 # Synchronous effect that might fail
-let parse : String -> Eff IO (Result ParseError Int)
+let parse(input : String) -> Eff(IO, Result(ParseError, Int)) =
+    ...
 
 # Asynchronous effect with built-in error type
-let fetch : Url -> Aff HttpError Response
+let fetch(url : Url) -> Aff(HttpError, Response) =
+    ...
 ```
 
 ## Best Practices
