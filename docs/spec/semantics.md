@@ -17,7 +17,7 @@
 Pipeline-oriented programming emphasizes data transformation through a series of discrete steps. Functions are designed to be composable and "data-first" to support natural pipeline construction using the pipe operator (`|>`).
 
 Example:
-```mox
+```mn
 some_data
 |> transform
 |> validate
@@ -101,7 +101,7 @@ some_data
 
 ### Pattern Matching Semantics
 
-```mox
+```mn
 match value on
 | pattern1 when guard => expression1  # Evaluated first if guard is true
 | pattern2 => expression2             # Evaluated if pattern1 didn't match
@@ -110,7 +110,7 @@ match value on
 
 ### Function Application
 
-```mox
+```mn
 # These are equivalent:
 add(1, 2)
 1 |> add(2)     # Right pipe
@@ -118,7 +118,7 @@ add(1, 2)
 
 ### Effect Handling
 
-```mox
+```mn
 # Pure function
 let pure(n : Int) -> Int =
     ...

@@ -29,7 +29,7 @@ pub fn main() !void {
         if (std.mem.eql(u8, arg, "build")) {
             const filepath = args.next() orelse {
                 std.debug.print("Error: build command requires a filepath\n", .{});
-                std.debug.print("Usage: mox build <filepath>\n", .{});
+                std.debug.print("Usage: midnite build <filepath>\n", .{});
                 std.process.exit(1);
             };
 
@@ -42,7 +42,7 @@ pub fn main() !void {
         if (std.mem.eql(u8, arg, "fmt")) {
             const filepath = args.next() orelse {
                 std.debug.print("Error: fmt command requires a filepath\n", .{});
-                std.debug.print("Usage: mox fmt <filepath>\n", .{});
+                std.debug.print("Usage: midnite fmt <filepath>\n", .{});
                 std.process.exit(1);
             };
 

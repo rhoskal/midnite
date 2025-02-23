@@ -1227,7 +1227,7 @@ const testing = std.testing;
 
 const lexer = @import("lexer.zig");
 
-const TEST_FILE = "test.mox";
+const TEST_FILE = "test.mn";
 
 test "example" {
     if (true) return error.SkipZigTest;

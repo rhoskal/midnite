@@ -2,7 +2,7 @@
 
 ## Overview
 
-Mox differentiates between pure and effectful computations at the type level. The language provides two core effect types:
+Midnite differentiates between pure and effectful computations at the type level. The language provides two core effect types:
 - `Eff` - For synchronous effects
 - `Aff` - For asynchronous effects
 
@@ -10,7 +10,7 @@ Mox differentiates between pure and effectful computations at the type level. Th
 
 ### Type Definition
 
-```mox
+```mn
 type Eff(e, a)
 ```
 
@@ -20,7 +20,7 @@ Where:
 
 ### Common Effects
 
-```mox
+```mn
 # IO operations
 let read_line() -> Eff(IO, String) =
     ...
@@ -40,7 +40,7 @@ let set_state(state : s) -> Eff(State(s), Unit) =
 
 ### Type Definition
 
-```mox
+```mn
 type Aff(e, a)
 ```
 
@@ -50,7 +50,7 @@ Where:
 
 ### Common Async Operations
 
-```mox
+```mn
 let fetch(url : String) -> Aff(HttpError, Response) =
     ...
 
@@ -63,7 +63,7 @@ let query(sql : String) -> Aff(DbError, Result) =
 
 Effects can be composed using do-notation or operators:
 
-```mox
+```mn
 # Sequential composition
 let program() = 
     Eff.and_then(read_line, fn(name) => print("Hello " <> name <> "!"))
@@ -77,7 +77,7 @@ let parallel() =
 
 The type system enforces separation between pure and effectful code:
 
-```mox
+```mn
 # Pure function
 let double(x : Int) -> Int =
     x * 2
@@ -94,16 +94,16 @@ let read_and_double() : Eff(IO, Int) =
 ## FFI and Effects
 
 When using FFI with Zig:
-```mox
+```mn
 # FFI function that has effects
 foreign print_line(str : String) -> Eff(IO, Unit) = "zig_print_line"
 ```
 
 ## Error Handling in Effects
 
-Effects integrate with Mox's error handling types:
+Effects integrate with Midnite's error handling types:
 
-```mox
+```mn
 # Synchronous effect that might fail
 let parse(input : String) -> Eff(IO, Result(ParseError, Int)) =
     ...

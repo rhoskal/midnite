@@ -1829,7 +1829,7 @@ pub const Parser = struct {
 
 const testing = std.testing;
 
-const TEST_FILE = "test.mox";
+const TEST_FILE = "test.mn";
 
 test "[comment]" {
     // Setup

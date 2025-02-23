@@ -1,4 +1,4 @@
-# Mox Language 
+# Midnite Language 
 
 A new, general purpose language that takes inspiration from Elm, Elixir and Ocaml.
 

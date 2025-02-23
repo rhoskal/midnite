@@ -8,7 +8,7 @@ Modules are used to group functions around related types. Functions are private 
 
 ### Basic Module Structure
 
-```mox
+```mn
 module MyModule exposing (..)
     # module contents here
 end
@@ -24,7 +24,7 @@ end
 
 ### Accessing Module Members
 
-```mox
+```mn
 MyModule.someFunction
 MyModule.SomeType
 ```
@@ -33,38 +33,38 @@ MyModule.SomeType
 
 #### Basic Open
 
-```mox
+```mn
 open MyModule
 ```
 
 #### Module Alias
 
-```mox
+```mn
 open MyModule.SubModule as Sub
 ```
 
 #### Selective Import
 
-```mox
+```mn
 open MyModule using (function1, function2)
 ```
 
 #### Rename Imports
 
-```mox
+```mn
 open MyModule using (oldName as newName)
 ```
 
 #### Hide Specific Imports
 
-```mox
+```mn
 open MyModule hiding (function1)
 ```
 
 ### Including Modules
 
 Use `include` to import and re-export a module:
-```mox
+```mn
 include MyModule
 ```
 
@@ -72,8 +72,8 @@ include MyModule
 
 Modules can be used to create opaque types by controlling what constructors are exposed:
 
-```mox
-# In MyModule.mox
+```mn
+# In MyModule.mn
 module MyModule exposing (MyType)  # Type but not constructors
     type MyType = 
         | Constructor1 
