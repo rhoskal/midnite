@@ -9,10 +9,10 @@ pub const KeywordKind = enum {
     Else,
     End,
     Exposing,
+    Fn,
     Foreign,
     Hiding,
     If,
-    In,
     Include,
     InfixLeft,
     InfixNon,
@@ -53,14 +53,10 @@ pub const OperatorKind = enum {
     LogicalOr,
 
     // Other
-    ComposeLeft,
-    ComposeRight,
     Cons,
     Equal,
     Expand,
-    Lambda,
     ListConcat,
-    PipeLeft,
     PipeRight,
     StrConcat,
 };
@@ -824,38 +820,6 @@ pub const Lexer = struct {
                             },
                         });
                     }
-
-                    if (next == '|') {
-                        self.advance();
-
-                        return Token.init(.{ .operator = .PipeLeft }, "<|", .{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        });
-                    }
-
-                    if (next == '<') {
-                        self.advance();
-
-                        return Token.init(.{ .operator = .ComposeLeft }, "<<", .{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        });
-                    }
                 }
 
                 return Token.init(.{ .operator = .LessThan }, "<", .{
@@ -878,22 +842,6 @@ pub const Lexer = struct {
                         self.advance();
 
                         return Token.init(.{ .operator = .GreaterThanEqual }, ">=", .{
-                            .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
-                            .src = .{
-                                .line = start_line,
-                                .col = start_col,
-                            },
-                        });
-                    }
-
-                    if (next == '>') {
-                        self.advance();
-
-                        return Token.init(.{ .operator = .ComposeRight }, ">>", .{
                             .filename = self.loc.filename,
                             .span = .{
                                 .start = span_start,
@@ -990,21 +938,6 @@ pub const Lexer = struct {
                 }
 
                 return Token.init(.{ .symbol = .Pipe }, "|", .{
-                    .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
-                    .src = .{
-                        .line = start_line,
-                        .col = start_col,
-                    },
-                });
-            },
-            '\\' => {
-                self.advance();
-
-                return Token.init(.{ .operator = .Lambda }, "\\", .{
                     .filename = self.loc.filename,
                     .span = .{
                         .start = span_start,
@@ -1396,10 +1329,10 @@ pub const Lexer = struct {
                 if (self.checkExactMatch(span_start, "else", .{ .keyword = .Else })) |token| return token;
                 if (self.checkExactMatch(span_start, "end", .{ .keyword = .End })) |token| return token;
                 if (self.checkExactMatch(span_start, "exposing", .{ .keyword = .Exposing })) |token| return token;
+                if (self.checkExactMatch(span_start, "fn", .{ .keyword = .Fn })) |token| return token;
                 if (self.checkExactMatch(span_start, "foreign", .{ .keyword = .Foreign })) |token| return token;
                 if (self.checkExactMatch(span_start, "hiding", .{ .keyword = .Hiding })) |token| return token;
                 if (self.checkExactMatch(span_start, "if", .{ .keyword = .If })) |token| return token;
-                if (self.checkExactMatch(span_start, "in", .{ .keyword = .In })) |token| return token;
                 if (self.checkExactMatch(span_start, "include", .{ .keyword = .Include })) |token| return token;
                 if (self.checkExactMatch(span_start, "infixl", .{ .keyword = .InfixLeft })) |token| return token;
                 if (self.checkExactMatch(span_start, "infixn", .{ .keyword = .InfixNon })) |token| return token;
@@ -1867,6 +1800,14 @@ test "[keyword]" {
             }),
         },
         .{
+            .source = "fn",
+            .token = Token.init(.{ .keyword = .Fn }, "fn", .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 0, .end = 2 },
+                .src = .{ .line = 1, .col = 1 },
+            }),
+        },
+        .{
             .source = "foreign",
             .token = Token.init(.{ .keyword = .Foreign }, "foreign", .{
                 .filename = TEST_FILE,
@@ -1885,14 +1826,6 @@ test "[keyword]" {
         .{
             .source = "if",
             .token = Token.init(.{ .keyword = .If }, "if", .{
-                .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
-                .src = .{ .line = 1, .col = 1 },
-            }),
-        },
-        .{
-            .source = "in",
-            .token = Token.init(.{ .keyword = .In }, "in", .{
                 .filename = TEST_FILE,
                 .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
@@ -2361,14 +2294,6 @@ test "[operator]" {
             }),
         },
         .{
-            .source = "<<",
-            .token = Token.init(.{ .operator = .ComposeLeft }, "<<", .{
-                .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
-                .src = .{ .line = 1, .col = 1 },
-            }),
-        },
-        .{
             .source = "<>",
             .token = Token.init(.{ .operator = .StrConcat }, "<>", .{
                 .filename = TEST_FILE,
@@ -2377,32 +2302,8 @@ test "[operator]" {
             }),
         },
         .{
-            .source = "<|",
-            .token = Token.init(.{ .operator = .PipeLeft }, "<|", .{
-                .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
-                .src = .{ .line = 1, .col = 1 },
-            }),
-        },
-        .{
             .source = "=",
             .token = Token.init(.{ .operator = .Equal }, "=", .{
-                .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
-                .src = .{ .line = 1, .col = 1 },
-            }),
-        },
-        .{
-            .source = ">>",
-            .token = Token.init(.{ .operator = .ComposeRight }, ">>", .{
-                .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
-                .src = .{ .line = 1, .col = 1 },
-            }),
-        },
-        .{
-            .source = "\\",
-            .token = Token.init(.{ .operator = .Lambda }, "\\", .{
                 .filename = TEST_FILE,
                 .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
