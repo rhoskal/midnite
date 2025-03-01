@@ -281,7 +281,7 @@ pub const Formatter = struct {
                 }
             },
             .lambda_expr => |expr| {
-                try self.write("\\");
+                try self.write("fn");
 
                 for (expr.param_names.items, 0..) |param, i| {
                     try self.write(param);
@@ -328,33 +328,9 @@ pub const Formatter = struct {
                 try self.write(" ++ ");
                 try self.formatNode(expr.right);
             },
-            .composition_expr => |expr| {
-                try self.formatNode(expr.first);
-
-                switch (expr.operator.kind) {
-                    .operator => |op| {
-                        if (op == .ComposeLeft) {
-                            try self.write(" << ");
-                        }
-
-                        if (op == .ComposeRight) {
-                            try self.write(" >> ");
-                        }
-                    },
-                    else => {},
-                }
-
-                try self.formatNode(expr.second);
-            },
             .pipe_expr => |expr| {
                 switch (expr.operator.kind) {
                     .operator => |op| {
-                        if (op == .PipeLeft) {
-                            try self.formatNode(expr.func);
-                            try self.write(" <| ");
-                            try self.formatNode(expr.value);
-                        }
-
                         if (op == .PipeRight) {
                             try self.formatNode(expr.value);
                             try self.write(" |> ");

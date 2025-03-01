@@ -13,9 +13,9 @@ pub const ParseError = error{
     InvalidStrLiteral,
     MissingParentheses,
     UnexpectedToken,
-};
+} || std.mem.Allocator.Error;
 
-pub const ParserError = ParseError || lexer.LexerError || std.mem.Allocator.Error;
+pub const ParserError = ParseError || lexer.LexerError;
 
 pub const Parser = struct {
     /// The lexer instance used to obtain tokens.
@@ -62,7 +62,7 @@ pub const Parser = struct {
             // Highest precedence (tightest binding)
             .operator => |op| switch (op) {
                 .Exp => .{
-                    .precedence = 13,
+                    .precedence = 12,
                     .associativity = .Left,
                 },
                 .FloatDiv,
@@ -70,7 +70,7 @@ pub const Parser = struct {
                 .IntDiv,
                 .IntMul,
                 => .{
-                    .precedence = 12,
+                    .precedence = 11,
                     .associativity = .Left,
                 },
                 .FloatAdd,
@@ -78,14 +78,6 @@ pub const Parser = struct {
                 .IntAdd,
                 .IntSub,
                 => .{
-                    .precedence = 11,
-                    .associativity = .Left,
-                },
-                .ComposeRight => .{
-                    .precedence = 10,
-                    .associativity = .Right,
-                },
-                .ComposeLeft => .{
                     .precedence = 10,
                     .associativity = .Left,
                 },
@@ -127,15 +119,10 @@ pub const Parser = struct {
                     .precedence = 2,
                     .associativity = .Left,
                 },
-                .PipeLeft => .{
-                    .precedence = 2,
-                    .associativity = .Right,
-                },
                 .Equal => .{
                     .precedence = 0,
                     .associativity = .None,
                 },
-                else => null,
             },
             .symbol => |sym| switch (sym) {
                 .DoubleArrowRight => .{
@@ -774,9 +761,9 @@ pub const Parser = struct {
     /// TypeParams = LowerIdent+
     ///
     /// Examples:
-    /// - `type alias Reader r a = r -> a`
-    /// - `type Dict k v = { keys: List k, values: List v }`
-    /// - `type Maybe a = | None | Some a`
+    /// - `type alias Reader(r, a) = (r) -> a`
+    /// - `type Dict(k, v) = { keys : List(k), values : List(v) }`
+    /// - `type Maybe(a) = | None | Some(a)`
     fn parseTypeDecl(self: *Parser) ParserError!*ast.Node {
         const start_token = try self.expect(lexer.TokenKind{ .keyword = .Type });
 
@@ -1013,9 +1000,9 @@ pub const Parser = struct {
     /// Parses a function declaration with an optional type annotation.
     ///
     /// Examples:
-    /// - `let add = \x y => x + y`
-    /// - `let factorial : Int -> Int = \n => if n == 0 then 1 else n * factorial (n - 1)`
-    /// - `let const : a -> b -> a = \x y => x`
+    /// - `let add(x, y) = x + y`
+    /// - `let factorial(n : Int) -> Int = if n == 0 then 1 else n * factorial(n - 1)`
+    /// - `let const(x : a, _ : b) -> a = x`
     fn parseFunctionDecl(self: *Parser) ParserError!*ast.Node {
         const start_token = try self.expect(lexer.TokenKind{ .keyword = .Let });
 
@@ -1065,8 +1052,8 @@ pub const Parser = struct {
     /// foreign <name> : <type> = "<external_name>"
     ///
     /// Examples:
-    /// - `foreign sqrt : Float -> Float = "c_sqrt"`
-    /// - `foreign print : String -> Unit = "c_print"`
+    /// - `foreign sqrt(x : Float) -> Float = "c_sqrt"`
+    /// - `foreign print(x : String) -> Unit = "c_print"`
     fn parseForeignFunctionDecl(self: *Parser) ParserError!*ast.Node {
         const start_token = try self.expect(lexer.TokenKind{ .keyword = .Foreign });
 
@@ -1321,9 +1308,8 @@ pub const Parser = struct {
                 return node;
             },
             .keyword => |kw| switch (kw) {
-                .If => {
-                    return try self.parseIfThenElse();
-                },
+                .Fn => return try self.parseLambdaExpr(),
+                .If => return try self.parseIfThenElse(),
                 else => return error.UnexpectedToken,
             },
             .literal => |lit| {
@@ -1356,12 +1342,6 @@ pub const Parser = struct {
 
                 return node;
             },
-            .operator => |op| switch (op) {
-                .Lambda => {
-                    return try self.parseLambdaExpr();
-                },
-                else => return error.UnexpectedToken,
-            },
             else => return error.UnexpectedToken,
         }
     }
@@ -1375,9 +1355,9 @@ pub const Parser = struct {
     /// - An expression body
     ///
     /// Examples:
-    /// - `\x => x + 1`
-    /// - `\x y => x * y`
-    /// - `\a b c => a + b + c`
+    /// - `fn(x) => x + 1`
+    /// - `fn(x, y) => x * y`
+    /// - `fn(a, b, c) => a + b + c`
     fn parseLambdaExpr(self: *Parser) ParserError!*ast.Node {
         const start_token = try self.expect(lexer.TokenKind{ .operator = .Lambda });
 
@@ -1553,8 +1533,8 @@ pub const Parser = struct {
     ///
     /// Examples:
     /// - `Int`
-    /// - `Maybe a`
-    /// - `List String`
+    /// - `Maybe(a)`
+    /// - `List(String)`
     fn parseTypeExpr(self: *Parser) ParserError!*ast.Node {
         const start_token = self.current_token;
 
@@ -2657,7 +2637,7 @@ test "[lambda_expr]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const source = "\\x => x + 1";
+    const source = "fn(x) => x + 1";
     var l = lexer.Lexer.init(source, TEST_FILE);
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
@@ -2682,7 +2662,7 @@ test "[lambda_expr]" {
     try testing.expectEqualStrings("x", expr.param_names.items[0]);
 
     // Verify the token kind matches
-    try testing.expectEqual(lexer.TokenKind{ .operator = .Lambda }, expr.token.kind);
+    try testing.expectEqual(lexer.TokenKind{ .keyword = .Fn }, expr.token.kind);
 
     // Validate that the body of the lambda expression is an arithmetic expression
     try testing.expect(expr.body.* == .arithmetic_expr);
@@ -2752,7 +2732,7 @@ test "[function_decl] (simple)" {
     const allocator = gpa.allocator();
 
     // Test a simple function declaration without type annotation
-    const source = "let add = \\x y => x + y";
+    const source = "let add(x, y) = x + y";
     var l = lexer.Lexer.init(source, TEST_FILE);
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
@@ -2812,7 +2792,7 @@ test "[function_decl] (w/ type annotation)" {
     const allocator = gpa.allocator();
 
     // Test function declaration with type annotation
-    const source = "let inc : Int -> Int = \\x => x + 1";
+    const source = "let inc(x : Int) -> Int = x + 1";
     var l = lexer.Lexer.init(source, TEST_FILE);
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
@@ -2881,9 +2861,9 @@ test "[foreign_function_decl]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // foreign sqrt : Float -> Float = "c_sqrt"
+    // foreign sqrt(x : Float) -> Float = "c_sqrt"
 
-    const source = "foreign sqrt : Float -> Float = \"c_sqrt\"";
+    const source = "foreign sqrt(x : Float) -> Float = \"c_sqrt\"";
     var l = lexer.Lexer.init(source, TEST_FILE);
     var parser = try Parser.init(allocator, &l);
     defer parser.deinit();
@@ -3275,7 +3255,7 @@ test "[type_alias]" {
 
     {
         // Type parameters
-        const source = "type alias Dict k v = Map k v";
+        const source = "type alias Dict(k, v) = Map(k, v)";
         var l = lexer.Lexer.init(source, TEST_FILE);
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
@@ -3377,7 +3357,7 @@ test "[type_alias]" {
 
     {
         // Complex nested type
-        const source = "type alias TreeMap k v = Tree (Pair k v) (Compare k)";
+        const source = "type alias TreeMap(k, v) = Tree(Pair(k, v), Compare(k))";
         var l = lexer.Lexer.init(source, TEST_FILE);
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
@@ -3468,7 +3448,7 @@ test "[record_type]" {
     const allocator = gpa.allocator();
 
     {
-        const source = "type User = { name: String, age: Int }";
+        const source = "type User = { name : String, age : Int }";
         var l = lexer.Lexer.init(source, TEST_FILE);
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
@@ -3814,7 +3794,7 @@ test "[variant_type]" {
     }
 
     {
-        const source = "type Maybe a = | None | Some a";
+        const source = "type Maybe(a) = | None | Some(a)";
         var l = lexer.Lexer.init(source, TEST_FILE);
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
@@ -3872,7 +3852,7 @@ test "[variant_type]" {
     }
 
     {
-        const source = "type Tree a = | Leaf | Branch (Tree a) a (Tree a)";
+        const source = "type Tree(a) = | Leaf | Branch(Tree(a), a, Tree(a))";
         var l = lexer.Lexer.init(source, TEST_FILE);
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
