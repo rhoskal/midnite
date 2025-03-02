@@ -1447,8 +1447,8 @@ test "[CommentNode]" {
     const comment_node = try allocator.create(CommentNode);
     comment_node.* = .{
         .text = try allocator.dupe(u8, text),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .comment = .Regular },
+        .token = .{
+            .kind = .{ .comment = .Regular },
             .lexeme = "#",
             .loc = .{
                 .filename = TEST_FILE,
@@ -1493,8 +1493,8 @@ test "[DocCommentNode]" {
     const comment_node = try allocator.create(DocCommentNode);
     comment_node.* = .{
         .text = try allocator.dupe(u8, text),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .comment = .Doc },
+        .token = .{
+            .kind = .{ .comment = .Doc },
             .lexeme = "##",
             .loc = .{
                 .filename = TEST_FILE,
@@ -1538,8 +1538,8 @@ test "[IntLiteralNode]" {
     // Action
     const int_node = .{
         .value = value,
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .literal = .Int },
+        .token = .{
+            .kind = .{ .literal = .Int },
             .lexeme = "42",
             .loc = .{
                 .filename = TEST_FILE,
@@ -1583,8 +1583,8 @@ test "[FloatLiteralNode]" {
     // Action
     const float_node = .{
         .value = value,
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .literal = .Float },
+        .token = .{
+            .kind = .{ .literal = .Float },
             .lexeme = "42.0",
             .loc = .{
                 .filename = TEST_FILE,
@@ -1628,8 +1628,8 @@ test "[CharLiteralNode]" {
     // Action
     const char_node = .{
         .value = value,
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .literal = .Char },
+        .token = .{
+            .kind = .{ .literal = .Char },
             .lexeme = "\'",
             .loc = .{
                 .filename = TEST_FILE,
@@ -1674,8 +1674,8 @@ test "[StrLiteralNode]" {
     const literal_node = try allocator.create(StrLiteralNode);
     literal_node.* = .{
         .value = try allocator.dupe(u8, value),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .literal = .String },
+        .token = .{
+            .kind = .{ .literal = .String },
             .lexeme = "\"",
             .loc = .{
                 .filename = TEST_FILE,
@@ -1727,8 +1727,8 @@ test "[MultilineStrLiteralNode]" {
     const literal_node = try allocator.create(MultilineStrLiteralNode);
     literal_node.* = .{
         .value = try allocator.dupe(u8, value),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .literal = .MultilineString },
+        .token = .{
+            .kind = .{ .literal = .MultilineString },
             .lexeme = "\"\"\"",
             .loc = .{
                 .filename = TEST_FILE,
@@ -1773,8 +1773,8 @@ test "[LowerIdentifierNode]" {
     const ident_node = try allocator.create(LowerIdentifierNode);
     ident_node.* = .{
         .identifier = try allocator.dupe(u8, identifier),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Lower },
+        .token = .{
+            .kind = .{ .identifier = .Lower },
             .lexeme = identifier,
             .loc = .{
                 .filename = TEST_FILE,
@@ -1822,8 +1822,8 @@ test "[UpperIdentifierNode]" {
     const ident_node = try allocator.create(UpperIdentifierNode);
     ident_node.* = .{
         .identifier = try allocator.dupe(u8, identifier),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Upper },
+        .token = .{
+            .kind = .{ .identifier = .Upper },
             .lexeme = identifier,
             .loc = .{
                 .filename = TEST_FILE,
@@ -1870,8 +1870,8 @@ test "[ListNode]" {
     elem1.* = .{
         .int_literal = .{
             .value = 1,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .Int },
+            .token = .{
+                .kind = .{ .literal = .Int },
                 .lexeme = "1",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1886,8 +1886,8 @@ test "[ListNode]" {
     elem2.* = .{
         .int_literal = .{
             .value = 2,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .Int },
+            .token = .{
+                .kind = .{ .literal = .Int },
                 .lexeme = "2",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1905,8 +1905,8 @@ test "[ListNode]" {
     const list_node = try allocator.create(ListNode);
     list_node.* = .{
         .elements = elements,
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
+        .token = .{
+            .kind = .{ .delimiter = .LeftBracket },
             .lexeme = "[",
             .loc = .{
                 .filename = TEST_FILE,
@@ -1954,8 +1954,8 @@ test "[TupleNode]" {
     first.* = .{
         .int_literal = .{
             .value = 1,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .Int },
+            .token = .{
+                .kind = .{ .literal = .Int },
                 .lexeme = "1",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -1969,8 +1969,8 @@ test "[TupleNode]" {
     const second_str = try allocator.create(StrLiteralNode);
     second_str.* = .{
         .value = try allocator.dupe(u8, "hello"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .literal = .String },
+        .token = .{
+            .kind = .{ .literal = .String },
             .lexeme = "\"hello\"",
             .loc = .{
                 .filename = TEST_FILE,
@@ -1990,8 +1990,8 @@ test "[TupleNode]" {
     const tuple_node = try allocator.create(TupleNode);
     tuple_node.* = .{
         .elements = elements,
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .delimiter = .LeftParen },
+        .token = .{
+            .kind = .{ .delimiter = .LeftParen },
             .lexeme = "(",
             .loc = .{
                 .filename = TEST_FILE,
@@ -2043,8 +2043,8 @@ test "[UnaryExprNode]" {
     operand.* = .{
         .int_literal = .{
             .value = 42,
-            .token = lexer.Token{
-                .kind = lexer.TokenKind{ .literal = .Int },
+            .token = .{
+                .kind = .{ .literal = .Int },
                 .lexeme = "42",
                 .loc = .{
                     .filename = TEST_FILE,
@@ -2058,8 +2058,8 @@ test "[UnaryExprNode]" {
     const unary_node = try allocator.create(UnaryExprNode);
     unary_node.* = .{
         .operand = operand,
-        .operator = lexer.Token{
-            .kind = lexer.TokenKind{ .operator = .IntSub },
+        .operator = .{
+            .kind = .{ .operator = .IntSub },
             .lexeme = "-",
             .loc = .{
                 .filename = TEST_FILE,
@@ -2141,7 +2141,7 @@ test "[ArithmeticExprNode]" {
     arithmetic_node.* = .{
         .left = left,
         .right = right,
-        .operator = lexer.Token{
+        .operator = .{
             .kind = .{ .operator = .IntMul },
             .lexeme = "*",
             .loc = .{
@@ -2191,7 +2191,7 @@ test "[LogicalExprNode]" {
     const left_ident = try allocator.create(LowerIdentifierNode);
     left_ident.* = .{
         .identifier = try allocator.dupe(u8, "a"),
-        .token = lexer.Token{
+        .token = .{
             .kind = .{ .identifier = .Lower },
             .lexeme = "a",
             .loc = .{
@@ -2208,7 +2208,7 @@ test "[LogicalExprNode]" {
     const right_ident = try allocator.create(LowerIdentifierNode);
     right_ident.* = .{
         .identifier = try allocator.dupe(u8, "b"),
-        .token = lexer.Token{
+        .token = .{
             .kind = .{ .identifier = .Lower },
             .lexeme = "b",
             .loc = .{
@@ -2226,7 +2226,7 @@ test "[LogicalExprNode]" {
     logical_node.* = .{
         .left = left,
         .right = right,
-        .operator = lexer.Token{
+        .operator = .{
             .kind = .{ .operator = .LogicalAnd },
             .lexeme = "&&",
             .loc = .{
@@ -2276,7 +2276,7 @@ test "[ComparisonExprNode]" {
     const left_ident = try allocator.create(LowerIdentifierNode);
     left_ident.* = .{
         .identifier = try allocator.dupe(u8, "x"),
-        .token = lexer.Token{
+        .token = .{
             .kind = .{ .identifier = .Lower },
             .lexeme = "x",
             .loc = .{
@@ -2293,7 +2293,7 @@ test "[ComparisonExprNode]" {
     const right_ident = try allocator.create(LowerIdentifierNode);
     right_ident.* = .{
         .identifier = try allocator.dupe(u8, "y"),
-        .token = lexer.Token{
+        .token = .{
             .kind = .{ .identifier = .Lower },
             .lexeme = "y",
             .loc = .{
@@ -2311,7 +2311,7 @@ test "[ComparisonExprNode]" {
     comparison_node.* = .{
         .left = left,
         .right = right,
-        .operator = lexer.Token{
+        .operator = .{
             .kind = .{ .operator = .LessThanEqual },
             .lexeme = "<=",
             .loc = .{
@@ -2363,7 +2363,7 @@ test "[MatchExprNode]" {
         const opt_ident = try allocator.create(LowerIdentifierNode);
         opt_ident.* = .{
             .identifier = try allocator.dupe(u8, "opt"),
-            .token = lexer.Token{
+            .token = .{
                 .kind = .{ .identifier = .Lower },
                 .lexeme = "opt",
                 .loc = .{
@@ -3094,8 +3094,8 @@ test "[FunctionSignatureNode]" {
     const int_type1 = try allocator.create(UpperIdentifierNode);
     int_type1.* = .{
         .identifier = try allocator.dupe(u8, "Int"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Upper },
+        .token = .{
+            .kind = .{ .identifier = .Upper },
             .lexeme = "Int",
             .loc = .{
                 .filename = TEST_FILE,
@@ -3111,8 +3111,8 @@ test "[FunctionSignatureNode]" {
     const int_type2 = try allocator.create(UpperIdentifierNode);
     int_type2.* = .{
         .identifier = try allocator.dupe(u8, "Int"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Upper },
+        .token = .{
+            .kind = .{ .identifier = .Upper },
             .lexeme = "Int",
             .loc = .{
                 .filename = TEST_FILE,
@@ -3128,8 +3128,8 @@ test "[FunctionSignatureNode]" {
     const int_type3 = try allocator.create(UpperIdentifierNode);
     int_type3.* = .{
         .identifier = try allocator.dupe(u8, "Int"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Upper },
+        .token = .{
+            .kind = .{ .identifier = .Upper },
             .lexeme = "Int",
             .loc = .{
                 .filename = TEST_FILE,
@@ -3152,8 +3152,8 @@ test "[FunctionSignatureNode]" {
     func_signature.* = .{
         .parameter_types = parameter_types,
         .return_type = return_type_node,
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .symbol = .ArrowRight },
+        .token = .{
+            .kind = .{ .symbol = .ArrowRight },
             .lexeme = "->",
             .loc = .{
                 .filename = TEST_FILE,
@@ -3211,8 +3211,8 @@ test "[LambdaExprNode]" {
     const x_param_ident = try allocator.create(LowerIdentifierNode);
     x_param_ident.* = .{
         .identifier = try allocator.dupe(u8, "x"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Lower },
+        .token = .{
+            .kind = .{ .identifier = .Lower },
             .lexeme = "x",
             .loc = .{
                 .filename = TEST_FILE,
@@ -3232,8 +3232,8 @@ test "[LambdaExprNode]" {
     const y_param_ident = try allocator.create(LowerIdentifierNode);
     y_param_ident.* = .{
         .identifier = try allocator.dupe(u8, "y"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Lower },
+        .token = .{
+            .kind = .{ .identifier = .Lower },
             .lexeme = "y",
             .loc = .{
                 .filename = TEST_FILE,
@@ -3256,8 +3256,8 @@ test "[LambdaExprNode]" {
     const x_ident = try allocator.create(LowerIdentifierNode);
     x_ident.* = .{
         .identifier = try allocator.dupe(u8, "x"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Lower },
+        .token = .{
+            .kind = .{ .identifier = .Lower },
             .lexeme = "x",
             .loc = .{
                 .filename = TEST_FILE,
@@ -3271,10 +3271,10 @@ test "[LambdaExprNode]" {
     x_node.* = .{ .lower_identifier = x_ident };
 
     const y_ident = try allocator.create(LowerIdentifierNode);
-    y_ident.* = LowerIdentifierNode{
+    y_ident.* = .{
         .identifier = try allocator.dupe(u8, "y"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Lower },
+        .token = .{
+            .kind = .{ .identifier = .Lower },
             .lexeme = "y",
             .loc = .{
                 .filename = TEST_FILE,
@@ -3291,8 +3291,8 @@ test "[LambdaExprNode]" {
     arithmetic_node.* = .{
         .left = x_node,
         .right = y_node,
-        .operator = lexer.Token{
-            .kind = lexer.TokenKind{ .operator = .IntAdd },
+        .operator = .{
+            .kind = .{ .operator = .IntAdd },
             .lexeme = "+",
             .loc = .{
                 .filename = TEST_FILE,
@@ -3309,8 +3309,8 @@ test "[LambdaExprNode]" {
     lambda_node.* = .{
         .parameters = parameters,
         .body = body_node,
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .keyword = .Fn },
+        .token = .{
+            .kind = .{ .keyword = .Fn },
             .lexeme = "fn",
             .loc = .{
                 .filename = TEST_FILE,
@@ -3386,8 +3386,8 @@ test "[FunctionCallNode]" {
     const not_ident = try allocator.create(LowerIdentifierNode);
     not_ident.* = .{
         .identifier = try allocator.dupe(u8, "not"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Lower },
+        .token = .{
+            .kind = .{ .identifier = .Lower },
             .lexeme = "not",
             .loc = .{
                 .filename = TEST_FILE,
@@ -3403,10 +3403,10 @@ test "[FunctionCallNode]" {
     var arguments = std.ArrayList(*Node).init(allocator);
 
     const true_ident = try allocator.create(UpperIdentifierNode);
-    true_ident.* = UpperIdentifierNode{
+    true_ident.* = .{
         .identifier = try allocator.dupe(u8, "True"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Upper },
+        .token = .{
+            .kind = .{ .identifier = .Upper },
             .lexeme = "True",
             .loc = .{
                 .filename = TEST_FILE,
@@ -3425,8 +3425,8 @@ test "[FunctionCallNode]" {
     function_call_node.* = .{
         .function = func_node,
         .arguments = arguments,
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Lower },
+        .token = .{
+            .kind = .{ .identifier = .Lower },
             .lexeme = "not",
             .loc = .{
                 .filename = TEST_FILE,
@@ -3531,8 +3531,8 @@ test "[ConsExprNode]" {
     const list_node = try allocator.create(ListNode);
     list_node.* = .{
         .elements = elements,
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .delimiter = .LeftBracket },
+        .token = .{
+            .kind = .{ .delimiter = .LeftBracket },
             .lexeme = "[",
             .loc = .{
                 .filename = TEST_FILE,
@@ -3549,8 +3549,8 @@ test "[ConsExprNode]" {
     cons_node.* = .{
         .head = one_node,
         .tail = tail_node,
-        .operator = lexer.Token{
-            .kind = lexer.TokenKind{ .operator = .Cons },
+        .operator = .{
+            .kind = .{ .operator = .Cons },
             .lexeme = "::",
             .loc = .{
                 .filename = TEST_FILE,
@@ -4329,7 +4329,7 @@ test "[TypeAliasNode]" {
     const type_params = std.ArrayList([]const u8).init(allocator);
 
     const string_ident = try allocator.create(UpperIdentifierNode);
-    string_ident.* = UpperIdentifierNode{
+    string_ident.* = .{
         .identifier = try allocator.dupe(u8, "String"),
         .token = .{
             .kind = .{ .identifier = .Upper },
@@ -4800,7 +4800,6 @@ test "[ModulePathNode]" {
             },
         },
     };
-    try segments.append(std_ident);
 
     const list_ident = try allocator.create(UpperIdentifierNode);
     list_ident.* = .{
@@ -4815,6 +4814,8 @@ test "[ModulePathNode]" {
             },
         },
     };
+
+    try segments.append(std_ident);
     try segments.append(list_ident);
 
     const path_node = try allocator.create(ModulePathNode);
@@ -4887,8 +4888,6 @@ test "[ExportSpecNode]" {
     };
 
     var items = std.ArrayList(ExportItem).init(allocator);
-    // defer items.deinit();
-
     try items.append(item1);
     try items.append(item2);
 
@@ -5516,8 +5515,8 @@ test "[FunctionDeclNode]" {
     const add_ident = try allocator.create(LowerIdentifierNode);
     add_ident.* = .{
         .identifier = try allocator.dupe(u8, "add"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Lower },
+        .token = .{
+            .kind = .{ .identifier = .Lower },
             .lexeme = "add",
             .loc = .{
                 .filename = TEST_FILE,
@@ -5530,8 +5529,8 @@ test "[FunctionDeclNode]" {
     const x_ident = try allocator.create(LowerIdentifierNode);
     x_ident.* = .{
         .identifier = try allocator.dupe(u8, "x"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Lower },
+        .token = .{
+            .kind = .{ .identifier = .Lower },
             .lexeme = "x",
             .loc = .{
                 .filename = TEST_FILE,
@@ -5544,8 +5543,8 @@ test "[FunctionDeclNode]" {
     const int_type1 = try allocator.create(UpperIdentifierNode);
     int_type1.* = .{
         .identifier = try allocator.dupe(u8, "Int"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Upper },
+        .token = .{
+            .kind = .{ .identifier = .Upper },
             .lexeme = "Int",
             .loc = .{
                 .filename = TEST_FILE,
@@ -5568,8 +5567,8 @@ test "[FunctionDeclNode]" {
     const y_ident = try allocator.create(LowerIdentifierNode);
     y_ident.* = .{
         .identifier = try allocator.dupe(u8, "y"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Lower },
+        .token = .{
+            .kind = .{ .identifier = .Lower },
             .lexeme = "y",
             .loc = .{
                 .filename = TEST_FILE,
@@ -5582,8 +5581,8 @@ test "[FunctionDeclNode]" {
     const int_type2 = try allocator.create(UpperIdentifierNode);
     int_type2.* = .{
         .identifier = try allocator.dupe(u8, "Int"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Upper },
+        .token = .{
+            .kind = .{ .identifier = .Upper },
             .lexeme = "Int",
             .loc = .{
                 .filename = TEST_FILE,
@@ -5610,8 +5609,8 @@ test "[FunctionDeclNode]" {
     const int_type3 = try allocator.create(UpperIdentifierNode);
     int_type3.* = .{
         .identifier = try allocator.dupe(u8, "Int"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Upper },
+        .token = .{
+            .kind = .{ .identifier = .Upper },
             .lexeme = "Int",
             .loc = .{
                 .filename = TEST_FILE,
@@ -5627,8 +5626,8 @@ test "[FunctionDeclNode]" {
     const x_body_ident = try allocator.create(LowerIdentifierNode);
     x_body_ident.* = .{
         .identifier = try allocator.dupe(u8, "x"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Lower },
+        .token = .{
+            .kind = .{ .identifier = .Lower },
             .lexeme = "x",
             .loc = .{
                 .filename = TEST_FILE,
@@ -5644,8 +5643,8 @@ test "[FunctionDeclNode]" {
     const y_body_ident = try allocator.create(LowerIdentifierNode);
     y_body_ident.* = .{
         .identifier = try allocator.dupe(u8, "y"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Lower },
+        .token = .{
+            .kind = .{ .identifier = .Lower },
             .lexeme = "y",
             .loc = .{
                 .filename = TEST_FILE,
@@ -5662,8 +5661,8 @@ test "[FunctionDeclNode]" {
     arith_node.* = .{
         .left = x_body_node,
         .right = y_body_node,
-        .operator = lexer.Token{
-            .kind = lexer.TokenKind{ .operator = .IntAdd },
+        .operator = .{
+            .kind = .{ .operator = .IntAdd },
             .lexeme = "+",
             .loc = .{
                 .filename = TEST_FILE,
@@ -5682,8 +5681,8 @@ test "[FunctionDeclNode]" {
         .parameters = parameters,
         .return_type = return_type_node,
         .value = body_node,
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .keyword = .Let },
+        .token = .{
+            .kind = .{ .keyword = .Let },
             .lexeme = "let",
             .loc = .{
                 .filename = TEST_FILE,
@@ -5762,8 +5761,8 @@ test "[ForeignFunctionDeclNode]" {
     const float_type1 = try allocator.create(UpperIdentifierNode);
     float_type1.* = .{
         .identifier = try allocator.dupe(u8, "Float"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Upper },
+        .token = .{
+            .kind = .{ .identifier = .Upper },
             .lexeme = "Float",
             .loc = .{
                 .filename = TEST_FILE,
@@ -5779,8 +5778,8 @@ test "[ForeignFunctionDeclNode]" {
     const x_ident = try allocator.create(LowerIdentifierNode);
     x_ident.* = .{
         .identifier = try allocator.dupe(u8, "x"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Lower },
+        .token = .{
+            .kind = .{ .identifier = .Lower },
             .lexeme = "x",
             .loc = .{
                 .filename = TEST_FILE,
@@ -5794,8 +5793,8 @@ test "[ForeignFunctionDeclNode]" {
     x_param.* = .{
         .name = x_ident,
         .type_annotation = x_type_node,
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Lower },
+        .token = .{
+            .kind = .{ .identifier = .Lower },
             .lexeme = "x",
             .loc = .{
                 .filename = TEST_FILE,
@@ -5811,8 +5810,8 @@ test "[ForeignFunctionDeclNode]" {
     const float_type2 = try allocator.create(UpperIdentifierNode);
     float_type2.* = .{
         .identifier = try allocator.dupe(u8, "Float"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Upper },
+        .token = .{
+            .kind = .{ .identifier = .Upper },
             .lexeme = "Float",
             .loc = .{
                 .filename = TEST_FILE,
@@ -5828,8 +5827,8 @@ test "[ForeignFunctionDeclNode]" {
     const external_name_node = try allocator.create(StrLiteralNode);
     external_name_node.* = .{
         .value = try allocator.dupe(u8, "c_sqrt"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .literal = .String },
+        .token = .{
+            .kind = .{ .literal = .String },
             .lexeme = "\"c_sqrt\"",
             .loc = .{
                 .filename = TEST_FILE,
@@ -5842,8 +5841,8 @@ test "[ForeignFunctionDeclNode]" {
     const sqrt_ident = try allocator.create(LowerIdentifierNode);
     sqrt_ident.* = .{
         .identifier = try allocator.dupe(u8, "sqrt"),
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .identifier = .Lower },
+        .token = .{
+            .kind = .{ .identifier = .Lower },
             .lexeme = "sqrt",
             .loc = .{
                 .filename = TEST_FILE,
@@ -5859,8 +5858,8 @@ test "[ForeignFunctionDeclNode]" {
         .parameters = parameters,
         .return_type = return_type_node,
         .external_name = external_name_node,
-        .token = lexer.Token{
-            .kind = lexer.TokenKind{ .keyword = .Foreign },
+        .token = .{
+            .kind = .{ .keyword = .Foreign },
             .lexeme = "foreign",
             .loc = .{
                 .filename = TEST_FILE,
