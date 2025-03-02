@@ -499,11 +499,14 @@ pub const FunctionSignatureNode = struct {
 ///
 /// Examples:
 /// - `fn(x, y) => x + y`
-/// - `fn(x : Int, y : Int) => x + y`
+/// - `fn(x : Int, y : Int) -> Int => x + y`
 /// - `fn(f, xs) => xs |> map(f)`
 pub const LambdaExprNode = struct {
     /// Array of parameter declarations.
     parameters: std.ArrayList(*ParamDeclNode),
+
+    /// Optional AST node representing the return type annotation.
+    return_type: ?*Node,
 
     /// The AST node representing the function body expression.
     body: *Node,
@@ -515,6 +518,11 @@ pub const LambdaExprNode = struct {
         for (self.parameters.items) |param| {
             param.deinit(allocator);
             allocator.destroy(param);
+        }
+
+        if (self.return_type) |rt| {
+            rt.deinit(allocator);
+            allocator.destroy(rt);
         }
 
         self.parameters.deinit();
