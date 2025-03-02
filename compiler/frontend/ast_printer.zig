@@ -343,6 +343,10 @@ pub const AstPrinter = struct {
                 try self.printIndent();
                 try self.writer.styled(term.Color.Cyan, "]\n");
 
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "return_type: ");
+                try self.printNode(ftype.return_type);
+
                 self.indent_level -= 1;
 
                 try self.printIndent();
@@ -355,16 +359,37 @@ pub const AstPrinter = struct {
                 self.indent_level += 1;
 
                 try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "parameters: [");
+                try self.writer.styled(term.Color.Cyan, "parameters: [\n");
 
-                for (expr.param_names.items, 0..) |param, i| {
-                    if (i > 0) {
-                        try self.writer.plain(", ");
+                self.indent_level += 1;
+
+                for (expr.parameters.items) |param| {
+                    try self.printIndent();
+                    try self.writer.styled(term.Color.Bold, "Parameter");
+                    try self.writer.styled(term.Color.Dim, " {\n");
+
+                    self.indent_level += 1;
+
+                    try self.printIndent();
+                    try self.writer.styled(term.Color.Cyan, "name: ");
+                    try self.writer.styled(term.Color.Magenta, param.name.identifier);
+                    try self.writer.plain("\n");
+
+                    if (param.type_annotation) |type_ann| {
+                        try self.printIndent();
+                        try self.writer.styled(term.Color.Cyan, "type: ");
+                        try self.printNode(type_ann);
                     }
 
-                    try self.writer.styled(term.Color.Magenta, param);
+                    self.indent_level -= 1;
+
+                    try self.printIndent();
+                    try self.writer.styled(term.Color.Dim, "}\n");
                 }
 
+                self.indent_level -= 1;
+
+                try self.printIndent();
                 try self.writer.plain("]\n");
 
                 try self.printIndent();
@@ -387,8 +412,19 @@ pub const AstPrinter = struct {
                 try self.printNode(expr.function);
 
                 try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "argument: ");
-                try self.printNode(expr.argument);
+                try self.writer.styled(term.Color.Cyan, "arguments: [\n");
+
+                self.indent_level += 1;
+
+                for (expr.arguments.items) |argument| {
+                    try self.printIndent();
+                    try self.printNode(argument);
+                }
+
+                self.indent_level -= 1;
+
+                try self.printIndent();
+                try self.writer.plain("]\n");
 
                 self.indent_level -= 1;
 
@@ -687,7 +723,7 @@ pub const AstPrinter = struct {
 
                     try self.printIndent();
                     try self.writer.styled(term.Color.Cyan, "name: ");
-                    try self.writer.styled(term.Color.Magenta, field.name);
+                    try self.writer.styled(term.Color.Magenta, field.name.identifier);
                     try self.writer.plain("\n");
 
                     try self.printIndent();
@@ -961,11 +997,44 @@ pub const AstPrinter = struct {
                 try self.writer.styled(term.Color.Magenta, decl.name.identifier);
                 try self.writer.plain("\n");
 
-                if (decl.type_annotation) |type_annot| {
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "parameters: [\n");
+
+                self.indent_level += 1;
+
+                for (decl.parameters.items) |param| {
                     try self.printIndent();
-                    try self.writer.styled(term.Color.Cyan, "type: ");
-                    const type_node = ast.Node{ .function_type = type_annot };
-                    try self.printNode(&type_node);
+                    try self.writer.styled(term.Color.Bold, "Parameter");
+                    try self.writer.styled(term.Color.Dim, " {\n");
+
+                    self.indent_level += 1;
+
+                    try self.printIndent();
+                    try self.writer.styled(term.Color.Cyan, "name: ");
+                    try self.writer.styled(term.Color.Magenta, param.name.identifier);
+                    try self.writer.plain("\n");
+
+                    if (param.type_annotation) |type_ann| {
+                        try self.printIndent();
+                        try self.writer.styled(term.Color.Cyan, "type: ");
+                        try self.printNode(type_ann);
+                    }
+
+                    self.indent_level -= 1;
+
+                    try self.printIndent();
+                    try self.writer.styled(term.Color.Dim, "}\n");
+                }
+
+                self.indent_level -= 1;
+
+                try self.printIndent();
+                try self.writer.plain("]\n");
+
+                if (decl.return_type) |ret_type| {
+                    try self.printIndent();
+                    try self.writer.styled(term.Color.Cyan, "return_type: ");
+                    try self.printNode(ret_type);
                 }
 
                 try self.printIndent();
@@ -989,14 +1058,47 @@ pub const AstPrinter = struct {
                 try self.writer.plain("\n");
 
                 try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "external_name: ");
-                try self.writer.styled(term.Color.Green, decl.external_name);
-                try self.writer.plain("\n");
+                try self.writer.styled(term.Color.Cyan, "parameters: [\n");
+
+                self.indent_level += 1;
+
+                for (decl.parameters.items) |param| {
+                    try self.printIndent();
+                    try self.writer.styled(term.Color.Bold, "Parameter");
+                    try self.writer.styled(term.Color.Dim, " {\n");
+
+                    self.indent_level += 1;
+
+                    try self.printIndent();
+                    try self.writer.styled(term.Color.Cyan, "name: ");
+                    try self.writer.styled(term.Color.Magenta, param.name.identifier);
+                    try self.writer.plain("\n");
+
+                    if (param.type_annotation) |type_ann| {
+                        try self.printIndent();
+                        try self.writer.styled(term.Color.Cyan, "type: ");
+                        try self.printNode(type_ann);
+                    }
+
+                    self.indent_level -= 1;
+
+                    try self.printIndent();
+                    try self.writer.styled(term.Color.Dim, "}\n");
+                }
+
+                self.indent_level -= 1;
 
                 try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "type: ");
-                const type_node = ast.Node{ .function_type = decl.type_annotation };
-                try self.printNode(&type_node);
+                try self.writer.plain("]\n");
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "return_type: ");
+                try self.printNode(decl.return_type);
+
+                try self.printIndent();
+                try self.writer.styled(term.Color.Cyan, "external_name: ");
+                try self.writer.styled(term.Color.Green, decl.external_name.value);
+                try self.writer.plain("\n");
 
                 self.indent_level -= 1;
 
@@ -1017,7 +1119,7 @@ pub const AstPrinter = struct {
                         try self.writer.plain(".");
                     }
 
-                    try self.writer.styled(term.Color.Magenta, segment);
+                    try self.writer.styled(term.Color.Magenta, segment.identifier);
                 }
 
                 try self.writer.plain("]\n");
@@ -1134,7 +1236,7 @@ pub const AstPrinter = struct {
             .variable => |var_pattern| {
                 try self.writer.styled(term.Color.Bold, "VariablePattern");
                 try self.writer.plain("(");
-                try self.writer.styled(term.Color.Magenta, var_pattern.name);
+                try self.writer.styled(term.Color.Magenta, var_pattern.name.identifier);
                 try self.writer.plain(")\n");
             },
             .constructor => |con| {
@@ -1211,12 +1313,10 @@ test "example" {
     // Create a simple expression: 1 + 2 * 3
 
     const two = try allocator.create(ast.Node);
-    defer allocator.destroy(two);
-
     two.* = .{
         .int_literal = .{
             .value = 2,
-            .token = lexer.Token{
+            .token = .{
                 .kind = .{ .literal = .Int },
                 .lexeme = "2",
                 .loc = .{
@@ -1229,12 +1329,10 @@ test "example" {
     };
 
     const three = try allocator.create(ast.Node);
-    defer allocator.destroy(three);
-
     three.* = .{
         .int_literal = .{
             .value = 3,
-            .token = lexer.Token{
+            .token = .{
                 .kind = .{ .literal = .Int },
                 .lexeme = "3",
                 .loc = .{
@@ -1246,32 +1344,29 @@ test "example" {
         },
     };
 
-    const mul = try allocator.create(ast.Node);
-    defer allocator.destroy(mul);
-
+    const mul = try allocator.create(ast.ArithmeticExprNode);
     mul.* = .{
-        .arithmetic_expr = .{
-            .left = two,
-            .right = three,
-            .operator = lexer.Token{
-                .kind = .{ .operator = .IntMul },
-                .lexeme = "*",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 6, .end = 7 },
-                    .src = .{ .line = 1, .col = 7 },
-                },
+        .left = two,
+        .right = three,
+        .operator = .{
+            .kind = .{ .operator = .IntMul },
+            .lexeme = "*",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 6, .end = 7 },
+                .src = .{ .line = 1, .col = 7 },
             },
         },
     };
 
-    const one = try allocator.create(ast.Node);
-    defer allocator.destroy(one);
+    const mul_node = try allocator.create(ast.Node);
+    mul_node.* = .{ .arithmetic_expr = mul };
 
+    const one = try allocator.create(ast.Node);
     one.* = .{
         .int_literal = .{
             .value = 1,
-            .token = lexer.Token{
+            .token = .{
                 .kind = .{ .literal = .Int },
                 .lexeme = "1",
                 .loc = .{
@@ -1283,25 +1378,29 @@ test "example" {
         },
     };
 
-    const add = try allocator.create(ast.Node);
-    defer allocator.destroy(add);
-
+    const add = try allocator.create(ast.ArithmeticExprNode);
     add.* = .{
-        .arithmetic_expr = .{
-            .left = one,
-            .right = mul,
-            .operator = lexer.Token{
-                .kind = .{ .operator = .IntAdd },
-                .lexeme = "+",
-                .loc = .{
-                    .filename = TEST_FILE,
-                    .span = .{ .start = 2, .end = 3 },
-                    .src = .{ .line = 1, .col = 3 },
-                },
+        .left = one,
+        .right = mul_node,
+        .operator = .{
+            .kind = .{ .operator = .IntAdd },
+            .lexeme = "+",
+            .loc = .{
+                .filename = TEST_FILE,
+                .span = .{ .start = 2, .end = 3 },
+                .src = .{ .line = 1, .col = 3 },
             },
         },
     };
 
+    const add_node = try allocator.create(ast.Node);
+    defer {
+        add_node.deinit(allocator);
+        allocator.destroy(add_node);
+    }
+
+    add_node.* = .{ .arithmetic_expr = add };
+
     var printer = AstPrinter.init(allocator, std.io.getStdOut().writer());
-    try printer.printNode(add);
+    try printer.printNode(add_node);
 }
