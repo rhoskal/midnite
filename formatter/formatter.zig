@@ -224,19 +224,23 @@ pub const Formatter = struct {
                         try self.write("]");
                     },
                     .variable => |var_pattern| {
-                        try self.formatNode(&.{
-                            .lower_identifier = .{
-                                .identifier = var_pattern.name,
-                                .token = var_pattern.token,
-                            },
-                        });
+                        try self.formatNode(&.{ .lower_identifier = var_pattern.name });
                     },
                     .constructor => |con| {
                         try self.write(con.name);
 
-                        for (con.parameters.items) |param| {
-                            try self.write(" ");
-                            try self.formatNode(&.{ .pattern = param });
+                        if (con.parameters.items.len > 0) {
+                            try self.write("(");
+
+                            for (con.parameters.items, 0..) |param, i| {
+                                try self.formatNode(&.{ .pattern = param });
+
+                                if (i < con.parameters.items.len - 1) {
+                                    try self.write(", ");
+                                }
+                            }
+
+                            try self.write(")");
                         }
                     },
                     .empty_list => {
@@ -251,7 +255,9 @@ pub const Formatter = struct {
             },
             .match_expr => |expr| {
                 try self.write("match ");
+
                 try self.formatNode(expr.subject);
+
                 try self.write(" on\n");
 
                 for (expr.cases.items) |case| {
@@ -265,51 +271,62 @@ pub const Formatter = struct {
                     }
 
                     try self.write(" => ");
+
                     try self.formatNode(case.expression);
+
                     try self.write("\n");
                 }
             },
 
             // Functions and Applications
-            .function_type => |ftype| {
-                for (ftype.signature_types.items, 0..) |stype, i| {
-                    try self.formatNode(stype);
+            .function_signature => |sig| {
+                try self.write("(");
 
-                    if (i < ftype.signature_types.items.len - 1) {
-                        try self.write(" -> ");
+                for (sig.parameter_types.items, 0..) |param_type, i| {
+                    try self.formatNode(param_type);
+
+                    if (i < sig.parameter_types.items.len - 1) {
+                        try self.write(", ");
                     }
                 }
+
+                try self.write(") -> ");
+
+                try self.formatNode(sig.return_type);
             },
             .lambda_expr => |expr| {
-                try self.write("fn");
+                try self.write("fn(");
 
-                for (expr.param_names.items, 0..) |param, i| {
-                    try self.write(param);
+                for (expr.parameters.items, 0..) |param, i| {
+                    try self.formatNode(&.{ .lower_identifier = param.name });
 
-                    if (i < expr.param_names.items.len - 1) {
-                        try self.write(" ");
+                    if (param.type_annotation) |type_anno| {
+                        try self.write(" : ");
+                        try self.formatNode(type_anno);
+                    }
+
+                    if (i < expr.parameters.items.len - 1) {
+                        try self.write(", ");
                     }
                 }
 
-                try self.write(" => ");
+                try self.write(") => ");
 
                 try self.formatNode(expr.body);
             },
-            .function_application => |app| {
-                try self.formatNode(app.function);
+            .function_call => |call| {
+                try self.formatNode(call.function);
+                try self.write("(");
 
-                try self.write(" ");
+                for (call.arguments.items, 0..) |arg, i| {
+                    try self.formatNode(arg);
 
-                const needs_parens = (app.argument.* == .function_application);
-                if (needs_parens) {
-                    try self.write("(");
+                    if (i < call.arguments.items.len - 1) {
+                        try self.write(", ");
+                    }
                 }
 
-                try self.formatNode(app.argument);
-
-                if (needs_parens) {
-                    try self.write(")");
-                }
+                try self.write(")");
             },
 
             // Advanced Expressions
@@ -344,6 +361,7 @@ pub const Formatter = struct {
             // Control Flow
             .if_then_else_stmt => |stmt| {
                 try self.write("if ");
+
                 try self.formatNode(stmt.condition);
 
                 try self.write(" then\n");
@@ -394,7 +412,9 @@ pub const Formatter = struct {
             },
             .type_alias => |atype| {
                 try self.write("type alias ");
-                try self.write(atype.name);
+
+                try self.write(atype.name.identifier);
+
                 try self.write(" ");
 
                 for (atype.type_params.items) |param| {
@@ -403,12 +423,16 @@ pub const Formatter = struct {
                 }
 
                 try self.write("= ");
+
                 try self.formatNode(atype.value);
+
                 try self.write("\n");
             },
             .variant_type => |vtype| {
                 try self.write("type ");
-                try self.write(vtype.name);
+
+                try self.write(vtype.name.identifier);
+
                 try self.write(" ");
 
                 for (vtype.type_params.items) |param| {
@@ -424,7 +448,7 @@ pub const Formatter = struct {
                 for (vtype.constructors.items, 0..) |constructor, i| {
                     try self.writeIndent();
                     try self.write("| ");
-                    try self.write(constructor.name);
+                    try self.write(constructor.name.identifier);
 
                     for (constructor.parameters.items) |param| {
                         try self.write(" ");
@@ -452,7 +476,9 @@ pub const Formatter = struct {
             },
             .record_type => |rtype| {
                 try self.write("type ");
-                try self.write(rtype.name);
+
+                try self.write(rtype.name.identifier);
+
                 try self.write(" ");
 
                 for (rtype.type_params.items) |param| {
@@ -469,7 +495,7 @@ pub const Formatter = struct {
                 try self.write("{ ");
 
                 for (rtype.fields.items, 0..) |field, i| {
-                    try self.write(field.name);
+                    try self.write(field.name.identifier);
                     try self.write(" : ");
                     try self.formatNode(field.type);
 
@@ -494,7 +520,7 @@ pub const Formatter = struct {
                         try self.write(".");
                     }
 
-                    try self.write(segment);
+                    try self.write(segment.identifier);
                 }
             },
             .export_spec => |spec| {
@@ -512,6 +538,7 @@ pub const Formatter = struct {
 
                     if (sorted.items.len <= 2) {
                         try self.write("(");
+
                         for (sorted.items, 0..) |item, i| {
                             try self.write(item.name);
 
@@ -545,8 +572,7 @@ pub const Formatter = struct {
 
                         self.indent_level -= 1;
 
-                        try self.write("\n");
-                        try self.writeIndent();
+                        try self.writeNewlineAndIndent();
                         try self.write(")");
                     }
                 }
@@ -559,14 +585,14 @@ pub const Formatter = struct {
                         try self.write(".");
                     }
 
-                    try self.write(segment);
+                    try self.write(segment.identifier);
                 }
 
                 switch (spec.kind) {
                     .Simple => {},
                     .Alias => {
                         try self.write(" as ");
-                        try self.write(spec.alias.?);
+                        try self.write(spec.alias.?.identifier);
                     },
                     .Using => {
                         try self.write(" using (");
@@ -659,7 +685,7 @@ pub const Formatter = struct {
                 try self.write("include ");
 
                 for (inc.path.segments.items, 0..) |segment, i| {
-                    try self.write(segment);
+                    try self.write(segment.identifier);
 
                     if (i < inc.path.segments.items.len - 1) {
                         try self.write(".");
@@ -672,29 +698,68 @@ pub const Formatter = struct {
             // Top-Level Declarations
             .function_decl => |decl| {
                 try self.write("let ");
-                try self.write(decl.name);
 
-                if (decl.type_annotation) |anno| {
-                    try self.write(" : ");
-                    try self.formatNode(&ast.Node{ .function_type = anno });
+                try self.formatNode(&.{ .lower_identifier = decl.name });
+                try self.write("(");
+
+                for (decl.parameters.items, 0..) |param, i| {
+                    try self.formatNode(&.{ .lower_identifier = param.name });
+
+                    if (param.type_annotation) |type_anno| {
+                        try self.write(" : ");
+                        try self.formatNode(type_anno);
+                    }
+
+                    if (i < decl.parameters.items.len - 1) {
+                        try self.write(", ");
+                    }
+                }
+
+                try self.write(")");
+
+                if (decl.return_type) |ret_type| {
+                    try self.write(" -> ");
+
+                    try self.formatNode(ret_type);
                 }
 
                 try self.write(" = ");
+
                 try self.formatNode(decl.value);
 
                 try self.write("\n");
             },
             .foreign_function_decl => |decl| {
                 try self.write("foreign ");
-                try self.write(decl.name);
 
-                try self.write(" : ");
-                try self.formatNode(&ast.Node{ .function_type = decl.type_annotation });
+                try self.formatNode(&.{ .lower_identifier = decl.name });
+                try self.write("(");
+
+                for (decl.parameters.items, 0..) |param, i| {
+                    try self.formatNode(&.{ .lower_identifier = param.name });
+
+                    if (param.type_annotation) |type_anno| {
+                        try self.write(" : ");
+
+                        try self.formatNode(type_anno);
+                    }
+
+                    if (i < decl.parameters.items.len - 1) {
+                        try self.write(", ");
+                    }
+                }
+
+                try self.write(")");
+
+                try self.write(" -> ");
+
+                try self.formatNode(decl.return_type);
 
                 try self.write(" = ");
-                try self.write("\"");
-                try self.write(decl.external_name);
-                try self.write("\"");
+
+                try self.formatNode(&.{ .str_literal = decl.external_name });
+
+                try self.write("\n");
             },
             .module_decl => |decl| {
                 try self.write("module ");
@@ -704,7 +769,7 @@ pub const Formatter = struct {
                         try self.write(".");
                     }
 
-                    try self.write(segment);
+                    try self.formatNode(&.{ .upper_identifier = segment });
                 }
 
                 try self.write(" ");
