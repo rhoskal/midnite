@@ -3316,6 +3316,7 @@ test "[LambdaExprNode]" {
     const lambda_node = try allocator.create(LambdaExprNode);
     lambda_node.* = .{
         .parameters = parameters,
+        .return_type = null,
         .body = body_node,
         .token = .{
             .kind = .{ .keyword = .Fn },
