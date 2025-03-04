@@ -1409,6 +1409,20 @@ pub const Parser = struct {
                         };
 
                         node.* = .{ .list_concat_expr = list_concat_node };
+                    } else if (op == .Cons) {
+                        const cons_node = try self.allocator.create(ast.ConsExprNode);
+                        errdefer {
+                            cons_node.deinit(self.allocator);
+                            self.allocator.destroy(cons_node);
+                        }
+
+                        cons_node.* = .{
+                            .head = left,
+                            .tail = right,
+                            .operator = operator,
+                        };
+
+                        node.* = .{ .cons_expr = cons_node };
                     } else {
                         unreachable;
                     }
@@ -2884,6 +2898,39 @@ test "[logical_expr]" {
 
         // Verify the name of the right operand matches the expected value
         try testing.expectEqualStrings("false", right.lower_identifier.identifier);
+    }
+}
+
+test "[cons_expr]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    {
+        const source = "x :: xs";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseExpression();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Ensure the expression is a cons expression
+        try testing.expect(node.* == .cons_expr);
+
+        const expr = node.cons_expr;
+
+        // Verify head is 'x'
+        try testing.expectEqualStrings("x", expr.head.lower_identifier.identifier);
+
+        // Verify tail is 'xs'
+        try testing.expectEqualStrings("xs", expr.tail.lower_identifier.identifier);
     }
 }
 
