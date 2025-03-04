@@ -887,6 +887,7 @@ pub const Parser = struct {
 
         // Handle record and variant types - parse common prefix first
         const type_ident = try self.parseUpperIdentifier();
+        errdefer type_ident.deinit(self.allocator);
 
         var type_params = std.ArrayList([]const u8).init(self.allocator);
         errdefer {
@@ -897,10 +898,23 @@ pub const Parser = struct {
             type_params.deinit();
         }
 
-        while (self.check(lexer.TokenKind{ .identifier = .Lower })) {
+        if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
             const param = try self.parseLowerIdentifier();
+            errdefer param.deinit(self.allocator);
 
             try type_params.append(try self.allocator.dupe(u8, param.identifier));
+
+            while (try self.match(lexer.TokenKind{ .delimiter = .Comma })) {
+                const next_param = try self.parseLowerIdentifier();
+                errdefer next_param.deinit(self.allocator);
+
+                try type_params.append(try self.allocator.dupe(u8, next_param.identifier));
+                next_param.deinit(self.allocator);
+            }
+
+            _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+
+            param.deinit(self.allocator);
         }
 
         _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
@@ -916,12 +930,42 @@ pub const Parser = struct {
                 fields.deinit();
             }
 
-            while (!self.check(lexer.TokenKind{ .delimiter = .RightBrace })) {
+            const first_field_name = try self.parseLowerIdentifier();
+            errdefer first_field_name.deinit(self.allocator);
+
+            _ = try self.expect(lexer.TokenKind{ .delimiter = .Colon });
+
+            const first_field_type = try self.parseTypeExpr();
+            errdefer {
+                first_field_type.deinit(self.allocator);
+                self.allocator.destroy(first_field_type);
+            }
+
+            const first_field_node = try self.allocator.create(ast.RecordFieldNode);
+            errdefer {
+                first_field_node.deinit(self.allocator);
+                self.allocator.destroy(first_field_node);
+            }
+
+            first_field_node.* = .{
+                .name = first_field_name,
+                .type = first_field_type,
+                .token = first_field_name.token,
+            };
+
+            try fields.append(first_field_node);
+
+            while (try self.match(lexer.TokenKind{ .delimiter = .Comma })) {
                 const field_name = try self.parseLowerIdentifier();
+                errdefer field_name.deinit(self.allocator);
 
                 _ = try self.expect(lexer.TokenKind{ .delimiter = .Colon });
 
                 const field_type = try self.parseTypeExpr();
+                errdefer {
+                    field_type.deinit(self.allocator);
+                    self.allocator.destroy(field_type);
+                }
 
                 const field_node = try self.allocator.create(ast.RecordFieldNode);
                 errdefer {
@@ -936,10 +980,6 @@ pub const Parser = struct {
                 };
 
                 try fields.append(field_node);
-
-                if (!self.check(lexer.TokenKind{ .delimiter = .RightBrace })) {
-                    _ = try self.expect(lexer.TokenKind{ .delimiter = .Comma });
-                }
             }
 
             _ = try self.expect(lexer.TokenKind{ .delimiter = .RightBrace });
@@ -981,6 +1021,7 @@ pub const Parser = struct {
 
             // Parse first constructor
             const constructor = try self.parseUpperIdentifier();
+            errdefer constructor.deinit(self.allocator);
 
             var parameters = std.ArrayList(*ast.Node).init(self.allocator);
             errdefer {
@@ -997,6 +1038,7 @@ pub const Parser = struct {
                 !self.check(lexer.TokenKind{ .special = .Eof }))
             {
                 const param = try self.parseTypeExpr();
+
                 try parameters.append(param);
             }
 
@@ -1017,6 +1059,7 @@ pub const Parser = struct {
             // Parse remaining constructors
             while (try self.match(lexer.TokenKind{ .symbol = .Pipe })) {
                 const next_constructor = try self.parseUpperIdentifier();
+                errdefer next_constructor.deinit(self.allocator);
 
                 var next_params = std.ArrayList(*ast.Node).init(self.allocator);
                 errdefer {
@@ -1044,6 +1087,7 @@ pub const Parser = struct {
                     !self.check(lexer.TokenKind{ .keyword = .Type }))
                 {
                     const param = try self.parseTypeExpr();
+
                     try next_params.append(param);
                 }
 
