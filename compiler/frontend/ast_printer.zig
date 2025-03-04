@@ -959,25 +959,22 @@ pub const AstPrinter = struct {
                 self.indent_level += 1;
 
                 try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "path: [\n");
+
+                try self.writer.styled(term.Color.Cyan, "path: ");
 
                 self.indent_level += 1;
 
                 for (inc.path.segments.items, 0..) |segment, i| {
-                    try self.printIndent();
-
                     if (i > 0) {
                         try self.writer.plain(".");
                     }
 
                     try self.writer.styled(term.Color.Magenta, segment.identifier);
-                    try self.writer.plain("\n");
                 }
 
                 self.indent_level -= 1;
 
-                try self.printIndent();
-                try self.writer.plain("]\n");
+                try self.writer.plain("\n");
 
                 self.indent_level -= 1;
 
