@@ -815,12 +815,6 @@ pub const Parser = struct {
     /// Parses a type declaration, which can be a type alias, record type, or variant type.
     /// Handles parsing of type parameters that may be used in the type definition.
     ///
-    /// Syntax:
-    /// TypeDecl = "type" "alias" UpperIdent TypeParams? "=" Type
-    ///          | "type" UpperIdent TypeParams? "=" "{" FieldList "}"
-    ///          | "type" UpperIdent TypeParams? "=" "|"? Constructor ("|" Constructor)*
-    /// TypeParams = LowerIdent+
-    ///
     /// Examples:
     /// - `type alias Reader(r, a) = (r) -> a`
     /// - `type Dict(k, v) = { keys : List(k), values : List(v) }`
@@ -1105,6 +1099,7 @@ pub const Parser = struct {
         const start_token = try self.expect(lexer.TokenKind{ .keyword = .Let });
 
         const fn_name = try self.parseLowerIdentifier();
+        errdefer fn_name.deinit(self.allocator);
 
         _ = try self.expect(lexer.TokenKind{ .delimiter = .LeftParen });
 
@@ -1112,16 +1107,21 @@ pub const Parser = struct {
         errdefer {
             for (parameters.items) |param| {
                 param.deinit(self.allocator);
+                self.allocator.destroy(param);
             }
 
             parameters.deinit();
         }
 
         if (!self.check(lexer.TokenKind{ .delimiter = .RightParen })) {
-            try parameters.append(try self.parseParameter());
+            const first_param = try self.parseParameter();
+
+            try parameters.append(first_param);
 
             while (try self.match(lexer.TokenKind{ .delimiter = .Comma })) {
-                try parameters.append(try self.parseParameter());
+                const next_param = try self.parseParameter();
+
+                try parameters.append(next_param);
             }
         }
 
@@ -1131,6 +1131,7 @@ pub const Parser = struct {
         errdefer {
             if (return_type) |rt| {
                 rt.deinit(self.allocator);
+                self.allocator.destroy(rt);
             }
         }
 
@@ -1143,6 +1144,10 @@ pub const Parser = struct {
         _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
 
         const value = try self.parseExpression();
+        errdefer {
+            value.deinit(self.allocator);
+            self.allocator.destroy(value);
+        }
 
         const func_decl_node = try self.allocator.create(ast.FunctionDeclNode);
         errdefer {
@@ -1173,9 +1178,6 @@ pub const Parser = struct {
     /// The declaration specifies an internal function name and type signature
     /// along with the external symbol name to link against.
     ///
-    /// Format:
-    /// foreign <name> : <type> = "<external_name>"
-    ///
     /// Examples:
     /// - `foreign sqrt(x : Float) -> Float = "c_sqrt"`
     /// - `foreign print(x : String) -> Unit = "c_print"`
@@ -1183,6 +1185,7 @@ pub const Parser = struct {
         const start_token = try self.expect(lexer.TokenKind{ .keyword = .Foreign });
 
         const fn_name = try self.parseLowerIdentifier();
+        errdefer fn_name.deinit(self.allocator);
 
         _ = try self.expect(lexer.TokenKind{ .delimiter = .LeftParen });
 
@@ -1190,28 +1193,41 @@ pub const Parser = struct {
         errdefer {
             for (parameters.items) |param| {
                 param.deinit(self.allocator);
+                self.allocator.destroy(param);
             }
 
             parameters.deinit();
         }
 
         if (!self.check(lexer.TokenKind{ .delimiter = .RightParen })) {
-            try parameters.append(try self.parseParameter());
+            const first_param = try self.parseParameter();
+
+            try parameters.append(first_param);
 
             while (try self.match(lexer.TokenKind{ .delimiter = .Comma })) {
-                try parameters.append(try self.parseParameter());
+                const second_param = try self.parseParameter();
+
+                try parameters.append(second_param);
             }
         }
 
         _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
 
         _ = try self.match(lexer.TokenKind{ .symbol = .ArrowRight });
+
         const return_type = try self.parseTypeExpr();
+        errdefer {
+            return_type.deinit(self.allocator);
+            self.allocator.destroy(return_type);
+        }
+
         assert(return_type.* == .lower_identifier or return_type.* == .upper_identifier);
 
         _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
 
         const external_name = try self.parseStrLiteral();
+        errdefer external_name.deinit(self.allocator);
+
         if (external_name.value.len == 0) {
             return error.EmptyFFIReference;
         }
@@ -1243,13 +1259,9 @@ pub const Parser = struct {
 
     /// Parses an include declaration which imports and re-exports all contents from a module.
     ///
-    /// Syntax:
-    /// include ModulePath
-    ///
     /// Examples:
     /// - `include MyModule`
     /// - `include Std.List`
-    /// - `include Parser.Internal.Utils`
     fn parseInclude(self: *Parser) ParserError!*ast.Node {
         const start_token = try self.expect(lexer.TokenKind{ .keyword = .Include });
 
@@ -1526,13 +1538,7 @@ pub const Parser = struct {
         }
     }
 
-    /// Parses a lambda expression of the form: \param1 param2 => expr
-    ///
-    /// A lambda expression consists of:
-    /// - A lambda symbol (\)
-    /// - One or more parameters (lowercase identifiers)
-    /// - A double arrow (=>)
-    /// - An expression body
+    /// Parses a lambda expression.
     ///
     /// Examples:
     /// - `fn(x) => x + 1`
@@ -1552,10 +1558,14 @@ pub const Parser = struct {
         }
 
         if (!self.check(lexer.TokenKind{ .delimiter = .RightParen })) {
-            try parameters.append(try self.parseParameter());
+            const first_param = try self.parseParameter();
+
+            try parameters.append(first_param);
 
             while (try self.match(lexer.TokenKind{ .delimiter = .Comma })) {
-                try parameters.append(try self.parseParameter());
+                const next_param = try self.parseParameter();
+
+                try parameters.append(next_param);
             }
         }
 
@@ -1576,6 +1586,10 @@ pub const Parser = struct {
         _ = try self.expect(lexer.TokenKind{ .symbol = .DoubleArrowRight });
 
         const body = try self.parseExpression();
+        errdefer {
+            body.deinit(self.allocator);
+            self.allocator.destroy(body);
+        }
 
         const lambda_node = try self.allocator.create(ast.LambdaExprNode);
         errdefer {
@@ -1601,11 +1615,12 @@ pub const Parser = struct {
         return node;
     }
 
-    // Helper function to parse a single parameter with optional type annotation
+    // Helper function to parse a single parameter with optional type annotation.
     fn parseParameter(self: *Parser) ParserError!*ast.ParamDeclNode {
         const param_token = self.current_token;
 
         const name = try self.parseLowerIdentifier();
+        errdefer name.deinit(self.allocator);
 
         var type_annotation: ?*ast.Node = null;
         errdefer {
@@ -1636,12 +1651,8 @@ pub const Parser = struct {
 
     /// Parses a list expression surrounded by square brackets with comma-separated elements.
     ///
-    /// Syntax:
-    /// List = "[" Element ("," Element)* "]"
-    ///      | "[" "]"  // Empty list
-    ///
     /// Examples:
-    /// - `[]` (empty list)
+    /// - `[]`
     /// - `[1, 2, 3]`
     /// - `[True, False]`
     /// - `["hello", "world"]`
@@ -1714,9 +1725,6 @@ pub const Parser = struct {
     }
 
     /// Parses a tuple expression surrounded by parentheses with 2 comma-separated elements.
-    ///
-    /// Syntax:
-    /// Tuple = "(" Expression ("," Expression)* ")"
     ///
     /// Examples:
     /// - `(1, "hello")`
@@ -1908,7 +1916,7 @@ pub const Parser = struct {
         return node;
     }
 
-    /// Helper function to parse non-function types
+    /// Helper function to parse non-function types.
     fn parseSimpleType(self: *Parser) ParserError!*ast.Node {
         if (self.check(lexer.TokenKind{ .identifier = .Upper })) {
             const start_token = self.current_token;
@@ -2060,13 +2068,9 @@ pub const Parser = struct {
     /// Parses a module path consisting of one or more uppercase identifiers separated by dots.
     /// Used by module declarations, includes, and imports.
     ///
-    /// Syntax:
-    /// ModulePath = UpperIdent ("." UpperIdent)*
-    ///
     /// Examples:
     /// - `MyModule`
     /// - `Std.List`
-    /// - `Parser.Internal.Utils`
     fn parseModulePath(self: *Parser) ParserError!*ast.Node {
         var segments = std.ArrayList(*ast.UpperIdentifierNode).init(self.allocator);
         errdefer {
@@ -2078,10 +2082,12 @@ pub const Parser = struct {
         }
 
         const first_segment = try self.parseUpperIdentifier();
+
         try segments.append(first_segment);
 
         while (try self.match(lexer.TokenKind{ .delimiter = .Dot })) {
             const next_segment = try self.parseUpperIdentifier();
+
             try segments.append(next_segment);
         }
 
