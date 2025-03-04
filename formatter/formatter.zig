@@ -365,7 +365,6 @@ pub const Formatter = struct {
                 try self.formatNode(stmt.condition);
 
                 try self.write(" then\n");
-
                 self.indent_level += 1;
 
                 try self.writeIndent();
@@ -373,9 +372,9 @@ pub const Formatter = struct {
                 try self.write("\n");
 
                 self.indent_level -= 1;
+                try self.writeIndent();
 
                 try self.write("else\n");
-
                 self.indent_level += 1;
 
                 try self.writeIndent();
@@ -723,9 +722,14 @@ pub const Formatter = struct {
                     try self.formatNode(ret_type);
                 }
 
-                try self.write(" = ");
+                try self.write(" =");
+
+                self.indent_level += 1;
+                try self.writeNewlineAndIndent();
 
                 try self.formatNode(decl.value);
+
+                self.indent_level -= 1;
 
                 try self.write("\n");
             },
@@ -755,9 +759,14 @@ pub const Formatter = struct {
 
                 try self.formatNode(decl.return_type);
 
-                try self.write(" = ");
+                try self.write(" =");
+
+                self.indent_level += 1;
+                try self.writeNewlineAndIndent();
 
                 try self.formatNode(&.{ .str_literal = decl.external_name });
+
+                self.indent_level -= 1;
 
                 try self.write("\n");
             },
