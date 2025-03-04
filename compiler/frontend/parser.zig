@@ -1459,7 +1459,88 @@ pub const Parser = struct {
             return node;
         }
 
+        if (self.check(lexer.TokenKind{ .identifier = .Lower })) {
+            const ident = try self.parseLowerIdentifier();
+            errdefer ident.deinit(self.allocator);
+
+            if (self.check(lexer.TokenKind{ .delimiter = .LeftParen })) {
+                return self.parseFunctionCall(ident);
+            }
+
+            const node = try self.allocator.create(ast.Node);
+            errdefer {
+                node.deinit(self.allocator);
+                self.allocator.destroy(node);
+            }
+
+            node.* = .{ .lower_identifier = ident };
+
+            return node;
+        }
+
         return self.parsePrimaryExpr();
+    }
+
+    /// Parses a function call expression.
+    ///
+    /// Examples:
+    /// - `add(42, 17)`
+    /// - `map(double, [1, 2, 3])`
+    /// - `getFunction()(x, y)`
+    fn parseFunctionCall(self: *Parser, fn_name: *ast.LowerIdentifierNode) ParserError!*ast.Node {
+        _ = try self.expect(lexer.TokenKind{ .delimiter = .LeftParen });
+
+        var arguments = std.ArrayList(*ast.Node).init(self.allocator);
+        errdefer {
+            for (arguments.items) |arg| {
+                arg.deinit(self.allocator);
+                self.allocator.destroy(arg);
+            }
+
+            arguments.deinit();
+        }
+
+        if (!self.check(lexer.TokenKind{ .delimiter = .RightParen })) {
+            const first_arg = try self.parseExpression();
+            try arguments.append(first_arg);
+
+            while (try self.match(lexer.TokenKind{ .delimiter = .Comma })) {
+                const next_arg = try self.parseExpression();
+                try arguments.append(next_arg);
+            }
+        }
+
+        _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+
+        const func_node = try self.allocator.create(ast.Node);
+        errdefer {
+            func_node.deinit(self.allocator);
+            self.allocator.destroy(func_node);
+        }
+
+        func_node.* = .{ .lower_identifier = fn_name };
+
+        const call_node = try self.allocator.create(ast.FunctionCallNode);
+        errdefer {
+            call_node.deinit(self.allocator);
+            self.allocator.destroy(call_node);
+        }
+
+        call_node.* = .{
+            .function = func_node,
+            .arguments = arguments,
+            .token = fn_name.token,
+        };
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer {
+            node.deinit(self.allocator);
+            self.allocator.destroy(node);
+        }
+
+        node.* = .{ .function_call = call_node };
+
+        return node;
     }
 
     /// Parses a primary expression, such as literals, identifiers, or parenthesized expressions.
@@ -3380,6 +3461,47 @@ test "[function_decl]" {
         const value = decl.value.lower_identifier;
 
         try testing.expectEqualStrings("x", value.identifier);
+    }
+}
+
+test "[function_call]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    {
+        // Test input: bitwise_and(x, y)
+
+        const source = "bitwise_and(x, y)";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseSimpleExpr();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify the node is a function call
+        try testing.expect(node.* == .function_call);
+
+        const call = node.function_call;
+
+        // Verify the function name matches
+        try testing.expectEqualStrings("bitwise_and", call.function.lower_identifier.identifier);
+
+        // Verify the function call has exactly two parameters
+        try testing.expectEqual(@as(usize, 2), call.arguments.items.len);
+
+        // Verify the first arg is "x"
+        try testing.expectEqualStrings("x", call.arguments.items[0].lower_identifier.identifier);
+
+        // Verify the second arg is "y"
+        try testing.expectEqualStrings("y", call.arguments.items[1].lower_identifier.identifier);
     }
 }
 
