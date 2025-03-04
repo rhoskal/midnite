@@ -1143,7 +1143,9 @@ pub const Parser = struct {
         if (try self.match(lexer.TokenKind{ .symbol = .ArrowRight })) {
             return_type = try self.parseTypeExpr();
 
-            assert(return_type.?.* == .lower_identifier or return_type.?.* == .upper_identifier);
+            assert((return_type.?.* == .lower_identifier) or
+                (return_type.?.* == .upper_identifier) or
+                (return_type.?.* == .type_application));
         }
 
         _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
@@ -1226,7 +1228,9 @@ pub const Parser = struct {
             self.allocator.destroy(return_type);
         }
 
-        assert(return_type.* == .lower_identifier or return_type.* == .upper_identifier);
+        assert((return_type.* == .lower_identifier) or
+            (return_type.* == .upper_identifier) or
+            (return_type.* == .type_application));
 
         _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
 

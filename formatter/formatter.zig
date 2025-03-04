@@ -388,25 +388,30 @@ pub const Formatter = struct {
             .typed_hole => {
                 try self.write(" ? ");
             },
-            .type_application => |app| {
-                try self.formatNode(&ast.Node{ .upper_identifier = app.constructor });
-                try self.write(" ");
+            .type_application => |tapp| {
+                try self.formatNode(&ast.Node{ .upper_identifier = tapp.constructor });
 
-                for (app.args.items, 0..) |arg, i| {
-                    const needs_parens = (arg.* == .type_application);
-                    if (needs_parens) {
-                        try self.write("(");
+                if (tapp.args.items.len > 0) {
+                    try self.write("(");
+
+                    for (tapp.args.items, 0..) |arg, i| {
+                        const needs_parens = (arg.* == .type_application);
+                        if (needs_parens) {
+                            try self.write("(");
+                        }
+
+                        try self.formatNode(arg);
+
+                        if (needs_parens) {
+                            try self.write(")");
+                        }
+
+                        if (i < tapp.args.items.len - 1) {
+                            try self.write(", ");
+                        }
                     }
 
-                    try self.formatNode(arg);
-
-                    if (needs_parens) {
-                        try self.write(")");
-                    }
-
-                    if (i < app.args.items.len - 1) {
-                        try self.write(" ");
-                    }
+                    try self.write(")");
                 }
             },
             .type_alias => |atype| {
