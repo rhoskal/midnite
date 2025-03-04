@@ -2302,31 +2302,31 @@ test "[comment]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const source = "# This is a regular comment";
-    const text = "This is a regular comment";
+    {
+        const source = "# This is a regular comment";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
 
-    var l = lexer.Lexer.init(source, TEST_FILE);
-    var parser = try Parser.init(allocator, &l);
-    defer parser.deinit();
+        // Action
+        const node = try parser.parseComment();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
 
-    // Action
-    const node = try parser.parseComment();
-    defer {
-        node.deinit(allocator);
-        allocator.destroy(node);
+        // Assertions
+        // Verify the node is a regular comment
+        try testing.expect(node.* == .comment);
+
+        const comment = node.comment;
+
+        // Validate the comment token and its properties
+        try testing.expectEqual(lexer.TokenKind{ .comment = .Regular }, comment.token.kind);
+
+        // Ensure the content of the comment matches the source
+        try testing.expectEqualStrings("This is a regular comment", comment.text);
     }
-
-    // Assertions
-    // Verify the node is a regular comment
-    try testing.expect(node.* == .comment);
-
-    const comment = node.comment;
-
-    // Validate the comment token and its properties
-    try testing.expectEqual(lexer.TokenKind{ .comment = .Regular }, comment.token.kind);
-
-    // Ensure the content of the comment matches the source
-    try testing.expectEqualStrings(text, comment.text);
 }
 
 test "[doc_comment]" {
@@ -2335,31 +2335,31 @@ test "[doc_comment]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const source = "## This is a doc comment";
-    const text = "This is a doc comment";
+    {
+        const source = "## This is a doc comment";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
 
-    var l = lexer.Lexer.init(source, TEST_FILE);
-    var parser = try Parser.init(allocator, &l);
-    defer parser.deinit();
+        // Action
+        const node = try parser.parseDocComment();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
 
-    // Action
-    const node = try parser.parseDocComment();
-    defer {
-        node.deinit(allocator);
-        allocator.destroy(node);
+        // Assertions
+        // Verify the node is a doc comment
+        try testing.expect(node.* == .doc_comment);
+
+        const comment = node.doc_comment;
+
+        // Validate the comment token and its properties
+        try testing.expectEqual(lexer.TokenKind{ .comment = .Doc }, comment.token.kind);
+
+        // Ensure the content of the comment matches the source
+        try testing.expectEqualStrings("This is a doc comment", comment.text);
     }
-
-    // Assertions
-    // Verify the node is a doc comment
-    try testing.expect(node.* == .doc_comment);
-
-    const comment = node.doc_comment;
-
-    // Validate the comment token and its properties
-    try testing.expectEqual(lexer.TokenKind{ .comment = .Doc }, comment.token.kind);
-
-    // Ensure the content of the comment matches the source
-    try testing.expectEqualStrings(text, comment.text);
 }
 
 test "[int_literal]" {
@@ -2664,33 +2664,35 @@ test "[unary_expr]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const source = "-42";
-    var l = lexer.Lexer.init(source, TEST_FILE);
-    var parser = try Parser.init(allocator, &l);
-    defer parser.deinit();
+    {
+        const source = "-42";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
 
-    // Action
-    const expr = try parser.parseSimpleExpr();
-    defer {
-        expr.deinit(allocator);
-        allocator.destroy(expr);
+        // Action
+        const expr = try parser.parseSimpleExpr();
+        defer {
+            expr.deinit(allocator);
+            allocator.destroy(expr);
+        }
+
+        // Assertions
+        // Ensure the expression is identified as a unary expression
+        try testing.expect(expr.* == .unary_expr);
+
+        // Validate the operator in the unary expression
+        try testing.expectEqual(lexer.TokenKind{ .operator = .IntSub }, expr.unary_expr.operator.kind);
+        try testing.expectEqualStrings("-", expr.unary_expr.operator.lexeme);
+
+        const operand = expr.unary_expr.operand;
+
+        // Ensure the operand is an integer literal
+        try testing.expect(operand.* == .int_literal);
+
+        // Verify the integer value of the operand is correct
+        try testing.expect(operand.int_literal.value == 42);
     }
-
-    // Assertions
-    // Ensure the expression is identified as a unary expression
-    try testing.expect(expr.* == .unary_expr);
-
-    // Validate the operator in the unary expression
-    try testing.expectEqual(lexer.TokenKind{ .operator = .IntSub }, expr.unary_expr.operator.kind);
-    try testing.expectEqualStrings("-", expr.unary_expr.operator.lexeme);
-
-    const operand = expr.unary_expr.operand;
-
-    // Ensure the operand is an integer literal
-    try testing.expect(operand.* == .int_literal);
-
-    // Verify the integer value of the operand is correct
-    try testing.expect(operand.int_literal.value == 42);
 }
 
 test "[arithmetic_expr]" {
@@ -2699,40 +2701,42 @@ test "[arithmetic_expr]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const source = "42 + 24";
-    var l = lexer.Lexer.init(source, TEST_FILE);
-    var parser = try Parser.init(allocator, &l);
-    defer parser.deinit();
+    {
+        const source = "42 + 24";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
 
-    // Action
-    const expr = try parser.parseExpression();
-    defer {
-        expr.deinit(allocator);
-        allocator.destroy(expr);
+        // Action
+        const expr = try parser.parseExpression();
+        defer {
+            expr.deinit(allocator);
+            allocator.destroy(expr);
+        }
+
+        // Assertions
+        // Ensure the expression is identified as an arithmetic expression
+        try testing.expect(expr.* == .arithmetic_expr);
+
+        // Validate the operator in the arithmetic expression
+        try testing.expectEqual(lexer.TokenKind{ .operator = .IntAdd }, expr.arithmetic_expr.operator.kind);
+
+        const left = expr.arithmetic_expr.left;
+
+        // Ensure the left operand is an integer literal
+        try testing.expect(left.* == .int_literal);
+
+        // Verify the integer value of the left operand is correct
+        try testing.expect(left.int_literal.value == 42);
+
+        const right = expr.arithmetic_expr.right;
+
+        // Ensure the right operand is an integer literal
+        try testing.expect(right.* == .int_literal);
+
+        // Verify the integer value of the right operand is correct
+        try testing.expect(right.int_literal.value == 24);
     }
-
-    // Assertions
-    // Ensure the expression is identified as an arithmetic expression
-    try testing.expect(expr.* == .arithmetic_expr);
-
-    // Validate the operator in the arithmetic expression
-    try testing.expectEqual(lexer.TokenKind{ .operator = .IntAdd }, expr.arithmetic_expr.operator.kind);
-
-    const left = expr.arithmetic_expr.left;
-
-    // Ensure the left operand is an integer literal
-    try testing.expect(left.* == .int_literal);
-
-    // Verify the integer value of the left operand is correct
-    try testing.expect(left.int_literal.value == 42);
-
-    const right = expr.arithmetic_expr.right;
-
-    // Ensure the right operand is an integer literal
-    try testing.expect(right.* == .int_literal);
-
-    // Verify the integer value of the right operand is correct
-    try testing.expect(right.int_literal.value == 24);
 }
 
 test "[comparison_expr]" {
@@ -3016,7 +3020,8 @@ test "[operator precedence] (structural)" {
     const allocator = gpa.allocator();
 
     {
-        var l = lexer.Lexer.init("1 + 2 * 3", TEST_FILE);
+        const source = "1 + 2 * 3";
+        var l = lexer.Lexer.init(source, TEST_FILE);
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
 
@@ -3060,7 +3065,8 @@ test "[operator precedence] (structural)" {
     }
 
     {
-        var l = lexer.Lexer.init("1 * 2 + 3 == 4", TEST_FILE);
+        const source = "1 * 2 + 3 == 4";
+        var l = lexer.Lexer.init(source, TEST_FILE);
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
 
@@ -3247,55 +3253,57 @@ test "[if_then_else_stmt]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const source = "if x > 0 then 1 else -1";
-    var l = lexer.Lexer.init(source, TEST_FILE);
-    var parser = try Parser.init(allocator, &l);
-    defer parser.deinit();
+    {
+        const source = "if x > 0 then 1 else -1";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
 
-    // Action
-    const node = try parser.parseIfThenElse();
-    defer {
-        node.deinit(allocator);
-        allocator.destroy(node);
+        // Action
+        const node = try parser.parseIfThenElse();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Ensure the node is identified as an if-then-else statement
+        try testing.expect(node.* == .if_then_else_stmt);
+
+        const stmt = node.if_then_else_stmt;
+
+        // Validate the condition of the if-then-else statement
+        try testing.expect(stmt.condition.* == .comparison_expr);
+
+        const condition = stmt.condition.comparison_expr;
+
+        // Ensure the condition's operator is a "greater than" comparison
+        try testing.expectEqual(lexer.TokenKind{ .operator = .GreaterThan }, condition.operator.kind);
+
+        // Check the left-hand side of the condition (should be the identifier "x")
+        try testing.expect(condition.left.* == .lower_identifier);
+        try testing.expectEqualStrings("x", condition.left.lower_identifier.identifier);
+
+        // Check the right-hand side of the condition (should be the integer literal 0)
+        try testing.expect(condition.right.* == .int_literal);
+        try testing.expectEqual(@as(i64, 0), condition.right.int_literal.value);
+
+        // Validate the "then" branch (should evaluate to integer literal 1)
+        try testing.expect(stmt.then_branch.* == .int_literal);
+        try testing.expectEqual(@as(i64, 1), stmt.then_branch.int_literal.value);
+
+        // Validate the "else" branch (should evaluate to the unary expression -1)
+        try testing.expect(stmt.else_branch.* == .unary_expr);
+
+        const else_expr = stmt.else_branch.unary_expr;
+
+        // Ensure the unary operator in the else branch is subtraction
+        try testing.expectEqual(lexer.TokenKind{ .operator = .IntSub }, else_expr.operator.kind);
+
+        // Ensure the operand of the unary expression is an integer literal 1
+        try testing.expect(else_expr.operand.* == .int_literal);
+        try testing.expectEqual(@as(i64, 1), else_expr.operand.int_literal.value);
     }
-
-    // Assertions
-    // Ensure the node is identified as an if-then-else statement
-    try testing.expect(node.* == .if_then_else_stmt);
-
-    const stmt = node.if_then_else_stmt;
-
-    // Validate the condition of the if-then-else statement
-    try testing.expect(stmt.condition.* == .comparison_expr);
-
-    const condition = stmt.condition.comparison_expr;
-
-    // Ensure the condition's operator is a "greater than" comparison
-    try testing.expectEqual(lexer.TokenKind{ .operator = .GreaterThan }, condition.operator.kind);
-
-    // Check the left-hand side of the condition (should be the identifier "x")
-    try testing.expect(condition.left.* == .lower_identifier);
-    try testing.expectEqualStrings("x", condition.left.lower_identifier.identifier);
-
-    // Check the right-hand side of the condition (should be the integer literal 0)
-    try testing.expect(condition.right.* == .int_literal);
-    try testing.expectEqual(@as(i64, 0), condition.right.int_literal.value);
-
-    // Validate the "then" branch (should evaluate to integer literal 1)
-    try testing.expect(stmt.then_branch.* == .int_literal);
-    try testing.expectEqual(@as(i64, 1), stmt.then_branch.int_literal.value);
-
-    // Validate the "else" branch (should evaluate to the unary expression -1)
-    try testing.expect(stmt.else_branch.* == .unary_expr);
-
-    const else_expr = stmt.else_branch.unary_expr;
-
-    // Ensure the unary operator in the else branch is subtraction
-    try testing.expectEqual(lexer.TokenKind{ .operator = .IntSub }, else_expr.operator.kind);
-
-    // Ensure the operand of the unary expression is an integer literal 1
-    try testing.expect(else_expr.operand.* == .int_literal);
-    try testing.expectEqual(@as(i64, 1), else_expr.operand.int_literal.value);
 }
 
 test "[function_decl]" {
@@ -3471,8 +3479,6 @@ test "[function_call]" {
     const allocator = gpa.allocator();
 
     {
-        // Test input: bitwise_and(x, y)
-
         const source = "bitwise_and(x, y)";
         var l = lexer.Lexer.init(source, TEST_FILE);
         var parser = try Parser.init(allocator, &l);
@@ -3511,45 +3517,45 @@ test "[foreign_function_decl]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // foreign sqrt(x : Float) -> Float = "c_sqrt"
+    {
+        const source = "foreign sqrt(x : Float) -> Float = \"c_sqrt\"";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
 
-    const source = "foreign sqrt(x : Float) -> Float = \"c_sqrt\"";
-    var l = lexer.Lexer.init(source, TEST_FILE);
-    var parser = try Parser.init(allocator, &l);
-    defer parser.deinit();
+        // Action
+        const node = try parser.parseForeignFunctionDecl();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
 
-    // Action
-    const node = try parser.parseForeignFunctionDecl();
-    defer {
-        node.deinit(allocator);
-        allocator.destroy(node);
+        // Assertions
+        // Verify the node is a foreign function declaration
+        try testing.expect(node.* == .foreign_function_decl);
+
+        const decl = node.foreign_function_decl;
+
+        // Verify the function name matches
+        try testing.expectEqualStrings("sqrt", decl.name.identifier);
+
+        // Verify the function type has exactly one parameter
+        try testing.expectEqual(@as(usize, 1), decl.parameters.items.len);
+
+        const param1 = decl.parameters.items[0];
+
+        // Verify the parameter name is "x"
+        try testing.expectEqualStrings("x", param1.name.identifier);
+
+        // Verify paramater type is "Flaot"
+        try testing.expectEqualStrings("Float", param1.type_annotation.?.upper_identifier.identifier);
+
+        // Verify return type is "Float"
+        try testing.expectEqualStrings("Float", decl.return_type.upper_identifier.identifier);
+
+        // Verify the external name matches
+        try testing.expectEqualStrings("c_sqrt", decl.external_name.value);
     }
-
-    // Assertions
-    // Verify the node is a foreign function declaration
-    try testing.expect(node.* == .foreign_function_decl);
-
-    const decl = node.foreign_function_decl;
-
-    // Verify the function name matches
-    try testing.expectEqualStrings("sqrt", decl.name.identifier);
-
-    // Verify the function type has exactly one parameter
-    try testing.expectEqual(@as(usize, 1), decl.parameters.items.len);
-
-    const param1 = decl.parameters.items[0];
-
-    // Verify the parameter name is "x"
-    try testing.expectEqualStrings("x", param1.name.identifier);
-
-    // Verify paramater type is "Flaot"
-    try testing.expectEqualStrings("Float", param1.type_annotation.?.upper_identifier.identifier);
-
-    // Verify return type is "Float"
-    try testing.expectEqualStrings("Float", decl.return_type.upper_identifier.identifier);
-
-    // Verify the external name matches
-    try testing.expectEqualStrings("c_sqrt", decl.external_name.value);
 }
 
 test "[module_path]" {
@@ -3558,31 +3564,33 @@ test "[module_path]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const source = "Std.List";
-    var l = lexer.Lexer.init(source, TEST_FILE);
-    var parser = try Parser.init(allocator, &l);
-    defer parser.deinit();
+    {
+        const source = "Std.List";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
 
-    // Action
-    const node = try parser.parseModulePath();
-    defer {
-        node.deinit(allocator);
-        allocator.destroy(node.module_path);
-        allocator.destroy(node);
+        // Action
+        const node = try parser.parseModulePath();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node.module_path);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify the node is a path to a module
+        try testing.expect(node.* == .module_path);
+
+        const module_path = node.module_path;
+
+        // Check the module path has exactly two segments
+        try testing.expectEqual(@as(usize, 2), module_path.segments.items.len);
+
+        // Verify the segments
+        try testing.expectEqualStrings("Std", module_path.segments.items[0].identifier);
+        try testing.expectEqualStrings("List", module_path.segments.items[1].identifier);
     }
-
-    // Assertions
-    // Verify the node is a path to a module
-    try testing.expect(node.* == .module_path);
-
-    const module_path = node.module_path;
-
-    // Check the module path has exactly two segments
-    try testing.expectEqual(@as(usize, 2), module_path.segments.items.len);
-
-    // Verify the segments
-    try testing.expectEqualStrings("Std", module_path.segments.items[0].identifier);
-    try testing.expectEqualStrings("List", module_path.segments.items[1].identifier);
 }
 
 test "[include]" {
@@ -3591,30 +3599,32 @@ test "[include]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const source = "include Std.List";
-    var l = lexer.Lexer.init(source, TEST_FILE);
-    var parser = try Parser.init(allocator, &l);
-    defer parser.deinit();
+    {
+        const source = "include Std.List";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
 
-    // Action
-    const node = try parser.parseInclude();
-    defer {
-        node.deinit(allocator);
-        allocator.destroy(node);
+        // Action
+        const node = try parser.parseInclude();
+        defer {
+            node.deinit(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify the node is an include statement
+        try testing.expect(node.* == .include);
+
+        const include = node.include;
+
+        // Check the include path has exactly two segments
+        try testing.expectEqual(@as(usize, 2), include.path.segments.items.len);
+
+        // Verify the segments
+        try testing.expectEqualStrings("Std", include.path.segments.items[0].identifier);
+        try testing.expectEqualStrings("List", include.path.segments.items[1].identifier);
     }
-
-    // Assertions
-    // Verify the node is an include statement
-    try testing.expect(node.* == .include);
-
-    const include = node.include;
-
-    // Check the include path has exactly two segments
-    try testing.expectEqual(@as(usize, 2), include.path.segments.items.len);
-
-    // Verify the segments
-    try testing.expectEqualStrings("Std", include.path.segments.items[0].identifier);
-    try testing.expectEqualStrings("List", include.path.segments.items[1].identifier);
 }
 
 test "[import_spec]" {
@@ -4613,9 +4623,8 @@ test "[list]" {
     const allocator = gpa.allocator();
 
     {
-        // Test input: []
-
-        var l = lexer.Lexer.init("[]", TEST_FILE);
+        const source = "[]";
+        var l = lexer.Lexer.init(source, TEST_FILE);
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
 
@@ -4637,9 +4646,8 @@ test "[list]" {
     }
 
     {
-        // Test input: [1, 2, 3]
-
-        var l = lexer.Lexer.init("[1, 2, 3]", TEST_FILE);
+        const source = "[1, 2, 3]";
+        var l = lexer.Lexer.init(source, TEST_FILE);
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
 
@@ -4680,9 +4688,8 @@ test "[tuple]" {
     const allocator = gpa.allocator();
 
     {
-        // Test input: (1, "hello")
-
-        var l = lexer.Lexer.init("(1, \"hello\")", TEST_FILE);
+        const source = "(1, \"hello\")";
+        var l = lexer.Lexer.init(source, TEST_FILE);
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
 
@@ -4706,9 +4713,8 @@ test "[tuple]" {
     }
 
     {
-        // Test input: (x, True)
-
-        var l = lexer.Lexer.init("(x, True)", TEST_FILE);
+        const source = "(x, True)";
+        var l = lexer.Lexer.init(source, TEST_FILE);
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
 
