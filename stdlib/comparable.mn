@@ -17,7 +17,7 @@ module Comparable exposing
         | GT
 
     let eq(x : Bool, y : Bool) -> Bool =
-        if (x == True) and (y == True) then
+        if (x == True) && (y == True) then
             True
         else
             False
