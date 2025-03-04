@@ -27,7 +27,7 @@ pub fn compile(allocator: std.mem.Allocator, writer: anytype, filepath: []const 
 
             if (std.meta.eql(token.kind, .{ .special = .Eof })) break;
 
-            try writer.print("Token: {s} ({any})\n", .{ token.lexeme, token.kind });
+            try writer.print("{any}\n", .{token});
         }
     }
 
