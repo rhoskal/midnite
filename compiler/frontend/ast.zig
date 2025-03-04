@@ -804,6 +804,7 @@ pub const VariantConstructorNode = struct {
 
     pub fn deinit(self: *VariantConstructorNode, allocator: std.mem.Allocator) void {
         self.name.deinit(allocator);
+        allocator.destroy(self.name);
 
         for (self.parameters.items) |param| {
             param.deinit(allocator);
@@ -811,8 +812,6 @@ pub const VariantConstructorNode = struct {
         }
 
         self.parameters.deinit();
-
-        allocator.destroy(self);
     }
 };
 
@@ -840,6 +839,7 @@ pub const VariantTypeNode = struct {
 
     pub fn deinit(self: *VariantTypeNode, allocator: std.mem.Allocator) void {
         self.name.deinit(allocator);
+        allocator.destroy(self.name);
 
         for (self.type_params.items) |param| {
             allocator.free(param);
@@ -849,6 +849,7 @@ pub const VariantTypeNode = struct {
 
         for (self.constructors.items) |constructor| {
             constructor.deinit(allocator);
+            allocator.destroy(constructor);
         }
 
         self.constructors.deinit();
@@ -1131,7 +1132,6 @@ pub const ImportSpecNode = struct {
 /// Examples:
 /// - `include MyModule`
 /// - `include Data.List`
-/// - `include Parser.Internal`
 pub const IncludeNode = struct {
     /// The module path being included.
     path: *ModulePathNode,
