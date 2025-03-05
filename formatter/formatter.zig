@@ -194,7 +194,7 @@ pub const Formatter = struct {
 
             // Pattern Matching
             .pattern => |pat| {
-                switch (pat.*) {
+                switch (pat.inner) {
                     .wildcard => {
                         try self.write("_");
                     },
@@ -606,7 +606,7 @@ pub const Formatter = struct {
                             defer sorted.deinit();
 
                             for (sorted.items, 0..) |item, i| {
-                                switch (item.*) {
+                                switch (item.inner) {
                                     .function => |f| {
                                         try self.write(f.name);
 
@@ -655,7 +655,7 @@ pub const Formatter = struct {
                             defer sorted.deinit();
 
                             for (sorted.items, 0..) |item, i| {
-                                switch (item.*) {
+                                switch (item.inner) {
                                     .function => |f| {
                                         try self.write(f.name);
                                     },
@@ -844,20 +844,20 @@ pub const Formatter = struct {
     /// Example output: `[Maybe(..), filter, map]`
     fn sortExportItems(
         allocator: std.mem.Allocator,
-        items: std.ArrayList(ast.ExportItem),
-    ) !std.ArrayList(ast.ExportItem) {
-        var result = std.ArrayList(ast.ExportItem).init(allocator);
+        items: std.ArrayList(*ast.ExportItem),
+    ) !std.ArrayList(*ast.ExportItem) {
+        var result = std.ArrayList(*ast.ExportItem).init(allocator);
         errdefer result.deinit();
 
         try result.appendSlice(items.items);
 
         const customSort = struct {
-            fn lessThan(_: void, a: ast.ExportItem, b: ast.ExportItem) bool {
+            fn lessThan(_: void, a: *ast.ExportItem, b: *ast.ExportItem) bool {
                 return std.mem.lessThan(u8, a.name, b.name);
             }
         }.lessThan;
 
-        std.mem.sort(ast.ExportItem, result.items, {}, customSort);
+        std.mem.sort(*ast.ExportItem, result.items, {}, customSort);
 
         return result;
     }
@@ -886,7 +886,7 @@ pub const Formatter = struct {
         defer operators.deinit();
 
         for (items.items) |item| {
-            switch (item.*) {
+            switch (item.inner) {
                 .type => try types.append(item),
                 .function => try functions.append(item),
                 .operator => try operators.append(item),
@@ -895,19 +895,19 @@ pub const Formatter = struct {
 
         const typeSort = struct {
             fn lessThan(_: void, a: *ast.ImportItem, b: *ast.ImportItem) bool {
-                return std.mem.lessThan(u8, a.type.name, b.type.name);
+                return std.mem.lessThan(u8, a.inner.type.name, b.inner.type.name);
             }
         }.lessThan;
 
         const functionSort = struct {
             fn lessThan(_: void, a: *ast.ImportItem, b: *ast.ImportItem) bool {
-                return std.mem.lessThan(u8, a.function.name, b.function.name);
+                return std.mem.lessThan(u8, a.inner.function.name, b.inner.function.name);
             }
         }.lessThan;
 
         const operatorSort = struct {
             fn lessThan(_: void, a: *ast.ImportItem, b: *ast.ImportItem) bool {
-                return std.mem.lessThan(u8, a.operator.symbol, b.operator.symbol);
+                return std.mem.lessThan(u8, a.inner.operator.symbol, b.inner.operator.symbol);
             }
         }.lessThan;
 

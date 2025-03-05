@@ -411,7 +411,7 @@ pub const Parser = struct {
         var statements = std.ArrayList(*ast.Node).init(self.allocator);
         errdefer {
             for (statements.items) |item| {
-                item.rel(self.allocator);
+                item.release(self.allocator);
                 self.allocator.destroy(item);
             }
             statements.deinit();
@@ -800,64 +800,6 @@ pub const Parser = struct {
     fn parseTypeDecl(self: *Parser) ParserError!*ast.Node {
         const start_token = try self.expect(lexer.TokenKind{ .keyword = .Type });
 
-        // if (try self.match(lexer.TokenKind{ .keyword = .Alias })) {
-        //     const type_ident = try self.parseUpperIdentifier();
-        //     errdefer type_ident.release(self.allocator);
-
-        //     var type_params = std.ArrayList([]const u8).init(self.allocator);
-        //     errdefer {
-        //         for (type_params.items) |param| {
-        //             self.allocator.free(param);
-        //         }
-        //         type_params.deinit();
-        //     }
-
-        //     if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
-        //         const param = try self.parseLowerIdentifier();
-        //         errdefer param.release(self.allocator);
-
-        //         try type_params.append(try self.allocator.dupe(u8, param.identifier));
-        //         param.release(self.allocator);
-
-        //         while (try self.match(lexer.TokenKind{ .delimiter = .Comma })) {
-        //             const next_param = try self.parseLowerIdentifier();
-        //             errdefer next_param.release(self.allocator);
-
-        //             try type_params.append(try self.allocator.dupe(u8, next_param.identifier));
-        //             next_param.release(self.allocator);
-        //         }
-
-        //         _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
-        //     }
-
-        //     _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
-
-        //     const value = try self.parseTypeExpr();
-        //     errdefer {
-        //         value.release(self.allocator);
-        //         self.allocator.destroy(value);
-        //     }
-
-        //     const alias_node = try self.allocator.create(ast.TypeAliasNode);
-        //     errdefer alias_node.release(self.allocator);
-
-        //     alias_node.* = .{
-        //         .name = type_ident,
-        //         .type_params = type_params,
-        //         .value = value,
-        //         .token = start_token,
-        //     };
-
-        //     const node = try self.allocator.create(ast.Node);
-        //     errdefer {
-        //         node.release(self.allocator);
-        //         self.allocator.destroy(node);
-        //     }
-
-        //     node.* = .{ .type_alias = alias_node };
-
-        //     return node;
-        // }
         if (try self.match(lexer.TokenKind{ .keyword = .Alias })) {
             const type_ident = try self.parseUpperIdentifier();
             errdefer type_ident.release(self.allocator);
@@ -890,7 +832,6 @@ pub const Parser = struct {
 
             _ = try self.expect(lexer.TokenKind{ .operator = .Equal });
 
-            // Handle function type explicitly
             var parameter_types = std.ArrayList(*ast.Node).init(self.allocator);
             errdefer {
                 for (parameter_types.items) |param_type| {

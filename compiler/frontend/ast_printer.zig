@@ -863,7 +863,7 @@ pub const AstPrinter = struct {
                     for (items.items) |item| {
                         try self.printIndent();
 
-                        switch (item.*) {
+                        switch (item.inner) {
                             .function => |f| {
                                 try self.writer.styled(term.Color.Bold, "Function");
                                 try self.writer.styled(term.Color.Dim, " {\n");
@@ -1173,7 +1173,7 @@ pub const AstPrinter = struct {
     }
 
     fn printPattern(self: *AstPrinter, pattern: *const ast.PatternNode) !void {
-        switch (pattern.*) {
+        switch (pattern.inner) {
             .wildcard => {
                 try self.writer.styled(term.Color.Bold, "WildcardPattern");
                 try self.writer.plain("(_)\n");
