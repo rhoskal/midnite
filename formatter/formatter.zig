@@ -419,17 +419,22 @@ pub const Formatter = struct {
 
                 try self.write(atype.name.identifier);
 
-                try self.write(" ");
+                if (atype.type_params.items.len > 0) {
+                    try self.write("(");
 
-                for (atype.type_params.items) |param| {
-                    try self.write(param);
-                    try self.write(" ");
+                    for (atype.type_params.items, 0..) |param, i| {
+                        try self.write(param);
+
+                        if (i < atype.type_params.items.len - 1) {
+                            try self.write(", ");
+                        }
+                    }
+
+                    try self.write(")");
                 }
 
-                try self.write("= ");
-
+                try self.write(" = ");
                 try self.formatNode(atype.value);
-
                 try self.write("\n");
             },
             .variant_type => |vtype| {
