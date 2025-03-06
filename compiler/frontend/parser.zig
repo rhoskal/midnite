@@ -441,10 +441,101 @@ pub const Parser = struct {
     fn parseTopLevel(self: *Parser) ParserError!*ast.Node {
         switch (self.current_token.kind) {
             .keyword => |kw| switch (kw) {
+                .Module => return self.parseModuleDecl(),
+                else => return error.UnexpectedToken,
+            },
+            .comment => |c| switch (c) {
+                .Doc => return self.parseDocComment(),
+                .Regular => return self.parseComment(),
+            },
+            else => return error.UnexpectedToken,
+        }
+    }
+
+    /// Parses a module declaration with its name, exports, and contents.
+    /// A module groups related declarations (functions, types, etc.) and controls
+    /// their visibility through an export specification. This is the top-level
+    /// construct for organizing code in a file.
+    ///
+    /// Examples:
+    /// - `module A exposing (..) ... end`
+    fn parseModuleDecl(self: *Parser) ParserError!*ast.Node {
+        const start_token = try self.expect(lexer.TokenKind{ .keyword = .Module });
+
+        const path_node = try self.parseModulePath();
+        errdefer {
+            path_node.release(self.allocator);
+            self.allocator.destroy(path_node);
+        }
+
+        const module_path = path_node.module_path;
+        self.allocator.destroy(path_node);
+
+        const exports_node = try self.parseExportSpec();
+        errdefer {
+            exports_node.release(self.allocator);
+            self.allocator.destroy(exports_node);
+        }
+
+        const exports = exports_node.export_spec;
+        self.allocator.destroy(exports_node);
+
+        var declarations = std.ArrayList(*ast.Node).init(self.allocator);
+        errdefer {
+            for (declarations.items) |decl| {
+                decl.release(self.allocator);
+                self.allocator.destroy(decl);
+            }
+            declarations.deinit();
+        }
+
+        while (!self.check(lexer.TokenKind{ .keyword = .End })) {
+            const decl = try self.parseModuleStmt();
+            errdefer {
+                decl.release(self.allocator);
+                self.allocator.destroy(decl);
+            }
+
+            try declarations.append(decl);
+        }
+
+        _ = try self.expect(lexer.TokenKind{ .keyword = .End });
+
+        const module_node = try self.allocator.create(ast.ModuleDeclNode);
+        errdefer module_node.release(self.allocator);
+
+        module_node.* = .{
+            .path = module_path,
+            .exports = exports,
+            .declarations = declarations,
+            .token = start_token,
+        };
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer {
+            node.release(self.allocator);
+            self.allocator.destroy(node);
+        }
+
+        node.* = .{ .module_decl = module_node };
+
+        return node;
+    }
+
+    /// Parses a single statement within a module declaration.
+    /// Handles declarations such as functions, types, imports, and comments that
+    /// appear inside a module's body.
+    ///
+    /// Examples:
+    /// - `let double(x : Int) -> Int = x * 2`
+    /// - `type Maybe(a) = None | Some(a)`
+    /// - `open StdLib.List`
+    fn parseModuleStmt(self: *Parser) ParserError!*ast.Node {
+        switch (self.current_token.kind) {
+            .keyword => |kw| switch (kw) {
                 .Foreign => return self.parseForeignFunctionDecl(),
                 .Include => return self.parseInclude(),
                 .Let => return self.parseFunctionDecl(),
-                // .Module => return self.parseModuleDecl(),
                 .Open => return self.parseImportSpec(),
                 .Type => return self.parseTypeDecl(),
                 else => return error.UnexpectedToken,
@@ -455,6 +546,88 @@ pub const Parser = struct {
             },
             else => return error.UnexpectedToken,
         }
+    }
+
+    /// Parses an export specification that defines which items a module exposes.
+    /// Can specify all items with '..' or a list of specific items, optionally
+    /// exposing constructors for types with '(..)'.
+    ///
+    /// Examples:
+    /// - `exposing (double)`
+    /// - `exposing (..)`
+    /// - `exposing (Maybe(..), and_then)`
+    fn parseExportSpec(self: *Parser) ParserError!*ast.Node {
+        const start_token = try self.expect(lexer.TokenKind{ .keyword = .Exposing });
+
+        _ = try self.expect(lexer.TokenKind{ .delimiter = .LeftParen });
+
+        var exposing_all = false;
+
+        var items: ?std.ArrayList(*ast.ExportItem) = null;
+        errdefer {
+            if (items) |*list| {
+                for (list.items) |item| {
+                    item.release(self.allocator);
+                }
+                list.deinit();
+            }
+        }
+
+        if (try self.match(lexer.TokenKind{ .operator = .Expand })) {
+            exposing_all = true;
+        } else {
+            items = std.ArrayList(*ast.ExportItem).init(self.allocator);
+
+            while (!self.check(lexer.TokenKind{ .delimiter = .RightParen })) {
+                const ident = try self.parseLowerIdentifier();
+                defer ident.release(self.allocator);
+
+                var expose_constructors = false;
+
+                if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
+                    _ = try self.expect(lexer.TokenKind{ .operator = .Expand });
+                    _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+
+                    expose_constructors = true;
+                }
+
+                const item = try self.allocator.create(ast.ExportItem);
+                errdefer item.release(self.allocator);
+
+                item.* = .{
+                    .name = try self.allocator.dupe(u8, ident.identifier),
+                    .expose_constructors = expose_constructors,
+                    .token = ident.token,
+                };
+
+                try items.?.append(item);
+
+                if (!self.check(lexer.TokenKind{ .delimiter = .RightParen })) {
+                    _ = try self.expect(lexer.TokenKind{ .delimiter = .Comma });
+                }
+            }
+        }
+
+        _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+
+        const export_node = try self.allocator.create(ast.ExportSpecNode);
+        errdefer export_node.release(self.allocator);
+
+        export_node.* = .{
+            .exposing_all = exposing_all,
+            .items = items,
+            .token = start_token,
+        };
+
+        const node = try self.allocator.create(ast.Node);
+        errdefer {
+            node.release(self.allocator);
+            self.allocator.destroy(node);
+        }
+
+        node.* = .{ .export_spec = export_node };
+
+        return node;
     }
 
     /// Parses an import specification that controls how a module is imported.
@@ -1293,9 +1466,14 @@ pub const Parser = struct {
     fn parseInclude(self: *Parser) ParserError!*ast.Node {
         const start_token = try self.expect(lexer.TokenKind{ .keyword = .Include });
 
-        const path_node = try self.parseModulePath();
-        const module_path = path_node.module_path;
-        self.allocator.destroy(path_node);
+        const path = try self.parseModulePath();
+        errdefer {
+            path.release(self.allocator);
+            self.allocator.destroy(path);
+        }
+
+        const module_path = path.module_path;
+        self.allocator.destroy(path);
 
         const include_node = try self.allocator.create(ast.IncludeNode);
         errdefer include_node.release(self.allocator);
