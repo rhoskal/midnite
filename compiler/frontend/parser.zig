@@ -333,6 +333,104 @@ pub const Parser = struct {
         return node;
     }
 
+    /// Parses a multiline string literal into a structured node.
+    /// Handles triple-quoted strings `"""` that preserve line breaks and indentation,
+    /// with support for escape sequences but not interpolation.
+    ///
+    /// Examples:
+    /// - `"""Hello\nWorld"""`
+    /// - `"""
+    ///  This keeps
+    ///  indentation
+    ///"""`
+    fn parseMultilineStringLiteral(self: *Parser) ParserError!*ast.MultilineStrLiteralNode {
+        const start_token = try self.expect(lexer.TokenKind{ .literal = .MultilineString });
+
+        const full_lexeme = start_token.lexeme;
+        const content = full_lexeme[3 .. full_lexeme.len - 3];
+
+        var raw_content = std.ArrayList(u8).init(self.allocator);
+        defer raw_content.deinit();
+
+        var i: usize = 0;
+        while (i < content.len) {
+            if (content[i] == '\\') {
+                const sequence = try self.parseStrEscapeSequence(content[i..]);
+
+                try raw_content.appendSlice(sequence.value);
+
+                if (content[i + 1] == 'u') {
+                    self.allocator.free(sequence.value);
+                }
+
+                i += sequence.len;
+            } else {
+                try raw_content.append(content[i]);
+
+                i += 1;
+            }
+        }
+
+        // Dedent lines
+        var final_content = std.ArrayList(u8).init(self.allocator);
+        errdefer final_content.deinit();
+
+        var lines = std.mem.split(u8, raw_content.items, "\n");
+        var first_line = true;
+        var base_indent: ?usize = null;
+
+        while (lines.next()) |line| {
+            if (first_line) {
+                if (line.len == 0) {
+                    continue;
+                }
+
+                var indent: usize = 0;
+                for (line) |c| {
+                    if (!std.ascii.isWhitespace(c)) {
+                        break;
+                    }
+
+                    indent += 1;
+                }
+
+                base_indent = indent;
+                first_line = false;
+            }
+
+            if (line.len > 0) {
+                var trimmed: []const u8 = line;
+                if (base_indent) |indent| {
+                    const indent_spaces = try self.allocator.alloc(u8, indent);
+                    defer self.allocator.free(indent_spaces);
+                    @memset(indent_spaces, ' ');
+
+                    if (line.len > indent and std.mem.startsWith(u8, line, indent_spaces)) {
+                        trimmed = line[indent..];
+                    }
+                }
+
+                try final_content.appendSlice(trimmed);
+            }
+
+            if (lines.index != null) {
+                try final_content.append('\n');
+            }
+        }
+
+        const node = try self.allocator.create(ast.MultilineStrLiteralNode);
+        errdefer node.release(self.allocator);
+
+        node.* = .{
+            .value = try self.allocator.dupe(u8, final_content.items),
+            .token = start_token,
+        };
+
+        final_content.deinit();
+
+        return node;
+    }
+
     const EscapeSequence = struct {
         value: []const u8,
         len: usize,
@@ -1806,7 +1904,11 @@ pub const Parser = struct {
 
                         node.* = .{ .str_literal = str_literal };
                     },
-                    .MultilineString => return error.UnexpectedToken,
+                    .MultilineString => {
+                        const str_literal = try self.parseMultilineStringLiteral();
+
+                        node.* = .{ .multiline_str_literal = str_literal };
+                    },
                 }
 
                 return node;
@@ -2465,18 +2567,48 @@ test "[int_literal]" {
 
     const cases = [_]TestCase{
         // Base 16 (hex)
-        .{ .source = "0xFF", .expected = 255 },
-        .{ .source = "0xff", .expected = 255 },
-        .{ .source = "0xDEAD_BEEF", .expected = 0xDEADBEEF },
+        .{
+            .source = "0xFF",
+            .expected = 255,
+        },
+        .{
+            .source = "0xff",
+            .expected = 255,
+        },
+        .{
+            .source = "0xDEAD_BEEF",
+            .expected = 0xDEADBEEF,
+        },
+
         // Base 10 (decimal)
-        .{ .source = "42", .expected = 42 },
-        .{ .source = "1_234_567", .expected = 1234567 },
+        .{
+            .source = "42",
+            .expected = 42,
+        },
+        .{
+            .source = "1_234_567",
+            .expected = 1234567,
+        },
+
         // Base 8 (octal)
-        .{ .source = "0o52", .expected = 42 },
-        .{ .source = "0o755", .expected = 493 },
+        .{
+            .source = "0o52",
+            .expected = 42,
+        },
+        .{
+            .source = "0o755",
+            .expected = 493,
+        },
+
         // Base 2 (binary)
-        .{ .source = "0b1010", .expected = 10 },
-        .{ .source = "0b1010_1010", .expected = 170 },
+        .{
+            .source = "0b1010",
+            .expected = 10,
+        },
+        .{
+            .source = "0b1010_1010",
+            .expected = 170,
+        },
     };
 
     for (cases) |case| {
@@ -2511,11 +2643,26 @@ test "[float_literal]" {
     };
 
     const cases = [_]TestCase{
-        .{ .source = "3.14", .expected = 3.14 },
-        .{ .source = "42.0", .expected = 42.0 },
-        .{ .source = "1.23e4", .expected = 12300.0 },
-        .{ .source = "1.23e-4", .expected = 0.000123 },
-        .{ .source = "1_234.567_89", .expected = 1234.56789 },
+        .{
+            .source = "3.14",
+            .expected = 3.14,
+        },
+        .{
+            .source = "42.0",
+            .expected = 42.0,
+        },
+        .{
+            .source = "1.23e4",
+            .expected = 12300.0,
+        },
+        .{
+            .source = "1.23e-4",
+            .expected = 0.000123,
+        },
+        .{
+            .source = "1_234.567_89",
+            .expected = 1234.56789,
+        },
     };
 
     for (cases) |case| {
@@ -2551,22 +2698,58 @@ test "[char_literal]" {
 
     const cases = [_]TestCase{
         // Regular characters
-        .{ .source = "'a'", .expected = 'a' },
-        .{ .source = "'Z'", .expected = 'Z' },
-        .{ .source = "'0'", .expected = '0' },
-        .{ .source = "'!'", .expected = '!' },
+        .{
+            .source = "'a'",
+            .expected = 'a',
+        },
+        .{
+            .source = "'Z'",
+            .expected = 'Z',
+        },
+        .{
+            .source = "'0'",
+            .expected = '0',
+        },
+        .{
+            .source = "'!'",
+            .expected = '!',
+        },
 
         // Escape sequences
-        .{ .source = "'\\n'", .expected = '\n' },
-        .{ .source = "'\\r'", .expected = '\r' },
-        .{ .source = "'\\t'", .expected = '\t' },
-        .{ .source = "'\\\\'", .expected = '\\' },
-        .{ .source = "'\\''", .expected = '\'' },
+        .{
+            .source = "'\\n'",
+            .expected = '\n',
+        },
+        .{
+            .source = "'\\r'",
+            .expected = '\r',
+        },
+        .{
+            .source = "'\\t'",
+            .expected = '\t',
+        },
+        .{
+            .source = "'\\\\'",
+            .expected = '\\',
+        },
+        .{
+            .source = "'\\''",
+            .expected = '\'',
+        },
 
         // Unicode escape sequences
-        .{ .source = "'\\u{0061}'", .expected = 0x0061 }, // 'a'
-        .{ .source = "'\\u{1F600}'", .expected = 0x1F600 }, // 😀
-        .{ .source = "'😀'", .expected = 0x1F600 },
+        .{
+            .source = "'\\u{0061}'",
+            .expected = 0x0061,
+        }, // 'a'
+        .{
+            .source = "'\\u{1F600}'",
+            .expected = 0x1F600,
+        }, // 😀
+        .{
+            .source = "'😀'",
+            .expected = 0x1F600,
+        },
     };
 
     for (cases) |case| {
@@ -2602,48 +2785,132 @@ test "[str_literal]" {
 
     const cases = [_]TestCase{
         // Empty string
-        .{ .source = "\"\"", .expected = "" },
+        .{
+            .source = "\"\"",
+            .expected = "",
+        },
 
         // Regular strings
-        .{ .source = "\"hello\"", .expected = "hello" },
-        .{ .source = "\"Hello, World!\"", .expected = "Hello, World!" },
-        .{ .source = "\"123\"", .expected = "123" },
-        .{ .source = "\"!@#$%^&*()\"", .expected = "!@#$%^&*()" },
+        .{
+            .source = "\"hello\"",
+            .expected = "hello",
+        },
+        .{
+            .source = "\"Hello, World!\"",
+            .expected = "Hello, World!",
+        },
+        .{
+            .source = "\"123\"",
+            .expected = "123",
+        },
+        .{
+            .source = "\"!@#$%^&*()\"",
+            .expected = "!@#$%^&*()",
+        },
 
         // Strings with spaces
-        .{ .source = "\"   \"", .expected = "   " },
-        .{ .source = "\"a b c\"", .expected = "a b c" },
-        .{ .source = "\"  leading and trailing  \"", .expected = "  leading and trailing  " },
+        .{
+            .source = "\"   \"",
+            .expected = "   ",
+        },
+        .{
+            .source = "\"a b c\"",
+            .expected = "a b c",
+        },
+        .{
+            .source = "\"  leading and trailing  \"",
+            .expected = "  leading and trailing  ",
+        },
 
         // Escape sequences
-        .{ .source = "\"\\n\"", .expected = "\n" },
-        .{ .source = "\"\\r\"", .expected = "\r" },
-        .{ .source = "\"\\t\"", .expected = "\t" },
-        .{ .source = "\"\\\\\"", .expected = "\\" },
-        .{ .source = "\"\\\"\"", .expected = "\"" },
+        .{
+            .source = "\"\\n\"",
+            .expected = "\n",
+        },
+        .{
+            .source = "\"\\r\"",
+            .expected = "\r",
+        },
+        .{
+            .source = "\"\\t\"",
+            .expected = "\t",
+        },
+        .{
+            .source = "\"\\\\\"",
+            .expected = "\\",
+        },
+        .{
+            .source = "\"\\\"\"",
+            .expected = "\"",
+        },
 
         // Mixed escape sequences
-        .{ .source = "\"line1\\nline2\"", .expected = "line1\nline2" },
-        .{ .source = "\"tab\\there\"", .expected = "tab\there" },
-        .{ .source = "\"quotes: \\\"nested\\\"\"", .expected = "quotes: \"nested\"" },
-        .{ .source = "\"\\t\\r\\n\\\\\\\"\"", .expected = "\t\r\n\\\"" },
-        .{ .source = "\"line1\\r\\nline2\"", .expected = "line1\r\nline2" },
-        .{ .source = "\"line1\\n\\rline2\"", .expected = "line1\n\rline2" },
+        .{
+            .source = "\"line1\\nline2\"",
+            .expected = "line1\nline2",
+        },
+        .{
+            .source = "\"tab\\there\"",
+            .expected = "tab\there",
+        },
+        .{
+            .source = "\"quotes: \\\"nested\\\"\"",
+            .expected = "quotes: \"nested\"",
+        },
+        .{
+            .source = "\"\\t\\r\\n\\\\\\\"\"",
+            .expected = "\t\r\n\\\"",
+        },
+        .{
+            .source = "\"line1\\r\\nline2\"",
+            .expected = "line1\r\nline2",
+        },
+        .{
+            .source = "\"line1\\n\\rline2\"",
+            .expected = "line1\n\rline2",
+        },
 
         // Unicode escape sequences
-        .{ .source = "\"\\u{0061}\"", .expected = "a" },
-        .{ .source = "\"\\u{1F600}\"", .expected = "😀" },
-        .{ .source = "\"hello \\u{1F600} world\"", .expected = "hello 😀 world" },
+        .{
+            .source = "\"\\u{0061}\"",
+            .expected = "a",
+        },
+        .{
+            .source = "\"\\u{1F600}\"",
+            .expected = "😀",
+        },
+        .{
+            .source = "\"hello \\u{1F600} world\"",
+            .expected = "hello 😀 world",
+        },
 
         // Direct Unicode characters
-        .{ .source = "\"Hello 世界\"", .expected = "Hello 世界" },
-        .{ .source = "\"café\"", .expected = "café" },
-        .{ .source = "\"🌟✨\"", .expected = "🌟✨" },
+        .{
+            .source = "\"Hello 世界\"",
+            .expected = "Hello 世界",
+        },
+        .{
+            .source = "\"café\"",
+            .expected = "café",
+        },
+        .{
+            .source = "\"🌟✨\"",
+            .expected = "🌟✨",
+        },
 
         // Mixed content
-        .{ .source = "\"Hello\\n\\tWorld\\u{1F600}!\"", .expected = "Hello\n\tWorld😀!" },
-        .{ .source = "\"Unicode \\u{2764} and emoji ❤\"", .expected = "Unicode ❤ and emoji ❤" },
-        .{ .source = "\"Escaped\\tand\\u{1F496}direct💖mixed\"", .expected = "Escaped\tand💖direct💖mixed" },
+        .{
+            .source = "\"Hello\\n\\tWorld\\u{1F600}!\"",
+            .expected = "Hello\n\tWorld😀!",
+        },
+        .{
+            .source = "\"Unicode \\u{2764} and emoji ❤\"",
+            .expected = "Unicode ❤ and emoji ❤",
+        },
+        .{
+            .source = "\"Escaped\\tand\\u{1F496}direct💖mixed\"",
+            .expected = "Escaped\tand💖direct💖mixed",
+        },
     };
 
     for (cases) |case| {
@@ -2667,7 +2934,93 @@ test "[str_literal]" {
     }
 }
 
-test "[multiline_str_literal]" {}
+test "[multiline_str_literal]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    const TestCase = struct {
+        source: []const u8,
+        expected: []const u8,
+    };
+
+    const cases = [_]TestCase{
+        // Single line, no escapes
+        .{
+            .source = "\"\"\"Hello\"\"\"",
+            .expected = "Hello",
+        },
+
+        // Single line with escape sequence
+        .{
+            .source = "\"\"\"Hello\\tWorld\"\"\"",
+            .expected = "Hello\tWorld",
+        },
+
+        // Multiple lines, no indentation
+        .{
+            .source = "\"\"\"Hello\nWorld\"\"\"",
+            .expected = "Hello\nWorld",
+        },
+
+        // Multiple lines with consistent indentation (dedented)
+        .{
+            .source = "\"\"\"    Hello\n    World\"\"\"",
+            .expected = "Hello\nWorld",
+        },
+
+        // Multiple lines with varying indentation (dedented based on first line)
+        .{
+            .source = "\"\"\"    Hello\n        World\n    Goodbye\"\"\"",
+            .expected = "Hello\n    World\nGoodbye",
+        },
+
+        // Leading newline (ignored for indentation)
+        .{
+            .source = "\"\"\"\n    Hello\n    World\"\"\"",
+            .expected = "Hello\nWorld",
+        },
+
+        // Escape sequences across lines
+        .{
+            .source = "\"\"\"    Hello\\n\n    World\\t!\"\"\"",
+            .expected = "Hello\n\nWorld\t!",
+        },
+
+        // Unicode escape
+        .{
+            .source = "\"\"\"    Hello\\u{2665}\n    World\"\"\"",
+            .expected = "Hello♥\nWorld",
+        },
+
+        // Mixed content with escapes and indentation
+        .{
+            .source = "\"\"\"    Line1\\tTab\n        Line2\\n\n    Line3\"\"\"",
+            .expected = "Line1\tTab\n    Line2\n\nLine3",
+        },
+    };
+
+    for (cases) |case| {
+        var l = lexer.Lexer.init(case.source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const literal = try parser.parseMultilineStringLiteral();
+        defer literal.release(allocator);
+
+        // Assertions
+        // Validate the literal token and its properties
+        try testing.expectEqual(lexer.TokenKind{ .literal = .MultilineString }, literal.token.kind);
+
+        // Ensure the lexeme matches the source string
+        try testing.expectEqualStrings(case.source, literal.token.lexeme);
+
+        // Verify the parsed string value matches the expected value
+        try testing.expectEqualStrings(case.expected, literal.value);
+    }
+}
 
 test "[lower_identifier]" {
     // Setup
@@ -2681,10 +3034,22 @@ test "[lower_identifier]" {
     };
 
     const cases = [_]TestCase{
-        .{ .source = "x", .expected = "x" },
-        .{ .source = "foo", .expected = "foo" },
-        .{ .source = "valid?", .expected = "valid?" },
-        .{ .source = "foo_bar", .expected = "foo_bar" },
+        .{
+            .source = "x",
+            .expected = "x",
+        },
+        .{
+            .source = "foo",
+            .expected = "foo",
+        },
+        .{
+            .source = "valid?",
+            .expected = "valid?",
+        },
+        .{
+            .source = "foo_bar",
+            .expected = "foo_bar",
+        },
     };
 
     for (cases) |case| {
@@ -2720,11 +3085,26 @@ test "[upper_identifier]" {
     };
 
     const cases = [_]TestCase{
-        .{ .source = "X", .expected = "X" },
-        .{ .source = "Foo", .expected = "Foo" },
-        .{ .source = "FooBar", .expected = "FooBar" },
-        .{ .source = "FooBar42", .expected = "FooBar42" },
-        .{ .source = "Foo_Bar", .expected = "Foo_Bar" },
+        .{
+            .source = "X",
+            .expected = "X",
+        },
+        .{
+            .source = "Foo",
+            .expected = "Foo",
+        },
+        .{
+            .source = "FooBar",
+            .expected = "FooBar",
+        },
+        .{
+            .source = "FooBar42",
+            .expected = "FooBar42",
+        },
+        .{
+            .source = "Foo_Bar",
+            .expected = "Foo_Bar",
+        },
     };
 
     for (cases) |case| {
