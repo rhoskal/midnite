@@ -211,10 +211,7 @@ pub const Parser = struct {
         const start_token = try self.expect(lexer.TokenKind{ .identifier = .Lower });
 
         const node = try self.allocator.create(ast.LowerIdentifierNode);
-        errdefer {
-            node.release(self.allocator);
-            self.allocator.destroy(node);
-        }
+        errdefer node.release(self.allocator);
 
         node.* = .{
             .identifier = try self.allocator.dupe(u8, start_token.lexeme),
@@ -229,10 +226,7 @@ pub const Parser = struct {
         const start_token = try self.expect(lexer.TokenKind{ .identifier = .Upper });
 
         const node = try self.allocator.create(ast.UpperIdentifierNode);
-        errdefer {
-            node.release(self.allocator);
-            self.allocator.destroy(node);
-        }
+        errdefer node.release(self.allocator);
 
         node.* = .{
             .identifier = try self.allocator.dupe(u8, start_token.lexeme),
@@ -329,10 +323,7 @@ pub const Parser = struct {
         }
 
         const node = try self.allocator.create(ast.StrLiteralNode);
-        errdefer {
-            node.release(self.allocator);
-            self.allocator.destroy(node);
-        }
+        errdefer node.release(self.allocator);
 
         node.* = .{
             .value = try self.allocator.dupe(u8, result.items),
@@ -419,6 +410,11 @@ pub const Parser = struct {
 
         while (!self.check(lexer.TokenKind{ .special = .Eof })) {
             const stmt = try self.parseTopLevel();
+            errdefer {
+                stmt.release(self.allocator);
+                self.allocator.destroy(stmt);
+            }
+
             try statements.append(stmt);
         }
 
@@ -473,6 +469,8 @@ pub const Parser = struct {
         const start_token = try self.expect(lexer.TokenKind{ .keyword = .Open });
 
         const path_node = try self.parseModulePath();
+        errdefer self.allocator.destroy(path_node);
+
         const module_path = path_node.module_path;
         self.allocator.destroy(path_node);
 
@@ -572,6 +570,7 @@ pub const Parser = struct {
                                     if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
                                         _ = try self.expect(lexer.TokenKind{ .operator = .Expand });
                                         _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+
                                         expose_constructors = true;
                                     }
 
@@ -701,6 +700,7 @@ pub const Parser = struct {
                                     if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
                                         _ = try self.expect(lexer.TokenKind{ .operator = .Expand });
                                         _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+
                                         expose_constructors = true;
                                     }
 
@@ -1245,7 +1245,10 @@ pub const Parser = struct {
         _ = try self.match(lexer.TokenKind{ .symbol = .ArrowRight });
 
         const return_type = try self.parseTypeExpr();
-        errdefer return_type.release(self.allocator);
+        errdefer {
+            return_type.release(self.allocator);
+            self.allocator.destroy(return_type);
+        }
 
         assert((return_type.* == .lower_identifier) or
             (return_type.* == .upper_identifier) or
@@ -1679,7 +1682,10 @@ pub const Parser = struct {
         _ = try self.expect(lexer.TokenKind{ .symbol = .DoubleArrowRight });
 
         const body = try self.parseExpression();
-        errdefer body.release(self.allocator);
+        errdefer {
+            body.release(self.allocator);
+            self.allocator.destroy(body);
+        }
 
         const lambda_node = try self.allocator.create(ast.LambdaExprNode);
         errdefer lambda_node.release(self.allocator);
@@ -1722,10 +1728,7 @@ pub const Parser = struct {
         }
 
         const node = try self.allocator.create(ast.ParamDeclNode);
-        errdefer {
-            node.release(self.allocator);
-            self.allocator.destroy(node);
-        }
+        errdefer node.release(self.allocator);
 
         node.* = .{
             .name = name,
@@ -1823,14 +1826,20 @@ pub const Parser = struct {
         }
 
         const first = try self.parseSimpleExpr();
-        errdefer first.release(self.allocator);
+        errdefer {
+            first.release(self.allocator);
+            self.allocator.destroy(first);
+        }
 
         try elements.append(first);
 
         _ = try self.match(lexer.TokenKind{ .delimiter = .Comma });
 
         const second = try self.parseSimpleExpr();
-        errdefer second.release(self.allocator);
+        errdefer {
+            second.release(self.allocator);
+            self.allocator.destroy(second);
+        }
 
         try elements.append(second);
 
@@ -1880,17 +1889,26 @@ pub const Parser = struct {
         const start_token = try self.expect(lexer.TokenKind{ .keyword = .If });
 
         const condition = try self.parseExpression();
-        errdefer condition.release(self.allocator);
+        errdefer {
+            condition.release(self.allocator);
+            self.allocator.destroy(condition);
+        }
 
         _ = try self.expect(lexer.TokenKind{ .keyword = .Then });
 
         const then_branch = try self.parseExpression();
-        errdefer then_branch.release(self.allocator);
+        errdefer {
+            then_branch.release(self.allocator);
+            self.allocator.destroy(then_branch);
+        }
 
         _ = try self.expect(lexer.TokenKind{ .keyword = .Else });
 
         const else_branch = try self.parseExpression();
-        errdefer else_branch.release(self.allocator);
+        errdefer {
+            else_branch.release(self.allocator);
+            self.allocator.destroy(else_branch);
+        }
 
         const if_node = try self.allocator.create(ast.IfThenElseStmtNode);
         errdefer if_node.release(self.allocator);
@@ -2093,10 +2111,14 @@ pub const Parser = struct {
         }
 
         const first_segment = try self.parseUpperIdentifier();
+        errdefer first_segment.release(self.allocator);
+
         try segments.append(first_segment);
 
         while (try self.match(lexer.TokenKind{ .delimiter = .Dot })) {
             const next_segment = try self.parseUpperIdentifier();
+            errdefer next_segment.release(self.allocator);
+
             try segments.append(next_segment);
         }
 
