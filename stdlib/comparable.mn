@@ -2,7 +2,7 @@ module Comparable exposing
     ( Ordering(..)
     , compare
     , eq
-    , gt,
+    , gt
     , gte
     , lt
     , lte
@@ -17,7 +17,7 @@ module Comparable exposing
         | GT
 
     let eq(x : Bool, y : Bool) -> Bool =
-        if (x == True) && (y == True) then
+        if x == True && y == True then
             True
         else
             False
@@ -40,10 +40,11 @@ module Comparable exposing
     let compare(x : comparable, y : comparable) -> Ordering =
         if x == y then
             EQ
-        else if x < y then
-            LT
         else
-            GT
+            if x < y then
+                LT
+            else
+                GT
 
     let min(x : comparable, y : comparable) -> comparable =
         if lt(x, y) then
