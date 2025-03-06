@@ -4852,3 +4852,73 @@ test "[tuple]" {
         try testing.expectEqualStrings("True", tuple.elements.items[1].upper_identifier.identifier);
     }
 }
+
+test "[module_decl]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    {
+        const source = "module Foo exposing (double)\n" ++ "let double(x : Int) -> Int = x * 2\n" ++ "end";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseModuleDecl();
+        defer {
+            node.release(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify that the node type is a module decl
+        try testing.expect(node.* == .module_decl);
+
+        const module = node.module_decl;
+
+        // Verify module path is 'Foo'
+        try testing.expectEqualStrings("Foo", module.path.segments.items[0].identifier);
+
+        // Verify exports is only 'double'
+        try testing.expectEqual(@as(usize, 1), module.exports.items.?.items.len);
+        try testing.expectEqualStrings("double", module.exports.items.?.items[0].name);
+
+        // Verify declaration is only 'double'
+        try testing.expectEqual(@as(usize, 1), module.declarations.items.len);
+        try testing.expectEqualStrings("double", module.declarations.items[0].function_decl.name.identifier);
+    }
+}
+
+test "[program]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    {
+        const source = "## some doc comment\n" ++ "module Foo exposing (double)\n" ++ "let double(x : Int) -> Int = x * 2\n" ++ "end";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseProgram();
+        defer {
+            node.release(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify that the node type is a program.
+        try testing.expect(node.* == .program);
+
+        const program = node.program;
+
+        // Verify programs has exactly two statements
+        try testing.expectEqual(@as(usize, 2), program.statements.items.len);
+        try testing.expect(program.statements.items[0].* == .doc_comment);
+        try testing.expect(program.statements.items[1].* == .module_decl);
+    }
+}
