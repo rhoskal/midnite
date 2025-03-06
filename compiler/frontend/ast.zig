@@ -17,10 +17,23 @@ pub const CommentNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *CommentNode, allocator: std.mem.Allocator) void {
-        allocator.free(self.text);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        allocator.destroy(self);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *CommentNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *CommentNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            allocator.free(self.text);
+
+            allocator.destroy(self);
+        }
     }
 };
 
@@ -35,10 +48,23 @@ pub const DocCommentNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *DocCommentNode, allocator: std.mem.Allocator) void {
-        allocator.free(self.text);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        allocator.destroy(self);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *DocCommentNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *DocCommentNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            allocator.free(self.text);
+
+            allocator.destroy(self);
+        }
     }
 };
 
@@ -96,10 +122,23 @@ pub const StrLiteralNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *StrLiteralNode, allocator: std.mem.Allocator) void {
-        allocator.free(self.value);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        allocator.destroy(self);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *StrLiteralNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *StrLiteralNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            allocator.free(self.value);
+
+            allocator.destroy(self);
+        }
     }
 };
 
@@ -117,10 +156,23 @@ pub const MultilineStrLiteralNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *MultilineStrLiteralNode, allocator: std.mem.Allocator) void {
-        allocator.free(self.value);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        allocator.destroy(self);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *MultilineStrLiteralNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *MultilineStrLiteralNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            allocator.free(self.value);
+
+            allocator.destroy(self);
+        }
     }
 };
 
@@ -136,9 +188,23 @@ pub const LowerIdentifierNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *LowerIdentifierNode, allocator: std.mem.Allocator) void {
-        allocator.free(self.identifier);
-        allocator.destroy(self);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
+
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *LowerIdentifierNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *LowerIdentifierNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            allocator.free(self.identifier);
+
+            allocator.destroy(self);
+        }
     }
 };
 
@@ -150,9 +216,23 @@ pub const UpperIdentifierNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *UpperIdentifierNode, allocator: std.mem.Allocator) void {
-        allocator.free(self.identifier);
-        allocator.destroy(self);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
+
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *UpperIdentifierNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *UpperIdentifierNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            allocator.free(self.identifier);
+
+            allocator.destroy(self);
+        }
     }
 };
 
@@ -173,15 +253,27 @@ pub const ListNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *ListNode, allocator: std.mem.Allocator) void {
-        for (self.elements.items) |element| {
-            element.deinit(allocator);
-            allocator.destroy(element);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
+
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *ListNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *ListNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            for (self.elements.items) |element| {
+                element.release(allocator);
+                allocator.destroy(element);
+            }
+            self.elements.deinit();
+
+            allocator.destroy(self);
         }
-
-        self.elements.deinit();
-
-        allocator.destroy(self);
     }
 };
 
@@ -199,15 +291,27 @@ pub const TupleNode = struct {
     /// The token representing the start of this tuple.
     token: lexer.Token,
 
-    pub fn deinit(self: *TupleNode, allocator: std.mem.Allocator) void {
-        for (self.elements.items) |element| {
-            element.deinit(allocator);
-            allocator.destroy(element);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
+
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *TupleNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *TupleNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            for (self.elements.items) |element| {
+                element.release(allocator);
+                allocator.destroy(element);
+            }
+            self.elements.deinit();
+
+            allocator.destroy(self);
         }
-
-        self.elements.deinit();
-
-        allocator.destroy(self);
     }
 };
 
@@ -226,11 +330,24 @@ pub const UnaryExprNode = struct {
     /// The token representing the operator.
     operator: lexer.Token,
 
-    pub fn deinit(self: *UnaryExprNode, allocator: std.mem.Allocator) void {
-        self.operand.deinit(allocator);
-        allocator.destroy(self.operand);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        allocator.destroy(self);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *UnaryExprNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *UnaryExprNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.operand.release(allocator);
+            allocator.destroy(self.operand);
+
+            allocator.destroy(self);
+        }
     }
 };
 
@@ -244,14 +361,27 @@ pub const BinaryOp = struct {
     /// The token representing the operator.
     operator: lexer.Token,
 
-    pub fn deinit(self: *BinaryOp, allocator: std.mem.Allocator) void {
-        self.left.deinit(allocator);
-        allocator.destroy(self.left);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        self.right.deinit(allocator);
-        allocator.destroy(self.right);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *BinaryOp) void {
+        self.ref_count += 1;
+    }
 
-        allocator.destroy(self);
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *BinaryOp, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.left.release(allocator);
+            allocator.destroy(self.left);
+
+            self.right.release(allocator);
+            allocator.destroy(self.right);
+
+            allocator.destroy(self);
+        }
     }
 };
 
@@ -289,91 +419,104 @@ pub const ComparisonExprNode = BinaryOp;
 /// - `Some(x)`
 /// - `head :: tail`
 /// - `[]`
-pub const PatternNode = union(enum) {
-    wildcard: struct {
-        token: lexer.Token,
-    },
-    int_literal: IntLiteralNode,
-    float_literal: FloatLiteralNode,
-    char_literal: CharLiteralNode,
-    string_literal: *StrLiteralNode,
-    list: struct {
-        /// Array of pattern nodes for matching against list elements.
-        patterns: std.ArrayList(*PatternNode),
+pub const PatternNode = struct {
+    inner: Inner,
 
-        /// The token representing the start of the list pattern
-        token: lexer.Token,
-    },
-    variable: struct {
-        /// The name of the variable to bind.
-        name: *LowerIdentifierNode,
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        /// The token representing the variable.
-        token: lexer.Token,
-    },
-    constructor: struct {
-        /// The name of the constructor.
-        name: []const u8,
+    pub const Inner = union(enum(u8)) {
+        wildcard: struct {
+            token: lexer.Token,
+        },
+        int_literal: IntLiteralNode,
+        float_literal: FloatLiteralNode,
+        char_literal: CharLiteralNode,
+        string_literal: *StrLiteralNode,
+        list: struct {
+            /// Array of pattern nodes for matching against list elements.
+            patterns: std.ArrayList(*PatternNode),
 
-        /// Array of patterns for matching constructor arguments.
-        parameters: std.ArrayList(*PatternNode),
+            /// The token representing the start of the list pattern
+            token: lexer.Token,
+        },
+        variable: struct {
+            /// The name of the variable to bind.
+            name: *LowerIdentifierNode,
 
-        /// The token representing the constructor.
-        token: lexer.Token,
-    },
-    empty_list: struct {
-        /// The token representing the empty list pattern.
-        token: lexer.Token,
-    },
-    cons: struct {
-        /// Pattern for matching the head element.
-        head: *PatternNode,
+            /// The token representing the variable.
+            token: lexer.Token,
+        },
+        constructor: struct {
+            /// The name of the constructor.
+            name: []const u8,
 
-        /// Pattern for matching the tail list.
-        tail: *PatternNode,
+            /// Array of patterns for matching constructor arguments.
+            parameters: std.ArrayList(*PatternNode),
 
-        /// The token representing the cons pattern.
-        token: lexer.Token,
-    },
+            /// The token representing the constructor.
+            token: lexer.Token,
+        },
+        empty_list: struct {
+            /// The token representing the empty list pattern.
+            token: lexer.Token,
+        },
+        cons: struct {
+            /// Pattern for matching the head element.
+            head: *PatternNode,
 
-    pub fn deinit(self: *PatternNode, allocator: std.mem.Allocator) void {
-        switch (self.*) {
-            .wildcard,
-            .int_literal,
-            .float_literal,
-            .char_literal,
-            .empty_list,
-            => {},
-            .string_literal => |lit| {
-                lit.deinit(allocator);
-            },
-            .list => |list| {
-                for (list.patterns.items) |pattern| {
-                    pattern.deinit(allocator);
-                }
+            /// Pattern for matching the tail list.
+            tail: *PatternNode,
 
-                list.patterns.deinit();
-            },
-            .variable => |variable| {
-                variable.name.deinit(allocator);
-            },
-            .constructor => |constructor| {
-                allocator.free(constructor.name);
+            /// The token representing the cons pattern.
+            token: lexer.Token,
+        },
+    };
 
-                for (constructor.parameters.items) |param| {
-                    param.deinit(allocator);
-                    allocator.destroy(param);
-                }
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *PatternNode) void {
+        self.ref_count += 1;
+    }
 
-                constructor.parameters.deinit();
-            },
-            .cons => |cons| {
-                cons.head.deinit(allocator);
-                allocator.destroy(cons.head);
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *PatternNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
 
-                cons.tail.deinit(allocator);
-                allocator.destroy(cons.tail);
-            },
+        if (self.ref_count == 0) {
+            switch (self.inner) {
+                .wildcard => {},
+                .int_literal => {},
+                .float_literal => {},
+                .char_literal => {},
+                .string_literal => |lit| {
+                    lit.release(allocator);
+                },
+                .list => |list| {
+                    for (list.patterns.items) |pattern| {
+                        pattern.release(allocator);
+                    }
+                    list.patterns.deinit();
+                },
+                .variable => |variable| {
+                    variable.name.release(allocator);
+                },
+                .constructor => |constructor| {
+                    allocator.free(constructor.name);
+
+                    for (constructor.parameters.items) |param| {
+                        param.release(allocator);
+                    }
+                    constructor.parameters.deinit();
+                },
+                .empty_list => {},
+                .cons => |cons| {
+                    cons.head.release(allocator);
+
+                    cons.tail.release(allocator);
+                },
+            }
+
+            allocator.destroy(self);
         }
     }
 };
@@ -391,9 +534,24 @@ pub const GuardNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *GuardNode, allocator: std.mem.Allocator) void {
-        self.condition.deinit(allocator);
-        allocator.destroy(self.condition);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
+
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *GuardNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *GuardNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.condition.release(allocator);
+            allocator.destroy(self.condition);
+
+            allocator.destroy(self);
+        }
     }
 };
 
@@ -403,7 +561,7 @@ pub const GuardNode = struct {
 /// Examples:
 /// - `0 => "zero"`
 /// - `x :: xs when length(xs) > 0 => count + 1`
-pub const MatchCase = struct {
+pub const MatchCaseNode = struct {
     /// The pattern to match against.
     pattern: *PatternNode,
 
@@ -416,16 +574,29 @@ pub const MatchCase = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *MatchCase, allocator: std.mem.Allocator) void {
-        self.pattern.deinit(allocator);
-        allocator.destroy(self.pattern);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        self.expression.deinit(allocator);
-        allocator.destroy(self.expression);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *MatchCaseNode) void {
+        self.ref_count += 1;
+    }
 
-        if (self.guard) |guard| {
-            guard.deinit(allocator);
-            allocator.destroy(guard);
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *MatchCaseNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.pattern.release(allocator);
+
+            self.expression.release(allocator);
+            allocator.destroy(self.expression);
+
+            if (self.guard) |guard| {
+                guard.release(allocator);
+            }
+
+            allocator.destroy(self);
         }
     }
 };
@@ -442,23 +613,34 @@ pub const MatchExprNode = struct {
     subject: *Node,
 
     /// Array of match cases to test against.
-    cases: std.ArrayList(*MatchCase),
+    cases: std.ArrayList(*MatchCaseNode),
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *MatchExprNode, allocator: std.mem.Allocator) void {
-        self.subject.deinit(allocator);
-        allocator.destroy(self.subject);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        for (self.cases.items) |case| {
-            case.deinit(allocator);
-            allocator.destroy(case);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *MatchExprNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *MatchExprNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.subject.release(allocator);
+            allocator.destroy(self.subject);
+
+            for (self.cases.items) |case| {
+                case.release(allocator);
+            }
+            self.cases.deinit();
+
+            allocator.destroy(self);
         }
-
-        self.cases.deinit();
-
-        allocator.destroy(self);
     }
 };
 
@@ -482,16 +664,30 @@ pub const FunctionSignatureNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *FunctionSignatureNode, allocator: std.mem.Allocator) void {
-        for (self.parameter_types.items) |param_type| {
-            param_type.deinit(allocator);
-            allocator.destroy(param_type);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
+
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *FunctionSignatureNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *FunctionSignatureNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            for (self.parameter_types.items) |param_type| {
+                param_type.release(allocator);
+                allocator.destroy(param_type);
+            }
+            self.parameter_types.deinit();
+
+            self.return_type.release(allocator);
+            allocator.destroy(self.return_type);
+
+            allocator.destroy(self);
         }
-
-        self.parameter_types.deinit();
-
-        self.return_type.deinit(allocator);
-        allocator.destroy(self.return_type);
     }
 };
 
@@ -514,23 +710,34 @@ pub const LambdaExprNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *LambdaExprNode, allocator: std.mem.Allocator) void {
-        for (self.parameters.items) |param| {
-            param.deinit(allocator);
-            allocator.destroy(param);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
+
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *LambdaExprNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *LambdaExprNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            for (self.parameters.items) |param| {
+                param.release(allocator);
+            }
+            self.parameters.deinit();
+
+            if (self.return_type) |rt| {
+                rt.release(allocator);
+                allocator.destroy(rt);
+            }
+
+            self.body.release(allocator);
+            allocator.destroy(self.body);
+
+            allocator.destroy(self);
         }
-
-        if (self.return_type) |rt| {
-            rt.deinit(allocator);
-            allocator.destroy(rt);
-        }
-
-        self.parameters.deinit();
-
-        self.body.deinit(allocator);
-        allocator.destroy(self.body);
-
-        allocator.destroy(self);
     }
 };
 
@@ -550,18 +757,30 @@ pub const FunctionCallNode = struct {
     /// The token representing the start of this application (usually the function's token).
     token: lexer.Token,
 
-    pub fn deinit(self: *FunctionCallNode, allocator: std.mem.Allocator) void {
-        self.function.deinit(allocator);
-        allocator.destroy(self.function);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        for (self.arguments.items) |argument| {
-            argument.deinit(allocator);
-            allocator.destroy(argument);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *FunctionCallNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *FunctionCallNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.function.release(allocator);
+            allocator.destroy(self.function);
+
+            for (self.arguments.items) |argument| {
+                argument.release(allocator);
+                allocator.destroy(argument);
+            }
+            self.arguments.deinit();
+
+            allocator.destroy(self);
         }
-
-        self.arguments.deinit();
-
-        allocator.destroy(self);
     }
 };
 
@@ -577,12 +796,27 @@ pub const ParamDeclNode = struct {
     /// The token representing this parameter declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *ParamDeclNode, allocator: std.mem.Allocator) void {
-        self.name.deinit(allocator);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        if (self.type_annotation) |type_ann| {
-            type_ann.deinit(allocator);
-            allocator.destroy(type_ann);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *ParamDeclNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *ParamDeclNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.name.release(allocator);
+
+            if (self.type_annotation) |ta| {
+                ta.release(allocator);
+                allocator.destroy(ta);
+            }
+
+            allocator.destroy(self);
         }
     }
 };
@@ -607,14 +841,27 @@ pub const ConsExprNode = struct {
     /// The token representing the cons operator.
     operator: lexer.Token,
 
-    pub fn deinit(self: *ConsExprNode, allocator: std.mem.Allocator) void {
-        self.head.deinit(allocator);
-        allocator.destroy(self.head);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        self.tail.deinit(allocator);
-        allocator.destroy(self.tail);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *ConsExprNode) void {
+        self.ref_count += 1;
+    }
 
-        allocator.destroy(self);
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *ConsExprNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.head.release(allocator);
+            allocator.destroy(self.head);
+
+            self.tail.release(allocator);
+            allocator.destroy(self.tail);
+
+            allocator.destroy(self);
+        }
     }
 };
 
@@ -648,14 +895,27 @@ pub const PipeExprNode = struct {
     /// The token representing the pipe operator.
     operator: lexer.Token,
 
-    pub fn deinit(self: *PipeExprNode, allocator: std.mem.Allocator) void {
-        self.value.deinit(allocator);
-        allocator.destroy(self.value);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        self.func.deinit(allocator);
-        allocator.destroy(self.func);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *PipeExprNode) void {
+        self.ref_count += 1;
+    }
 
-        allocator.destroy(self);
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *PipeExprNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.value.release(allocator);
+            allocator.destroy(self.value);
+
+            self.func.release(allocator);
+            allocator.destroy(self.func);
+
+            allocator.destroy(self);
+        }
     }
 };
 
@@ -684,17 +944,30 @@ pub const IfThenElseStmtNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *IfThenElseStmtNode, allocator: std.mem.Allocator) void {
-        self.condition.deinit(allocator);
-        allocator.destroy(self.condition);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        self.then_branch.deinit(allocator);
-        allocator.destroy(self.then_branch);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *IfThenElseStmtNode) void {
+        self.ref_count += 1;
+    }
 
-        self.else_branch.deinit(allocator);
-        allocator.destroy(self.else_branch);
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *IfThenElseStmtNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
 
-        allocator.destroy(self);
+        if (self.ref_count == 0) {
+            self.condition.release(allocator);
+            allocator.destroy(self.condition);
+
+            self.then_branch.release(allocator);
+            allocator.destroy(self.then_branch);
+
+            self.else_branch.release(allocator);
+            allocator.destroy(self.else_branch);
+
+            allocator.destroy(self);
+        }
     }
 };
 
@@ -732,17 +1005,29 @@ pub const TypeApplicationNode = struct {
     /// The token representing the type application.
     token: lexer.Token,
 
-    pub fn deinit(self: *TypeApplicationNode, allocator: std.mem.Allocator) void {
-        self.constructor.deinit(allocator);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        for (self.args.items) |arg| {
-            arg.deinit(allocator);
-            allocator.destroy(arg);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *TypeApplicationNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *TypeApplicationNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.constructor.release(allocator);
+
+            for (self.args.items) |arg| {
+                arg.release(allocator);
+                allocator.destroy(arg);
+            }
+            self.args.deinit();
+
+            allocator.destroy(self);
         }
-
-        self.args.deinit();
-
-        allocator.destroy(self);
     }
 };
 
@@ -768,19 +1053,31 @@ pub const TypeAliasNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *TypeAliasNode, allocator: std.mem.Allocator) void {
-        self.name.deinit(allocator);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        for (self.type_params.items) |param| {
-            allocator.free(param);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *TypeAliasNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *TypeAliasNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.name.release(allocator);
+
+            for (self.type_params.items) |param| {
+                allocator.free(param);
+            }
+            self.type_params.deinit();
+
+            self.value.release(allocator);
+            allocator.destroy(self.value);
+
+            allocator.destroy(self);
         }
-
-        self.type_params.deinit();
-
-        self.value.deinit(allocator);
-        allocator.destroy(self.value);
-
-        allocator.destroy(self);
     }
 };
 
@@ -802,16 +1099,29 @@ pub const VariantConstructorNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *VariantConstructorNode, allocator: std.mem.Allocator) void {
-        self.name.deinit(allocator);
-        allocator.destroy(self.name);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        for (self.parameters.items) |param| {
-            param.deinit(allocator);
-            allocator.destroy(param);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *VariantConstructorNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *VariantConstructorNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.name.release(allocator);
+
+            for (self.parameters.items) |param| {
+                param.release(allocator);
+                allocator.destroy(param);
+            }
+            self.parameters.deinit();
+
+            allocator.destroy(self);
         }
-
-        self.parameters.deinit();
     }
 };
 
@@ -837,24 +1147,33 @@ pub const VariantTypeNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *VariantTypeNode, allocator: std.mem.Allocator) void {
-        self.name.deinit(allocator);
-        allocator.destroy(self.name);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        for (self.type_params.items) |param| {
-            allocator.free(param);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *VariantTypeNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *VariantTypeNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.name.release(allocator);
+
+            for (self.type_params.items) |param| {
+                allocator.free(param);
+            }
+            self.type_params.deinit();
+
+            for (self.constructors.items) |constructor| {
+                constructor.release(allocator);
+            }
+            self.constructors.deinit();
+
+            allocator.destroy(self);
         }
-
-        self.type_params.deinit();
-
-        for (self.constructors.items) |constructor| {
-            constructor.deinit(allocator);
-            allocator.destroy(constructor);
-        }
-
-        self.constructors.deinit();
-
-        allocator.destroy(self);
     }
 };
 
@@ -869,11 +1188,26 @@ pub const RecordFieldNode = struct {
     /// The token representing this field declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *RecordFieldNode, allocator: std.mem.Allocator) void {
-        self.name.deinit(allocator);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        self.type.deinit(allocator);
-        allocator.destroy(self.type);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *RecordFieldNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *RecordFieldNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.name.release(allocator);
+
+            self.type.release(allocator);
+            allocator.destroy(self.type);
+
+            allocator.destroy(self);
+        }
     }
 };
 
@@ -895,23 +1229,33 @@ pub const RecordTypeNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *RecordTypeNode, allocator: std.mem.Allocator) void {
-        self.name.deinit(allocator);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        for (self.type_params.items) |param| {
-            allocator.free(param);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *RecordTypeNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *RecordTypeNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.name.release(allocator);
+
+            for (self.type_params.items) |param| {
+                allocator.free(param);
+            }
+            self.type_params.deinit();
+
+            for (self.fields.items) |field| {
+                field.release(allocator);
+            }
+            self.fields.deinit();
+
+            allocator.destroy(self);
         }
-
-        self.type_params.deinit();
-
-        for (self.fields.items) |field| {
-            field.deinit(allocator);
-            allocator.destroy(field);
-        }
-
-        self.fields.deinit();
-
-        allocator.destroy(self);
     }
 };
 
@@ -932,12 +1276,26 @@ pub const ModulePathNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *ModulePathNode, allocator: std.mem.Allocator) void {
-        for (self.segments.items) |segment| {
-            segment.deinit(allocator);
-        }
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        self.segments.deinit();
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *ModulePathNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *ModulePathNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            for (self.segments.items) |segment| {
+                segment.release(allocator);
+            }
+            self.segments.deinit();
+
+            allocator.destroy(self);
+        }
     }
 };
 
@@ -951,8 +1309,23 @@ pub const ExportItem = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: ExportItem, allocator: std.mem.Allocator) void {
-        allocator.free(self.name);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
+
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *ExportItem) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *ExportItem, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            allocator.free(self.name);
+
+            allocator.destroy(self);
+        }
     }
 };
 
@@ -967,87 +1340,120 @@ pub const ExportSpecNode = struct {
     exposing_all: bool,
 
     /// Optional array of specific items being exposed.
-    items: ?std.ArrayList(ExportItem),
+    items: ?std.ArrayList(*ExportItem),
 
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *ExportSpecNode, allocator: std.mem.Allocator) void {
-        if (self.items) |*items| {
-            for (items.items) |item| {
-                item.deinit(allocator);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
+
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *ExportSpecNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *ExportSpecNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            if (self.items) |*items| {
+                for (items.items) |item| {
+                    item.release(allocator);
+                }
+                items.deinit();
             }
 
-            items.deinit();
+            allocator.destroy(self);
         }
     }
 };
 
 /// Items that can be imported from a module, potentially with aliases.
 /// These represent what appears in the parentheses after `using` or `hiding`.
-pub const ImportItem = union(enum) {
-    /// Import a function, optionally with an alias.
-    ///
-    /// Examples:
-    /// - `map as list_map` or just `map`
-    function: struct {
-        /// The original name of the function in the module.
-        name: []const u8,
+pub const ImportItem = struct {
+    inner: Inner,
 
-        /// Optional alias to use in the importing module.
-        alias: ?[]const u8,
-    },
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-    /// Import an operator (like >>=).
-    ///
-    /// Examples:
-    /// - `(>>=)` or `(>>=) as bind`
-    operator: struct {
-        /// The operator symbol.
-        symbol: []const u8,
+    pub const Inner = union(enum(u8)) {
+        /// Import a function, optionally with an alias.
+        ///
+        /// Examples:
+        /// - `map as list_map` or just `map`
+        function: struct {
+            /// The original name of the function in the module.
+            name: []const u8,
 
-        /// Optional alias to use in the importing module.
-        alias: ?[]const u8,
-    },
+            /// Optional alias to use in the importing module.
+            alias: ?[]const u8,
+        },
 
-    /// Import a type, optionally exposing its constructors and/or with an alias.
-    ///
-    /// Examples:
-    /// - `Maybe(..)` or `Maybe(..) as Optional`
-    type: struct {
-        /// The name of the type.
-        name: []const u8,
+        /// Import an operator (like >>=).
+        ///
+        /// Examples:
+        /// - `(>>=)` or `(>>=) as bind`
+        operator: struct {
+            /// The operator symbol.
+            symbol: []const u8,
 
-        /// Whether to expose type constructors (indicated by (..)).
-        expose_constructors: bool,
+            /// Optional alias to use in the importing module.
+            alias: ?[]const u8,
+        },
 
-        /// Optional alias to use in the importing module.
-        alias: ?[]const u8,
-    },
+        /// Import a type, optionally exposing its constructors and/or with an alias.
+        ///
+        /// Examples:
+        /// - `Maybe(..)` or `Maybe(..) as Optional`
+        type: struct {
+            /// The name of the type.
+            name: []const u8,
 
-    pub fn deinit(self: *ImportItem, allocator: std.mem.Allocator) void {
-        switch (self.*) {
-            .function => |*f| {
-                allocator.free(f.name);
+            /// Whether to expose type constructors (indicated by (..)).
+            expose_constructors: bool,
 
-                if (f.alias) |alias| {
-                    allocator.free(alias);
-                }
-            },
-            .operator => |*op| {
-                allocator.free(op.symbol);
+            /// Optional alias to use in the importing module.
+            alias: ?[]const u8,
+        },
+    };
 
-                if (op.alias) |alias| {
-                    allocator.free(alias);
-                }
-            },
-            .type => |*t| {
-                allocator.free(t.name);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *ImportItem) void {
+        self.ref_count += 1;
+    }
 
-                if (t.alias) |alias| {
-                    allocator.free(alias);
-                }
-            },
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *ImportItem, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            switch (self.inner) {
+                .function => |f| {
+                    allocator.free(f.name);
+
+                    if (f.alias) |alias| {
+                        allocator.free(alias);
+                    }
+                },
+                .operator => |op| {
+                    allocator.free(op.symbol);
+
+                    if (op.alias) |alias| {
+                        allocator.free(alias);
+                    }
+                },
+                .type => |t| {
+                    allocator.free(t.name);
+
+                    if (t.alias) |alias| {
+                        allocator.free(alias);
+                    }
+                },
+            }
+
+            allocator.destroy(self);
         }
     }
 };
@@ -1105,24 +1511,34 @@ pub const ImportSpecNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *ImportSpecNode, allocator: std.mem.Allocator) void {
-        self.path.deinit(allocator);
-        allocator.destroy(self.path);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        if (self.alias) |alias| {
-            alias.deinit(allocator);
-        }
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *ImportSpecNode) void {
+        self.ref_count += 1;
+    }
 
-        if (self.items) |*items| {
-            for (items.items) |item| {
-                item.deinit(allocator);
-                allocator.destroy(item);
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *ImportSpecNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.path.release(allocator);
+
+            if (self.alias) |alias| {
+                alias.release(allocator);
             }
 
-            items.deinit();
-        }
+            if (self.items) |*items| {
+                for (items.items) |item| {
+                    item.release(allocator);
+                }
+                items.deinit();
+            }
 
-        allocator.destroy(self);
+            allocator.destroy(self);
+        }
     }
 };
 
@@ -1139,11 +1555,23 @@ pub const IncludeNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *IncludeNode, allocator: std.mem.Allocator) void {
-        self.path.deinit(allocator);
-        allocator.destroy(self.path);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        allocator.destroy(self);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *IncludeNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *IncludeNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.path.release(allocator);
+
+            allocator.destroy(self);
+        }
     }
 };
 
@@ -1175,25 +1603,36 @@ pub const FunctionDeclNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *FunctionDeclNode, allocator: std.mem.Allocator) void {
-        self.name.deinit(allocator);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        for (self.parameters.items) |param| {
-            param.deinit(allocator);
-            allocator.destroy(param);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *FunctionDeclNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *FunctionDeclNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.name.release(allocator);
+
+            for (self.parameters.items) |param| {
+                param.release(allocator);
+            }
+            self.parameters.deinit();
+
+            if (self.return_type) |rt| {
+                rt.release(allocator);
+                allocator.destroy(rt);
+            }
+
+            self.value.release(allocator);
+            allocator.destroy(self.value);
+
+            allocator.destroy(self);
         }
-
-        self.parameters.deinit();
-
-        if (self.return_type) |ret_type| {
-            ret_type.deinit(allocator);
-            allocator.destroy(ret_type);
-        }
-
-        self.value.deinit(allocator);
-        allocator.destroy(self.value);
-
-        allocator.destroy(self);
     }
 };
 
@@ -1219,22 +1658,33 @@ pub const ForeignFunctionDeclNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *ForeignFunctionDeclNode, allocator: std.mem.Allocator) void {
-        self.name.deinit(allocator);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        for (self.parameters.items) |param| {
-            param.deinit(allocator);
-            allocator.destroy(param);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *ForeignFunctionDeclNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *ForeignFunctionDeclNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.name.release(allocator);
+
+            for (self.parameters.items) |param| {
+                param.release(allocator);
+            }
+            self.parameters.deinit();
+
+            self.return_type.release(allocator);
+            allocator.destroy(self.return_type);
+
+            self.external_name.release(allocator);
+
+            allocator.destroy(self);
         }
-
-        self.parameters.deinit();
-
-        self.return_type.deinit(allocator);
-        allocator.destroy(self.return_type);
-
-        self.external_name.deinit(allocator);
-
-        allocator.destroy(self);
     }
 };
 
@@ -1259,21 +1709,31 @@ pub const ModuleDeclNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *ModuleDeclNode, allocator: std.mem.Allocator) void {
-        self.path.deinit(allocator);
-        allocator.destroy(self.path);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
 
-        self.exports.deinit(allocator);
-        allocator.destroy(self.exports);
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *ModuleDeclNode) void {
+        self.ref_count += 1;
+    }
 
-        for (self.declarations.items) |declaration| {
-            declaration.deinit(allocator);
-            allocator.destroy(declaration);
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *ModuleDeclNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            self.path.release(allocator);
+
+            self.exports.release(allocator);
+
+            for (self.declarations.items) |declaration| {
+                declaration.release(allocator);
+                allocator.destroy(declaration);
+            }
+            self.declarations.deinit();
+
+            allocator.destroy(self);
         }
-
-        self.declarations.deinit();
-
-        allocator.destroy(self);
     }
 };
 
@@ -1286,15 +1746,27 @@ pub const ProgramNode = struct {
     /// The token representing the start of this declaration.
     token: lexer.Token,
 
-    pub fn deinit(self: *ProgramNode, allocator: std.mem.Allocator) void {
-        for (self.statements.items) |statement| {
-            statement.deinit(allocator);
-            allocator.destroy(statement);
+    /// Reference count for this node, defaults to 1 on creation.
+    ref_count: usize = 1,
+
+    /// Increments the reference count when a new reference is created.
+    pub fn retain(self: *ProgramNode) void {
+        self.ref_count += 1;
+    }
+
+    /// Decrements the reference count and cleans up if it reaches zero.
+    pub fn release(self: *ProgramNode, allocator: std.mem.Allocator) void {
+        self.ref_count -= 1;
+
+        if (self.ref_count == 0) {
+            for (self.statements.items) |statement| {
+                statement.release(allocator);
+                allocator.destroy(statement);
+            }
+            self.statements.deinit();
+
+            allocator.destroy(self);
         }
-
-        self.statements.deinit();
-
-        allocator.destroy(self);
     }
 };
 
@@ -1363,71 +1835,142 @@ pub const Node = union(enum) {
     module_decl: *ModuleDeclNode,
     program: *ProgramNode,
 
-    /// Cleans up resources associated with this node.
+    /// Increments the reference count to ensure this node remains valid.
     ///
-    /// Recursively deinitializes any child nodes that this node owns,
-    /// ensuring no memory leaks occur.
-    pub fn deinit(self: *Node, allocator: std.mem.Allocator) void {
+    /// This function should be called whenever a new reference to the node
+    /// is created, preventing premature deallocation.
+    pub fn retain(self: *Node) void {
         switch (self.*) {
             // Basic Literals
-            .comment => |comment| comment.deinit(allocator),
-            .doc_comment => |comment| comment.deinit(allocator),
+            .comment => |comment| comment.retain(),
+            .doc_comment => |comment| comment.retain(),
             .int_literal => {}, // no allocation
             .float_literal => {}, // no allocation
             .char_literal => {}, // no allocation
-            .str_literal => |lit| lit.deinit(allocator),
-            .multiline_str_literal => |lit| lit.deinit(allocator),
+            .str_literal => |lit| lit.retain(),
+            .multiline_str_literal => |lit| lit.retain(),
 
             // Identifiers
-            .lower_identifier => |ident| ident.deinit(allocator),
-            .upper_identifier => |ident| ident.deinit(allocator),
+            .lower_identifier => |ident| ident.retain(),
+            .upper_identifier => |ident| ident.retain(),
 
             // Basic Data Structures
-            .list => |list| list.deinit(allocator),
-            .tuple => |tuple| tuple.deinit(allocator),
+            .list => |list| list.retain(),
+            .tuple => |tuple| tuple.retain(),
 
             // Basic Expressions
-            .unary_expr => |expr| expr.deinit(allocator),
-            .arithmetic_expr => |expr| expr.deinit(allocator),
-            .logical_expr => |expr| expr.deinit(allocator),
-            .comparison_expr => |expr| expr.deinit(allocator),
+            .unary_expr => |expr| expr.retain(),
+            .arithmetic_expr => |expr| expr.retain(),
+            .logical_expr => |expr| expr.retain(),
+            .comparison_expr => |expr| expr.retain(),
 
             // Pattern Matching
-            .pattern => |pat| pat.deinit(allocator),
-            .match_expr => |expr| expr.deinit(allocator),
+            .pattern => |pat| pat.retain(),
+            .match_expr => |expr| expr.retain(),
 
             // Functions and Applications
-            .function_signature => |sig| sig.deinit(allocator),
-            .lambda_expr => |expr| expr.deinit(allocator),
-            .function_call => |expr| expr.deinit(allocator),
+            .function_signature => |sig| sig.retain(),
+            .lambda_expr => |expr| expr.retain(),
+            .function_call => |expr| expr.retain(),
 
             // Advanced Expressions
-            .cons_expr => |expr| expr.deinit(allocator),
-            .str_concat_expr => |expr| expr.deinit(allocator),
-            .list_concat_expr => |expr| expr.deinit(allocator),
-            .pipe_expr => |expr| expr.deinit(allocator),
+            .cons_expr => |expr| expr.retain(),
+            .str_concat_expr => |expr| expr.retain(),
+            .list_concat_expr => |expr| expr.retain(),
+            .pipe_expr => |expr| expr.retain(),
 
             // Control Flow
-            .if_then_else_stmt => |stmt| stmt.deinit(allocator),
+            .if_then_else_stmt => |stmt| stmt.retain(),
 
             // Type System
             .typed_hole => {}, // no allocation
-            .type_application => |app| app.deinit(allocator),
-            .type_alias => |alias| alias.deinit(allocator),
-            .variant_type => |vtype| vtype.deinit(allocator),
-            .record_type => |rtype| rtype.deinit(allocator),
+            .type_application => |app| app.retain(),
+            .type_alias => |alias| alias.retain(),
+            .variant_type => |vtype| vtype.retain(),
+            .record_type => |rtype| rtype.retain(),
 
             // Module System
-            .module_path => |path| path.deinit(allocator),
-            .export_spec => |spec| spec.deinit(allocator),
-            .import_spec => |spec| spec.deinit(allocator),
-            .include => |inc| inc.deinit(allocator),
+            .module_path => |path| path.retain(),
+            .export_spec => |spec| spec.retain(),
+            .import_spec => |spec| spec.retain(),
+            .include => |inc| inc.retain(),
 
             // Top-Level Declarations
-            .function_decl => |decl| decl.deinit(allocator),
-            .foreign_function_decl => |decl| decl.deinit(allocator),
-            .module_decl => |decl| decl.deinit(allocator),
-            .program => |prog| prog.deinit(allocator),
+            .function_decl => |decl| decl.retain(),
+            .foreign_function_decl => |decl| decl.retain(),
+            .module_decl => |decl| decl.retain(),
+            .program => |prog| prog.retain(),
+        }
+    }
+
+    /// Decrements the reference count and cleans up resources if no references remain.
+    ///
+    /// When the reference count reaches zero, this function recursively releases
+    /// any child nodes that this node owns, ensuring proper memory management
+    /// and preventing leaks.
+    ///
+    /// If other references still exist, the node remains valid.
+    pub fn release(self: *Node, allocator: std.mem.Allocator) void {
+        switch (self.*) {
+            // Basic Literals
+            .comment => |comment| comment.release(allocator),
+            .doc_comment => |comment| comment.release(allocator),
+            .int_literal => {}, // no allocation
+            .float_literal => {}, // no allocation
+            .char_literal => {}, // no allocation
+            .str_literal => |lit| lit.release(allocator),
+            .multiline_str_literal => |lit| lit.release(allocator),
+
+            // Identifiers
+            .lower_identifier => |ident| ident.release(allocator),
+            .upper_identifier => |ident| ident.release(allocator),
+
+            // Basic Data Structures
+            .list => |list| list.release(allocator),
+            .tuple => |tuple| tuple.release(allocator),
+
+            // Basic Expressions
+            .unary_expr => |expr| expr.release(allocator),
+            .arithmetic_expr => |expr| expr.release(allocator),
+            .logical_expr => |expr| expr.release(allocator),
+            .comparison_expr => |expr| expr.release(allocator),
+
+            // Pattern Matching
+            .pattern => |pat| pat.release(allocator),
+            .match_expr => |expr| expr.release(allocator),
+
+            // Functions and Applications
+            .function_signature => |sig| sig.release(allocator),
+            .lambda_expr => |expr| expr.release(allocator),
+            .function_call => |expr| expr.release(allocator),
+
+            // Advanced Expressions
+            .cons_expr => |expr| expr.release(allocator),
+            .str_concat_expr => |expr| expr.release(allocator),
+            .list_concat_expr => |expr| expr.release(allocator),
+            .pipe_expr => |expr| expr.release(allocator),
+
+            // Control Flow
+            .if_then_else_stmt => |stmt| stmt.release(allocator),
+
+            // Type System
+            .typed_hole => {}, // no allocation
+            .type_application => |app| app.release(allocator),
+            .type_alias => |alias| alias.release(allocator),
+            .variant_type => |vtype| vtype.release(allocator),
+            .record_type => |rtype| rtype.release(allocator),
+
+            // Module System
+            .module_path => |path| path.release(allocator),
+            .export_spec => |spec| spec.release(allocator),
+            .import_spec => |spec| spec.release(allocator),
+            .include => |inc| inc.release(allocator),
+
+            // Top-Level Declarations
+            .function_decl => |decl| decl.release(allocator),
+            .foreign_function_decl => |decl| decl.release(allocator),
+            .module_decl => |decl| decl.release(allocator),
+            .program => |prog| prog.release(allocator),
         }
     }
 };
@@ -1468,7 +2011,7 @@ test "[CommentNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -1514,7 +2057,7 @@ test "[DocCommentNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -1544,7 +2087,7 @@ test "[IntLiteralNode]" {
     const value = 42;
 
     // Action
-    const int_node = .{
+    const int_node = IntLiteralNode{
         .value = value,
         .token = .{
             .kind = .{ .literal = .Int },
@@ -1559,7 +2102,7 @@ test "[IntLiteralNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -1589,7 +2132,7 @@ test "[FloatLiteralNode]" {
     const value = 42.0;
 
     // Action
-    const float_node = .{
+    const float_node = FloatLiteralNode{
         .value = value,
         .token = .{
             .kind = .{ .literal = .Float },
@@ -1604,7 +2147,7 @@ test "[FloatLiteralNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -1634,7 +2177,7 @@ test "[CharLiteralNode]" {
     const value = 'a';
 
     // Action
-    const char_node = .{
+    const char_node = CharLiteralNode{
         .value = value,
         .token = .{
             .kind = .{ .literal = .Char },
@@ -1649,7 +2192,7 @@ test "[CharLiteralNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -1695,7 +2238,7 @@ test "[StrLiteralNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -1725,11 +2268,7 @@ test "[MultilineStrLiteralNode]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const value =
-        \\first line
-        \\second line
-        \\third line
-    ;
+    const value = "first line\nsecond line\nthird line";
 
     // Action
     const literal_node = try allocator.create(MultilineStrLiteralNode);
@@ -1748,14 +2287,14 @@ test "[MultilineStrLiteralNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
     node.* = .{ .multiline_str_literal = literal_node };
 
     // Assertions
-    // Verify the node is a string literal
+    // Verify the node is a multiline string literal
     try testing.expect(node.* == .multiline_str_literal);
 
     const literal = node.multiline_str_literal;
@@ -1794,7 +2333,7 @@ test "[LowerIdentifierNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -1843,7 +2382,7 @@ test "[UpperIdentifierNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -1874,6 +2413,8 @@ test "[ListNode]" {
     const allocator = gpa.allocator();
 
     // Action
+    var elements = std.ArrayList(*Node).init(allocator);
+
     const elem1 = try allocator.create(Node);
     elem1.* = .{
         .int_literal = .{
@@ -1889,6 +2430,8 @@ test "[ListNode]" {
             },
         },
     };
+
+    try elements.append(elem1);
 
     const elem2 = try allocator.create(Node);
     elem2.* = .{
@@ -1906,8 +2449,6 @@ test "[ListNode]" {
         },
     };
 
-    var elements = std.ArrayList(*Node).init(allocator);
-    try elements.append(elem1);
     try elements.append(elem2);
 
     const list_node = try allocator.create(ListNode);
@@ -1926,7 +2467,7 @@ test "[ListNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -1958,6 +2499,8 @@ test "[TupleNode]" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
+    var elements = std.ArrayList(*Node).init(allocator);
+
     const first = try allocator.create(Node);
     first.* = .{
         .int_literal = .{
@@ -1973,6 +2516,8 @@ test "[TupleNode]" {
             },
         },
     };
+
+    try elements.append(first);
 
     const second_str = try allocator.create(StrLiteralNode);
     second_str.* = .{
@@ -1991,8 +2536,6 @@ test "[TupleNode]" {
     const second = try allocator.create(Node);
     second.* = .{ .str_literal = second_str };
 
-    var elements = std.ArrayList(*Node).init(allocator);
-    try elements.append(first);
     try elements.append(second);
 
     const tuple_node = try allocator.create(TupleNode);
@@ -2011,7 +2554,7 @@ test "[TupleNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -2079,7 +2622,7 @@ test "[UnaryExprNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -2162,7 +2705,7 @@ test "[ArithmeticExprNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -2247,7 +2790,7 @@ test "[LogicalExprNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -2332,7 +2875,7 @@ test "[ComparisonExprNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -2385,7 +2928,9 @@ test "[MatchExprNode]" {
         const subject_node = try allocator.create(Node);
         subject_node.* = .{ .lower_identifier = opt_ident };
 
-        // Case 1: Some x => x
+        var cases = std.ArrayList(*MatchCaseNode).init(allocator);
+
+        // Case 1: Some(x) => x
         const x_name = try allocator.create(LowerIdentifierNode);
         x_name.* = .{
             .identifier = try allocator.dupe(u8, "x"),
@@ -2402,15 +2947,17 @@ test "[MatchExprNode]" {
 
         const var_pattern = try allocator.create(PatternNode);
         var_pattern.* = .{
-            .variable = .{
-                .name = x_name,
-                .token = .{
-                    .kind = .{ .identifier = .Lower },
-                    .lexeme = "x",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 20, .end = 21 },
-                        .src = .{ .line = 1, .col = 21 },
+            .inner = .{
+                .variable = .{
+                    .name = x_name,
+                    .token = .{
+                        .kind = .{ .identifier = .Lower },
+                        .lexeme = "x",
+                        .loc = .{
+                            .filename = TEST_FILE,
+                            .span = .{ .start = 20, .end = 21 },
+                            .src = .{ .line = 1, .col = 21 },
+                        },
                     },
                 },
             },
@@ -2421,16 +2968,18 @@ test "[MatchExprNode]" {
 
         const some_pattern = try allocator.create(PatternNode);
         some_pattern.* = .{
-            .constructor = .{
-                .name = try allocator.dupe(u8, "Some"),
-                .parameters = some_params,
-                .token = .{
-                    .kind = .{ .identifier = .Upper },
-                    .lexeme = "Some",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 15, .end = 19 },
-                        .src = .{ .line = 1, .col = 16 },
+            .inner = .{
+                .constructor = .{
+                    .name = try allocator.dupe(u8, "Some"),
+                    .parameters = some_params,
+                    .token = .{
+                        .kind = .{ .identifier = .Upper },
+                        .lexeme = "Some",
+                        .loc = .{
+                            .filename = TEST_FILE,
+                            .span = .{ .start = 15, .end = 19 },
+                            .src = .{ .line = 1, .col = 16 },
+                        },
                     },
                 },
             },
@@ -2453,7 +3002,7 @@ test "[MatchExprNode]" {
         const some_expr = try allocator.create(Node);
         some_expr.* = .{ .lower_identifier = x_expr_ident };
 
-        const some_case = try allocator.create(MatchCase);
+        const some_case = try allocator.create(MatchCaseNode);
         some_case.* = .{
             .pattern = some_pattern,
             .expression = some_expr,
@@ -2469,19 +3018,23 @@ test "[MatchExprNode]" {
             },
         };
 
+        try cases.append(some_case);
+
         // Case 2: None => 0
         const none_pattern = try allocator.create(PatternNode);
         none_pattern.* = .{
-            .constructor = .{
-                .name = try allocator.dupe(u8, "None"),
-                .parameters = std.ArrayList(*PatternNode).init(allocator),
-                .token = .{
-                    .kind = .{ .identifier = .Upper },
-                    .lexeme = "None",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 30, .end = 34 },
-                        .src = .{ .line = 1, .col = 31 },
+            .inner = .{
+                .constructor = .{
+                    .name = try allocator.dupe(u8, "None"),
+                    .parameters = std.ArrayList(*PatternNode).init(allocator),
+                    .token = .{
+                        .kind = .{ .identifier = .Upper },
+                        .lexeme = "None",
+                        .loc = .{
+                            .filename = TEST_FILE,
+                            .span = .{ .start = 30, .end = 34 },
+                            .src = .{ .line = 1, .col = 31 },
+                        },
                     },
                 },
             },
@@ -2503,7 +3056,7 @@ test "[MatchExprNode]" {
             },
         };
 
-        const none_case = try allocator.create(MatchCase);
+        const none_case = try allocator.create(MatchCaseNode);
         none_case.* = .{
             .pattern = none_pattern,
             .expression = none_expr,
@@ -2519,8 +3072,6 @@ test "[MatchExprNode]" {
             },
         };
 
-        var cases = std.ArrayList(*MatchCase).init(allocator);
-        try cases.append(some_case);
         try cases.append(none_case);
 
         const match_expr = try allocator.create(MatchExprNode);
@@ -2540,7 +3091,7 @@ test "[MatchExprNode]" {
 
         const node = try allocator.create(Node);
         defer {
-            node.deinit(allocator);
+            node.release(allocator);
             allocator.destroy(node);
         }
 
@@ -2556,18 +3107,19 @@ test "[MatchExprNode]" {
         try testing.expectEqual(@as(usize, 2), match.cases.items.len);
 
         // Ensure the constructor name for the first case is "Some"
-        const case1 = match.cases.items[0];
-        try testing.expectEqualStrings("Some", case1.pattern.constructor.name);
+        const case1 = match.cases.items[0].pattern.inner;
+        try testing.expectEqualStrings("Some", case1.constructor.name);
 
         // Check the argument for the "Some" constructor is a variable named "x"
-        try testing.expectEqualStrings("x", case1.pattern.constructor.parameters.items[0].variable.name.identifier);
+        try testing.expectEqual(@as(usize, 1), case1.constructor.parameters.items.len);
+        try testing.expectEqualStrings("x", case1.constructor.parameters.items[0].inner.variable.name.identifier);
 
         // Ensure the constructor name for the second case is "None"
-        const case2 = match.cases.items[1];
-        try testing.expectEqualStrings("None", case2.pattern.constructor.name);
+        const case2 = match.cases.items[1].pattern.inner;
+        try testing.expectEqualStrings("None", case2.constructor.name);
 
         // Verify the "None" constructor in the second case has no arguments
-        try testing.expectEqual(@as(usize, 0), case2.pattern.constructor.parameters.items.len);
+        try testing.expectEqual(@as(usize, 0), case2.constructor.parameters.items.len);
     }
 
     {
@@ -2593,6 +3145,8 @@ test "[MatchExprNode]" {
         const subject_node = try allocator.create(Node);
         subject_node.* = .{ .lower_identifier = list_ident };
 
+        var cases = std.ArrayList(*MatchCaseNode).init(allocator);
+
         // Case 1: head :: tail => head
         const head_ident = try allocator.create(LowerIdentifierNode);
         head_ident.* = .{
@@ -2610,15 +3164,17 @@ test "[MatchExprNode]" {
 
         const head_pattern = try allocator.create(PatternNode);
         head_pattern.* = .{
-            .variable = .{
-                .name = head_ident,
-                .token = .{
-                    .kind = .{ .identifier = .Lower },
-                    .lexeme = "head",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 15, .end = 19 },
-                        .src = .{ .line = 1, .col = 16 },
+            .inner = .{
+                .variable = .{
+                    .name = head_ident,
+                    .token = .{
+                        .kind = .{ .identifier = .Lower },
+                        .lexeme = "head",
+                        .loc = .{
+                            .filename = TEST_FILE,
+                            .span = .{ .start = 15, .end = 19 },
+                            .src = .{ .line = 1, .col = 16 },
+                        },
                     },
                 },
             },
@@ -2640,15 +3196,17 @@ test "[MatchExprNode]" {
 
         const tail_pattern = try allocator.create(PatternNode);
         tail_pattern.* = .{
-            .variable = .{
-                .name = tail_ident,
-                .token = .{
-                    .kind = .{ .identifier = .Lower },
-                    .lexeme = "tail",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 23, .end = 27 },
-                        .src = .{ .line = 1, .col = 24 },
+            .inner = .{
+                .variable = .{
+                    .name = tail_ident,
+                    .token = .{
+                        .kind = .{ .identifier = .Lower },
+                        .lexeme = "tail",
+                        .loc = .{
+                            .filename = TEST_FILE,
+                            .span = .{ .start = 23, .end = 27 },
+                            .src = .{ .line = 1, .col = 24 },
+                        },
                     },
                 },
             },
@@ -2656,16 +3214,18 @@ test "[MatchExprNode]" {
 
         const cons_pattern = try allocator.create(PatternNode);
         cons_pattern.* = .{
-            .cons = .{
-                .head = head_pattern,
-                .tail = tail_pattern,
-                .token = .{
-                    .kind = .{ .operator = .Cons },
-                    .lexeme = "::",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 20, .end = 22 },
-                        .src = .{ .line = 1, .col = 21 },
+            .inner = .{
+                .cons = .{
+                    .head = head_pattern,
+                    .tail = tail_pattern,
+                    .token = .{
+                        .kind = .{ .operator = .Cons },
+                        .lexeme = "::",
+                        .loc = .{
+                            .filename = TEST_FILE,
+                            .span = .{ .start = 20, .end = 22 },
+                            .src = .{ .line = 1, .col = 21 },
+                        },
                     },
                 },
             },
@@ -2688,7 +3248,7 @@ test "[MatchExprNode]" {
         const head_expr = try allocator.create(Node);
         head_expr.* = .{ .lower_identifier = head_expr_ident };
 
-        const cons_case = try allocator.create(MatchCase);
+        const cons_case = try allocator.create(MatchCaseNode);
         cons_case.* = .{
             .pattern = cons_pattern,
             .expression = head_expr,
@@ -2704,17 +3264,21 @@ test "[MatchExprNode]" {
             },
         };
 
+        try cases.append(cons_case);
+
         // Case 2: [] => 0
         const empty_pattern = try allocator.create(PatternNode);
         empty_pattern.* = .{
-            .empty_list = .{
-                .token = .{
-                    .kind = .{ .delimiter = .LeftBracket },
-                    .lexeme = "[]",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 39, .end = 41 },
-                        .src = .{ .line = 1, .col = 40 },
+            .inner = .{
+                .empty_list = .{
+                    .token = .{
+                        .kind = .{ .delimiter = .LeftBracket },
+                        .lexeme = "[]",
+                        .loc = .{
+                            .filename = TEST_FILE,
+                            .span = .{ .start = 39, .end = 41 },
+                            .src = .{ .line = 1, .col = 40 },
+                        },
                     },
                 },
             },
@@ -2736,7 +3300,7 @@ test "[MatchExprNode]" {
             },
         };
 
-        const empty_case = try allocator.create(MatchCase);
+        const empty_case = try allocator.create(MatchCaseNode);
         empty_case.* = .{
             .pattern = empty_pattern,
             .expression = zero_node,
@@ -2752,8 +3316,6 @@ test "[MatchExprNode]" {
             },
         };
 
-        var cases = std.ArrayList(*MatchCase).init(allocator);
-        try cases.append(cons_case);
         try cases.append(empty_case);
 
         const match_expr = try allocator.create(MatchExprNode);
@@ -2773,7 +3335,7 @@ test "[MatchExprNode]" {
 
         const node = try allocator.create(Node);
         defer {
-            node.deinit(allocator);
+            node.release(allocator);
             allocator.destroy(node);
         }
 
@@ -2789,22 +3351,22 @@ test "[MatchExprNode]" {
         try testing.expectEqual(@as(usize, 2), match.cases.items.len);
 
         // Test the first case (cons pattern)
-        const list_cons_case = match.cases.items[0];
+        const list_cons_case = match.cases.items[0].pattern.inner;
 
         // Verify the pattern in the first case is a cons pattern (head :: tail)
-        try testing.expect(list_cons_case.pattern.* == .cons);
+        try testing.expect(list_cons_case == .cons);
 
         // Ensure the name of the head variable in the cons pattern is "head"
-        try testing.expectEqualStrings("head", list_cons_case.pattern.cons.head.variable.name.identifier);
+        try testing.expectEqualStrings("head", list_cons_case.cons.head.inner.variable.name.identifier);
 
         // Ensure the name of the tail variable in the cons pattern is "tail"
-        try testing.expectEqualStrings("tail", list_cons_case.pattern.cons.tail.variable.name.identifier);
+        try testing.expectEqualStrings("tail", list_cons_case.cons.tail.inner.variable.name.identifier);
 
         // Test the second case (empty list pattern)
-        const empty_list_case = match.cases.items[1];
+        const empty_list_case = match.cases.items[1].pattern.inner;
 
         // Verify the pattern in the second case is an empty list
-        try testing.expect(empty_list_case.pattern.* == .empty_list);
+        try testing.expect(empty_list_case == .empty_list);
     }
 
     {
@@ -2829,6 +3391,8 @@ test "[MatchExprNode]" {
         const subject_node = try allocator.create(Node);
         subject_node.* = .{ .lower_identifier = x_ident };
 
+        var cases = std.ArrayList(*MatchCaseNode).init(allocator);
+
         // Case 1: n when n > 0 => "positive"
         const n_ident = try allocator.create(LowerIdentifierNode);
         n_ident.* = .{
@@ -2846,15 +3410,17 @@ test "[MatchExprNode]" {
 
         const n_pattern = try allocator.create(PatternNode);
         n_pattern.* = .{
-            .variable = .{
-                .name = n_ident,
-                .token = .{
-                    .kind = .{ .identifier = .Lower },
-                    .lexeme = "n",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 13, .end = 14 },
-                        .src = .{ .line = 1, .col = 14 },
+            .inner = .{
+                .variable = .{
+                    .name = n_ident,
+                    .token = .{
+                        .kind = .{ .identifier = .Lower },
+                        .lexeme = "n",
+                        .loc = .{
+                            .filename = TEST_FILE,
+                            .span = .{ .start = 13, .end = 14 },
+                            .src = .{ .line = 1, .col = 14 },
+                        },
                     },
                 },
             },
@@ -2942,7 +3508,7 @@ test "[MatchExprNode]" {
         const positive_expr = try allocator.create(Node);
         positive_expr.* = .{ .str_literal = positive_str };
 
-        const guarded_case = try allocator.create(MatchCase);
+        const guarded_case = try allocator.create(MatchCaseNode);
         guarded_case.* = .{
             .pattern = n_pattern,
             .expression = positive_expr,
@@ -2957,6 +3523,8 @@ test "[MatchExprNode]" {
                 },
             },
         };
+
+        try cases.append(guarded_case);
 
         // Case 2: n => "non-positive"
         const n2_ident = try allocator.create(LowerIdentifierNode);
@@ -2975,15 +3543,17 @@ test "[MatchExprNode]" {
 
         const n2_pattern = try allocator.create(PatternNode);
         n2_pattern.* = .{
-            .variable = .{
-                .name = n2_ident,
-                .token = .{
-                    .kind = .{ .identifier = .Lower },
-                    .lexeme = "n",
-                    .loc = .{
-                        .filename = TEST_FILE,
-                        .span = .{ .start = 36, .end = 37 },
-                        .src = .{ .line = 1, .col = 37 },
+            .inner = .{
+                .variable = .{
+                    .name = n2_ident,
+                    .token = .{
+                        .kind = .{ .identifier = .Lower },
+                        .lexeme = "n",
+                        .loc = .{
+                            .filename = TEST_FILE,
+                            .span = .{ .start = 36, .end = 37 },
+                            .src = .{ .line = 1, .col = 37 },
+                        },
                     },
                 },
             },
@@ -3006,7 +3576,7 @@ test "[MatchExprNode]" {
         const non_positive_expr = try allocator.create(Node);
         non_positive_expr.* = .{ .str_literal = non_pos_str };
 
-        const default_case = try allocator.create(MatchCase);
+        const default_case = try allocator.create(MatchCaseNode);
         default_case.* = .{
             .pattern = n2_pattern,
             .expression = non_positive_expr,
@@ -3022,8 +3592,6 @@ test "[MatchExprNode]" {
             },
         };
 
-        var cases = std.ArrayList(*MatchCase).init(allocator);
-        try cases.append(guarded_case);
         try cases.append(default_case);
 
         const match_expr = try allocator.create(MatchExprNode);
@@ -3043,7 +3611,7 @@ test "[MatchExprNode]" {
 
         const node = try allocator.create(Node);
         defer {
-            node.deinit(allocator);
+            node.release(allocator);
             allocator.destroy(node);
         }
 
@@ -3062,10 +3630,10 @@ test "[MatchExprNode]" {
         const positive_case = match.cases.items[0];
 
         // Verify the pattern in the guarded case is a variable
-        try testing.expect(positive_case.pattern.* == .variable);
+        try testing.expect(positive_case.pattern.inner == .variable);
 
         // Verify the name of the variable
-        try testing.expectEqualStrings("n", positive_case.pattern.variable.name.identifier);
+        try testing.expectEqualStrings("n", positive_case.pattern.inner.variable.name.identifier);
 
         // Ensure the guarded case has a guard condition
         try testing.expect(positive_case.guard != null);
@@ -3077,10 +3645,10 @@ test "[MatchExprNode]" {
         const non_positive_case = match.cases.items[1];
 
         // Verify the pattern in the catch-all case is a variable
-        try testing.expect(non_positive_case.pattern.* == .variable);
+        try testing.expect(non_positive_case.pattern.inner == .variable);
 
         // Ensure the name of the variable in the pattern is "n"
-        try testing.expectEqualStrings("n", non_positive_case.pattern.variable.name.identifier);
+        try testing.expectEqualStrings("n", non_positive_case.pattern.inner.variable.name.identifier);
 
         // Ensure the catch-all case does not have a guard condition
         try testing.expect(non_positive_case.guard == null);
@@ -3099,6 +3667,8 @@ test "[FunctionSignatureNode]" {
     const allocator = gpa.allocator();
 
     // Action
+    var parameter_types = std.ArrayList(*Node).init(allocator);
+
     const int_type1 = try allocator.create(UpperIdentifierNode);
     int_type1.* = .{
         .identifier = try allocator.dupe(u8, "Int"),
@@ -3115,6 +3685,8 @@ test "[FunctionSignatureNode]" {
 
     const int_node1 = try allocator.create(Node);
     int_node1.* = .{ .upper_identifier = int_type1 };
+
+    try parameter_types.append(int_node1);
 
     const int_type2 = try allocator.create(UpperIdentifierNode);
     int_type2.* = .{
@@ -3133,6 +3705,8 @@ test "[FunctionSignatureNode]" {
     const int_node2 = try allocator.create(Node);
     int_node2.* = .{ .upper_identifier = int_type2 };
 
+    try parameter_types.append(int_node2);
+
     const int_type3 = try allocator.create(UpperIdentifierNode);
     int_type3.* = .{
         .identifier = try allocator.dupe(u8, "Int"),
@@ -3150,12 +3724,7 @@ test "[FunctionSignatureNode]" {
     const return_type_node = try allocator.create(Node);
     return_type_node.* = .{ .upper_identifier = int_type3 };
 
-    var parameter_types = std.ArrayList(*Node).init(allocator);
-    try parameter_types.append(int_node1);
-    try parameter_types.append(int_node2);
-
     const func_signature = try allocator.create(FunctionSignatureNode);
-    defer allocator.destroy(func_signature);
 
     func_signature.* = .{
         .parameter_types = parameter_types,
@@ -3173,7 +3742,7 @@ test "[FunctionSignatureNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -3237,6 +3806,8 @@ test "[LambdaExprNode]" {
         .token = x_param_ident.token,
     };
 
+    try parameters.append(x_param);
+
     const y_param_ident = try allocator.create(LowerIdentifierNode);
     y_param_ident.* = .{
         .identifier = try allocator.dupe(u8, "y"),
@@ -3258,7 +3829,6 @@ test "[LambdaExprNode]" {
         .token = y_param_ident.token,
     };
 
-    try parameters.append(x_param);
     try parameters.append(y_param);
 
     const x_ident = try allocator.create(LowerIdentifierNode);
@@ -3331,7 +3901,7 @@ test "[LambdaExprNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -3447,7 +4017,7 @@ test "[FunctionCallNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -3484,8 +4054,6 @@ test "[ConsExprNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    var elements = std.ArrayList(*Node).init(allocator);
-
     const one_node = try allocator.create(Node);
     one_node.* = .{
         .int_literal = .{
@@ -3501,6 +4069,8 @@ test "[ConsExprNode]" {
             },
         },
     };
+
+    var elements = std.ArrayList(*Node).init(allocator);
 
     const two_node = try allocator.create(Node);
     two_node.* = .{
@@ -3518,6 +4088,8 @@ test "[ConsExprNode]" {
         },
     };
 
+    try elements.append(two_node);
+
     const three_node = try allocator.create(Node);
     three_node.* = .{
         .int_literal = .{
@@ -3534,7 +4106,6 @@ test "[ConsExprNode]" {
         },
     };
 
-    try elements.append(two_node);
     try elements.append(three_node);
 
     const list_node = try allocator.create(ListNode);
@@ -3571,7 +4142,7 @@ test "[ConsExprNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -3670,7 +4241,7 @@ test "[StrConcatExprNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -3722,6 +4293,8 @@ test "[ListConcatExprNode]" {
         },
     };
 
+    try left_elements.append(one_node);
+
     const two_node = try allocator.create(Node);
     two_node.* = .{
         .int_literal = .{
@@ -3738,7 +4311,6 @@ test "[ListConcatExprNode]" {
         },
     };
 
-    try left_elements.append(one_node);
     try left_elements.append(two_node);
 
     const left_list = try allocator.create(ListNode);
@@ -3776,6 +4348,8 @@ test "[ListConcatExprNode]" {
         },
     };
 
+    try right_elements.append(three_node);
+
     const four_node = try allocator.create(Node);
     four_node.* = .{
         .int_literal = .{
@@ -3792,7 +4366,6 @@ test "[ListConcatExprNode]" {
         },
     };
 
-    try right_elements.append(three_node);
     try right_elements.append(four_node);
 
     const right_list = try allocator.create(ListNode);
@@ -3829,7 +4402,7 @@ test "[ListConcatExprNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -3956,7 +4529,7 @@ test "[PipeExprNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -4103,7 +4676,7 @@ test "[IfThenElseStmtNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -4189,7 +4762,7 @@ test "[TypedHoleNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -4229,6 +4802,8 @@ test "[TypeApplicationNode]" {
         },
     };
 
+    var args = std.ArrayList(*Node).init(allocator);
+
     const k_ident = try allocator.create(LowerIdentifierNode);
     k_ident.* = .{
         .identifier = try allocator.dupe(u8, "k"),
@@ -4245,6 +4820,8 @@ test "[TypeApplicationNode]" {
 
     const k_node = try allocator.create(Node);
     k_node.* = .{ .lower_identifier = k_ident };
+
+    try args.append(k_node);
 
     const v_ident = try allocator.create(LowerIdentifierNode);
     v_ident.* = .{
@@ -4263,8 +4840,6 @@ test "[TypeApplicationNode]" {
     const v_node = try allocator.create(Node);
     v_node.* = .{ .lower_identifier = v_ident };
 
-    var args = std.ArrayList(*Node).init(allocator);
-    try args.append(k_node);
     try args.append(v_node);
 
     const type_application = try allocator.create(TypeApplicationNode);
@@ -4284,7 +4859,7 @@ test "[TypeApplicationNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -4372,7 +4947,7 @@ test "[TypeAliasNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -4436,6 +5011,8 @@ test "[VariantTypeNode]" {
     try type_params.append(try allocator.dupe(u8, "e"));
     try type_params.append(try allocator.dupe(u8, "a"));
 
+    var constructors = std.ArrayList(*VariantConstructorNode).init(allocator);
+
     const e_ident = try allocator.create(LowerIdentifierNode);
     e_ident.* = .{
         .identifier = try allocator.dupe(u8, "e"),
@@ -4484,6 +5061,8 @@ test "[VariantTypeNode]" {
             },
         },
     };
+
+    try constructors.append(err_constructor);
 
     const a_ident = try allocator.create(LowerIdentifierNode);
     a_ident.* = .{
@@ -4534,8 +5113,6 @@ test "[VariantTypeNode]" {
         },
     };
 
-    var constructors = std.ArrayList(*VariantConstructorNode).init(allocator);
-    try constructors.append(err_constructor);
     try constructors.append(ok_constructor);
 
     const variant_type = try allocator.create(VariantTypeNode);
@@ -4556,7 +5133,7 @@ test "[VariantTypeNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -4671,6 +5248,8 @@ test "[RecordTypeNode]" {
         .token = x_ident.token,
     };
 
+    try fields.append(field_x);
+
     const y_ident = try allocator.create(LowerIdentifierNode);
     y_ident.* = .{
         .identifier = try allocator.dupe(u8, "y"),
@@ -4709,7 +5288,6 @@ test "[RecordTypeNode]" {
         .token = y_ident.token,
     };
 
-    try fields.append(field_x);
     try fields.append(field_y);
 
     const rtype_node = try allocator.create(RecordTypeNode);
@@ -4730,7 +5308,7 @@ test "[RecordTypeNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -4810,6 +5388,8 @@ test "[ModulePathNode]" {
         },
     };
 
+    try segments.append(std_ident);
+
     const list_ident = try allocator.create(UpperIdentifierNode);
     list_ident.* = .{
         .identifier = try allocator.dupe(u8, "List"),
@@ -4824,11 +5404,9 @@ test "[ModulePathNode]" {
         },
     };
 
-    try segments.append(std_ident);
     try segments.append(list_ident);
 
     const path_node = try allocator.create(ModulePathNode);
-    defer allocator.destroy(path_node);
 
     path_node.* = .{
         .segments = segments,
@@ -4837,7 +5415,7 @@ test "[ModulePathNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -4868,7 +5446,10 @@ test "[ExportSpecNode]" {
     const allocator = gpa.allocator();
 
     // Action
-    const item1 = ExportItem{
+    var items = std.ArrayList(*ExportItem).init(allocator);
+
+    const item1 = try allocator.create(ExportItem);
+    item1.* = .{
         .name = try allocator.dupe(u8, "func1"),
         .expose_constructors = false,
         .token = .{
@@ -4882,7 +5463,10 @@ test "[ExportSpecNode]" {
         },
     };
 
-    const item2 = ExportItem{
+    try items.append(item1);
+
+    const item2 = try allocator.create(ExportItem);
+    item2.* = .{
         .name = try allocator.dupe(u8, "Type1"),
         .expose_constructors = true,
         .token = .{
@@ -4896,8 +5480,6 @@ test "[ExportSpecNode]" {
         },
     };
 
-    var items = std.ArrayList(ExportItem).init(allocator);
-    try items.append(item1);
     try items.append(item2);
 
     const export_node = try allocator.create(ExportSpecNode);
@@ -4917,10 +5499,8 @@ test "[ExportSpecNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
-
-        allocator.destroy(export_node);
     }
 
     node.* = .{ .export_spec = export_node };
@@ -4996,7 +5576,7 @@ test "[ImportSpecNode]" {
 
         const node = try allocator.create(Node);
         defer {
-            node.deinit(allocator);
+            node.release(allocator);
             allocator.destroy(node);
         }
 
@@ -5082,7 +5662,7 @@ test "[ImportSpecNode]" {
 
         const node = try allocator.create(Node);
         defer {
-            node.deinit(allocator);
+            node.release(allocator);
             allocator.destroy(node);
         }
 
@@ -5138,44 +5718,56 @@ test "[ImportSpecNode]" {
             .token = module_ident.token,
         };
 
+        var items = std.ArrayList(*ImportItem).init(allocator);
+
         const map_item = try allocator.create(ImportItem);
         map_item.* = .{
-            .function = .{
-                .name = try allocator.dupe(u8, "map"),
-                .alias = null,
+            .inner = .{
+                .function = .{
+                    .name = try allocator.dupe(u8, "map"),
+                    .alias = null,
+                },
             },
         };
+
+        try items.append(map_item);
 
         const filter_item = try allocator.create(ImportItem);
         filter_item.* = .{
-            .function = .{
-                .name = try allocator.dupe(u8, "filter"),
-                .alias = null,
+            .inner = .{
+                .function = .{
+                    .name = try allocator.dupe(u8, "filter"),
+                    .alias = null,
+                },
             },
         };
+
+        try items.append(filter_item);
 
         const maybe_item = try allocator.create(ImportItem);
         maybe_item.* = .{
-            .type = .{
-                .name = try allocator.dupe(u8, "Maybe"),
-                .expose_constructors = false,
-                .alias = null,
+            .inner = .{
+                .type = .{
+                    .name = try allocator.dupe(u8, "Maybe"),
+                    .expose_constructors = false,
+                    .alias = null,
+                },
             },
         };
+
+        try items.append(maybe_item);
 
         const either_item = try allocator.create(ImportItem);
         either_item.* = .{
-            .type = .{
-                .name = try allocator.dupe(u8, "Either"),
-                .expose_constructors = true,
-                .alias = null,
+            .inner = .{
+                .type = .{
+                    .name = try allocator.dupe(u8, "Either"),
+                    .expose_constructors = true,
+                    .alias = null,
+                },
             },
         };
 
-        var items = std.ArrayList(*ImportItem).init(allocator);
-        try items.append(map_item);
-        try items.append(filter_item);
-        try items.append(maybe_item);
         try items.append(either_item);
 
         const import_node = try allocator.create(ImportSpecNode);
@@ -5197,7 +5789,7 @@ test "[ImportSpecNode]" {
 
         const node = try allocator.create(Node);
         defer {
-            node.deinit(allocator);
+            node.release(allocator);
             allocator.destroy(node);
         }
 
@@ -5226,23 +5818,28 @@ test "[ImportSpecNode]" {
         try testing.expectEqual(@as(usize, 4), spec.items.?.items.len);
 
         // Verify first two items are functions
-        try testing.expect(spec.items.?.items[0].* == .function);
-        try testing.expectEqualStrings("map", spec.items.?.items[0].function.name);
-        try testing.expect(spec.items.?.items[0].function.alias == null);
-        try testing.expect(spec.items.?.items[1].* == .function);
-        try testing.expectEqualStrings("filter", spec.items.?.items[1].function.name);
-        try testing.expect(spec.items.?.items[1].function.alias == null);
+        const item1 = spec.items.?.items[0].inner;
+        try testing.expect(item1 == .function);
+        try testing.expectEqualStrings("map", item1.function.name);
+        try testing.expect(item1.function.alias == null);
+
+        const item2 = spec.items.?.items[1].inner;
+        try testing.expect(item2 == .function);
+        try testing.expectEqualStrings("filter", item2.function.name);
+        try testing.expect(item2.function.alias == null);
 
         // Verify last two items are types
-        try testing.expect(spec.items.?.items[2].* == .type);
-        try testing.expectEqualStrings("Maybe", spec.items.?.items[2].type.name);
-        try testing.expect(spec.items.?.items[2].type.alias == null);
-        try testing.expect(spec.items.?.items[2].type.expose_constructors == false);
+        const item3 = spec.items.?.items[2].inner;
+        try testing.expect(item3 == .type);
+        try testing.expectEqualStrings("Maybe", item3.type.name);
+        try testing.expect(item3.type.alias == null);
+        try testing.expect(item3.type.expose_constructors == false);
 
-        try testing.expect(spec.items.?.items[3].* == .type);
-        try testing.expectEqualStrings("Either", spec.items.?.items[3].type.name);
-        try testing.expect(spec.items.?.items[3].type.alias == null);
-        try testing.expect(spec.items.?.items[3].type.expose_constructors == true);
+        const item4 = spec.items.?.items[3].inner;
+        try testing.expect(item4 == .type);
+        try testing.expectEqualStrings("Either", item4.type.name);
+        try testing.expect(item4.type.alias == null);
+        try testing.expect(item4.type.expose_constructors == true);
     }
 
     {
@@ -5276,9 +5873,11 @@ test "[ImportSpecNode]" {
 
         const map_item = try allocator.create(ImportItem);
         map_item.* = .{
-            .function = .{
-                .name = try allocator.dupe(u8, "map"),
-                .alias = try allocator.dupe(u8, "list_map"),
+            .inner = .{
+                .function = .{
+                    .name = try allocator.dupe(u8, "map"),
+                    .alias = try allocator.dupe(u8, "list_map"),
+                },
             },
         };
 
@@ -5303,7 +5902,7 @@ test "[ImportSpecNode]" {
 
         const node = try allocator.create(Node);
         defer {
-            node.deinit(allocator);
+            node.release(allocator);
             allocator.destroy(node);
         }
 
@@ -5328,11 +5927,12 @@ test "[ImportSpecNode]" {
         try testing.expect(spec.alias == null);
 
         // Verify items list contains one item
-        try testing.expect(spec.items != null);
         try testing.expectEqual(@as(usize, 1), spec.items.?.items.len);
-        try testing.expect(spec.items.?.items[0].* == .function);
-        try testing.expectEqualStrings("map", spec.items.?.items[0].function.name);
-        try testing.expectEqualStrings("list_map", spec.items.?.items[0].function.alias.?);
+
+        const item1 = spec.items.?.items[0].inner;
+        try testing.expect(item1 == .function);
+        try testing.expectEqualStrings("map", item1.function.name);
+        try testing.expectEqualStrings("list_map", item1.function.alias.?);
     }
 
     {
@@ -5366,9 +5966,11 @@ test "[ImportSpecNode]" {
 
         const internal_func = try allocator.create(ImportItem);
         internal_func.* = .{
-            .function = .{
-                .name = try allocator.dupe(u8, "internal_func"),
-                .alias = null,
+            .inner = .{
+                .function = .{
+                    .name = try allocator.dupe(u8, "internal_func"),
+                    .alias = null,
+                },
             },
         };
 
@@ -5393,7 +5995,7 @@ test "[ImportSpecNode]" {
 
         const node = try allocator.create(Node);
         defer {
-            node.deinit(allocator);
+            node.release(allocator);
             allocator.destroy(node);
         }
 
@@ -5418,11 +6020,12 @@ test "[ImportSpecNode]" {
         try testing.expect(spec.alias == null);
 
         // Verify items list contains one item to hide
-        try testing.expect(spec.items != null);
         try testing.expectEqual(@as(usize, 1), spec.items.?.items.len);
-        try testing.expect(spec.items.?.items[0].* == .function);
-        try testing.expectEqualStrings("internal_func", spec.items.?.items[0].function.name);
-        try testing.expect(spec.items.?.items[0].function.alias == null);
+
+        const item1 = spec.items.?.items[0].inner;
+        try testing.expect(item1 == .function);
+        try testing.expectEqualStrings("internal_func", item1.function.name);
+        try testing.expect(item1.function.alias == null);
     }
 }
 
@@ -5451,6 +6054,8 @@ test "[IncludeNode]" {
         },
     };
 
+    try segments.append(std_ident);
+
     const list_ident = try allocator.create(UpperIdentifierNode);
     list_ident.* = .{
         .identifier = try allocator.dupe(u8, "List"),
@@ -5465,7 +6070,6 @@ test "[IncludeNode]" {
         },
     };
 
-    try segments.append(std_ident);
     try segments.append(list_ident);
 
     const path_node = try allocator.create(ModulePathNode);
@@ -5490,7 +6094,7 @@ test "[IncludeNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -5535,6 +6139,8 @@ test "[FunctionDeclNode]" {
         },
     };
 
+    var parameters = std.ArrayList(*ParamDeclNode).init(allocator);
+
     const x_ident = try allocator.create(LowerIdentifierNode);
     x_ident.* = .{
         .identifier = try allocator.dupe(u8, "x"),
@@ -5572,6 +6178,8 @@ test "[FunctionDeclNode]" {
         .type_annotation = x_type_node,
         .token = x_ident.token,
     };
+
+    try parameters.append(x_param);
 
     const y_ident = try allocator.create(LowerIdentifierNode);
     y_ident.* = .{
@@ -5611,8 +6219,6 @@ test "[FunctionDeclNode]" {
         .token = y_ident.token,
     };
 
-    var parameters = std.ArrayList(*ParamDeclNode).init(allocator);
-    try parameters.append(x_param);
     try parameters.append(y_param);
 
     const int_type3 = try allocator.create(UpperIdentifierNode);
@@ -5703,7 +6309,7 @@ test "[FunctionDeclNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -5767,6 +6373,8 @@ test "[ForeignFunctionDeclNode]" {
     const allocator = gpa.allocator();
 
     // Action
+    var parameters = std.ArrayList(*ParamDeclNode).init(allocator);
+
     const float_type1 = try allocator.create(UpperIdentifierNode);
     float_type1.* = .{
         .identifier = try allocator.dupe(u8, "Float"),
@@ -5813,7 +6421,6 @@ test "[ForeignFunctionDeclNode]" {
         },
     };
 
-    var parameters = std.ArrayList(*ParamDeclNode).init(allocator);
     try parameters.append(x_param);
 
     const float_type2 = try allocator.create(UpperIdentifierNode);
@@ -5880,7 +6487,7 @@ test "[ForeignFunctionDeclNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -6013,7 +6620,7 @@ test "[ModuleDeclNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 
@@ -6045,6 +6652,8 @@ test "[ProgramNode]" {
     const allocator = gpa.allocator();
 
     // Action
+    var statements = std.ArrayList(*Node).init(allocator);
+
     const comment_node = try allocator.create(CommentNode);
     comment_node.* = .{
         .text = try allocator.dupe(u8, "program statement"),
@@ -6058,8 +6667,6 @@ test "[ProgramNode]" {
             },
         },
     };
-
-    var statements = std.ArrayList(*Node).init(allocator);
 
     const stmt = try allocator.create(Node);
     stmt.* = .{ .comment = comment_node };
@@ -6082,7 +6689,7 @@ test "[ProgramNode]" {
 
     const node = try allocator.create(Node);
     defer {
-        node.deinit(allocator);
+        node.release(allocator);
         allocator.destroy(node);
     }
 

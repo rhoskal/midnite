@@ -39,7 +39,7 @@ pub fn compile(allocator: std.mem.Allocator, writer: anytype, filepath: []const 
 
         const ast = try parser.parseProgram();
         defer {
-            ast.deinit(allocator);
+            ast.release(allocator);
             allocator.destroy(ast);
         }
 
