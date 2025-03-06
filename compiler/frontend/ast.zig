@@ -2087,7 +2087,7 @@ test "[IntLiteralNode]" {
     const value = 42;
 
     // Action
-    const int_node = .{
+    const int_node = IntLiteralNode{
         .value = value,
         .token = .{
             .kind = .{ .literal = .Int },
@@ -2132,7 +2132,7 @@ test "[FloatLiteralNode]" {
     const value = 42.0;
 
     // Action
-    const float_node = .{
+    const float_node = FloatLiteralNode{
         .value = value,
         .token = .{
             .kind = .{ .literal = .Float },
@@ -2177,7 +2177,7 @@ test "[CharLiteralNode]" {
     const value = 'a';
 
     // Action
-    const char_node = .{
+    const char_node = CharLiteralNode{
         .value = value,
         .token = .{
             .kind = .{ .literal = .Char },
@@ -2431,6 +2431,8 @@ test "[ListNode]" {
         },
     };
 
+    try elements.append(elem1);
+
     const elem2 = try allocator.create(Node);
     elem2.* = .{
         .int_literal = .{
@@ -2447,7 +2449,6 @@ test "[ListNode]" {
         },
     };
 
-    try elements.append(elem1);
     try elements.append(elem2);
 
     const list_node = try allocator.create(ListNode);
@@ -3666,6 +3667,8 @@ test "[FunctionSignatureNode]" {
     const allocator = gpa.allocator();
 
     // Action
+    var parameter_types = std.ArrayList(*Node).init(allocator);
+
     const int_type1 = try allocator.create(UpperIdentifierNode);
     int_type1.* = .{
         .identifier = try allocator.dupe(u8, "Int"),
@@ -3682,6 +3685,8 @@ test "[FunctionSignatureNode]" {
 
     const int_node1 = try allocator.create(Node);
     int_node1.* = .{ .upper_identifier = int_type1 };
+
+    try parameter_types.append(int_node1);
 
     const int_type2 = try allocator.create(UpperIdentifierNode);
     int_type2.* = .{
@@ -3700,6 +3705,8 @@ test "[FunctionSignatureNode]" {
     const int_node2 = try allocator.create(Node);
     int_node2.* = .{ .upper_identifier = int_type2 };
 
+    try parameter_types.append(int_node2);
+
     const int_type3 = try allocator.create(UpperIdentifierNode);
     int_type3.* = .{
         .identifier = try allocator.dupe(u8, "Int"),
@@ -3716,10 +3723,6 @@ test "[FunctionSignatureNode]" {
 
     const return_type_node = try allocator.create(Node);
     return_type_node.* = .{ .upper_identifier = int_type3 };
-
-    var parameter_types = std.ArrayList(*Node).init(allocator);
-    try parameter_types.append(int_node1);
-    try parameter_types.append(int_node2);
 
     const func_signature = try allocator.create(FunctionSignatureNode);
 
