@@ -1655,9 +1655,15 @@ pub const Parser = struct {
 
             switch (operator.kind) {
                 .operator => |op| {
-                    if (op == .Exp or op == .FloatAdd or op == .FloatDiv or
-                        op == .FloatMul or op == .FloatSub or op == .IntAdd or
-                        op == .IntDiv or op == .IntMul or op == .IntSub)
+                    if ((op == .Exp) or
+                        (op == .FloatAdd) or
+                        (op == .FloatDiv) or
+                        (op == .FloatMul) or
+                        (op == .FloatSub) or
+                        (op == .IntAdd) or
+                        (op == .IntDiv) or
+                        (op == .IntMul) or
+                        (op == .IntSub))
                     {
                         const arithmetic_node = try self.allocator.create(ast.ArithmeticExprNode);
                         errdefer arithmetic_node.release(self.allocator);
@@ -1680,8 +1686,12 @@ pub const Parser = struct {
                         };
 
                         node.* = .{ .logical_expr = logical_node };
-                    } else if (op == .Equality or op == .GreaterThan or op == .GreaterThanEqual or
-                        op == .LessThan or op == .LessThanEqual or op == .NotEqual)
+                    } else if ((op == .Equality) or
+                        (op == .GreaterThan) or
+                        (op == .GreaterThanEqual) or
+                        (op == .LessThan) or
+                        (op == .LessThanEqual) or
+                        (op == .NotEqual))
                     {
                         const comparison_node = try self.allocator.create(ast.ComparisonExprNode);
                         errdefer comparison_node.release(self.allocator);

@@ -387,7 +387,6 @@ pub const Formatter = struct {
 
                 try self.writeIndent();
                 try self.formatNode(stmt.else_branch);
-                try self.write("\n");
 
                 self.indent_level -= 1;
             },

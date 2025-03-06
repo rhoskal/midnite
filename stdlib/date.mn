@@ -33,7 +33,7 @@ module Date exposing
     let today() -> Eff () Date =
         todo("not implemented")
 
-    let map(f : (Date -> Date), date : Date) -> Date =
+    let map(f : (Date -> Date)), date : Date) -> Date =
         f(date)
 
     let and_then(mdate : Maybe(Date), f : (Date -> Maybe(Date))) -> Maybe(Date)
