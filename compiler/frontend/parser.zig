@@ -842,7 +842,7 @@ pub const Parser = struct {
             }
 
             if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
-                const first_type = try self.parseSimpleType();
+                const first_type = try self.parseTypeExpr();
                 errdefer {
                     first_type.release(self.allocator);
                     self.allocator.destroy(first_type);
@@ -852,7 +852,7 @@ pub const Parser = struct {
 
                 if (try self.match(lexer.TokenKind{ .delimiter = .Comma })) {
                     while (true) {
-                        const next_type = try self.parseSimpleType();
+                        const next_type = try self.parseTypeExpr();
                         errdefer {
                             next_type.release(self.allocator);
                             self.allocator.destroy(next_type);
@@ -868,7 +868,7 @@ pub const Parser = struct {
 
                 _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
             } else {
-                const single_type = try self.parseSimpleType();
+                const single_type = try self.parseTypeExpr();
                 errdefer {
                     single_type.release(self.allocator);
                     self.allocator.destroy(single_type);
@@ -1920,98 +1920,7 @@ pub const Parser = struct {
     /// - `Int`
     /// - `Maybe(a)`
     /// - `List(String)`
-    // fn parseTypeExpr(self: *Parser) ParserError!*ast.Node {
-    //     const start_token = self.current_token;
-
-    //     var parameter_types = std.ArrayList(*ast.Node).init(self.allocator);
-    //     errdefer {
-    //         for (parameter_types.items) |param_type| {
-    //             param_type.release(self.allocator);
-    //             self.allocator.destroy(param_type);
-    //         }
-    //         parameter_types.deinit();
-    //     }
-
-    //     // Handle parenthesized parameter list: (a, b)
-    //     if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
-    //         const first_type = try self.parseSimpleType();
-    //         errdefer {
-    //             first_type.release(self.allocator);
-    //             self.allocator.destroy(first_type);
-    //         }
-
-    //         try parameter_types.append(first_type);
-
-    //         if (try self.match(lexer.TokenKind{ .delimiter = .Comma })) {
-    //             while (true) {
-    //                 const next_type = try self.parseSimpleType();
-    //                 errdefer {
-    //                     next_type.release(self.allocator);
-    //                     self.allocator.destroy(next_type);
-    //                 }
-
-    //                 try parameter_types.append(next_type);
-
-    //                 if (!try self.match(lexer.TokenKind{ .delimiter = .Comma })) {
-    //                     break;
-    //                 }
-    //             }
-    //         }
-
-    //         _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
-    //     } else {
-    //         const single_type = try self.parseSimpleType();
-    //         errdefer {
-    //             single_type.release(self.allocator);
-    //             self.allocator.destroy(single_type);
-    //         }
-
-    //         try parameter_types.append(single_type);
-    //     }
-
-    //     if (!try self.match(lexer.TokenKind{ .symbol = .ArrowRight })) {
-    //         if (parameter_types.items.len == 1) {
-    //             const result = parameter_types.items[0];
-    //             parameter_types.deinit();
-
-    //             return result;
-    //         }
-
-    //         // For now, error if multiple types without arrow (future tuple support)
-    //         return error.UnexpectedToken;
-    //     }
-
-    //     const return_type = try self.parseTypeExpr();
-    //     errdefer {
-    //         return_type.release(self.allocator);
-    //         self.allocator.destroy(return_type);
-    //     }
-
-    //     const function_sig_node = try self.allocator.create(ast.FunctionSignatureNode);
-    //     errdefer function_sig_node.release(self.allocator);
-
-    //     function_sig_node.* = .{
-    //         .parameter_types = parameter_types,
-    //         .return_type = return_type,
-    //         .token = start_token,
-    //     };
-
-    //     const node = try self.allocator.create(ast.Node);
-    //     errdefer {
-    //         node.release(self.allocator);
-    //         self.allocator.destroy(node);
-    //     }
-
-    //     node.* = .{ .function_signature = function_sig_node };
-
-    //     return node;
-    // }
     fn parseTypeExpr(self: *Parser) ParserError!*ast.Node {
-        return try self.parseSimpleType();
-    }
-
-    /// Helper function to parse non-function types.
-    fn parseSimpleType(self: *Parser) ParserError!*ast.Node {
         if (self.check(lexer.TokenKind{ .identifier = .Upper })) {
             const start_token = self.current_token;
 
