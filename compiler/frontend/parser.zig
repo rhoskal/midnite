@@ -1736,6 +1736,17 @@ pub const Parser = struct {
                         };
 
                         node.* = .{ .cons_expr = cons_node };
+                    } else if (op == .PipeRight) {
+                        const pipe_node = try self.allocator.create(ast.PipeExprNode);
+                        errdefer pipe_node.release(self.allocator);
+
+                        pipe_node.* = .{
+                            .value = left,
+                            .func = right,
+                            .operator = operator,
+                        };
+
+                        node.* = .{ .pipe_expr = pipe_node };
                     } else {
                         unreachable;
                     }
@@ -3437,6 +3448,180 @@ test "[cons_expr]" {
 
         // Verify tail is 'xs'
         try testing.expectEqualStrings("xs", expr.tail.lower_identifier.identifier);
+    }
+}
+
+test "[pipe_expr]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    {
+        // Simple pipe expression
+        const source = "x |> f()";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseExpression();
+        defer {
+            node.release(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify the node type is a pipe expression
+        try testing.expect(node.* == .pipe_expr);
+
+        const expr = node.pipe_expr;
+
+        // Verify the pipe operator
+        try testing.expectEqual(lexer.TokenKind{ .operator = .PipeRight }, expr.operator.kind);
+
+        // Verify value side of pipe is 'x'
+        try testing.expect(expr.value.* == .lower_identifier);
+        try testing.expectEqualStrings("x", expr.value.lower_identifier.identifier);
+
+        // Verify func side of pipe is 'f()'
+        try testing.expect(expr.func.* == .function_call);
+        try testing.expectEqualStrings("f", expr.func.function_call.function.lower_identifier.identifier);
+        try testing.expectEqual(@as(usize, 0), expr.func.function_call.arguments.items.len);
+    }
+
+    {
+        // Chained pipe expressions
+        const source = "x |> f() |> g()";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseExpression();
+        defer {
+            node.release(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify the node type is a pipe expression
+        try testing.expect(node.* == .pipe_expr);
+
+        const top_expr = node.pipe_expr;
+
+        // Verify the pipe operator
+        try testing.expectEqual(lexer.TokenKind{ .operator = .PipeRight }, top_expr.operator.kind);
+
+        // Verify value side of top pipe is another pipe expression
+        try testing.expect(top_expr.value.* == .pipe_expr);
+
+        const nested_expr = top_expr.value.pipe_expr;
+
+        // Verify the operator of the nested expression is also pipe
+        try testing.expectEqual(lexer.TokenKind{ .operator = .PipeRight }, nested_expr.operator.kind);
+
+        // Verify nested pipe value is 'x'
+        try testing.expect(nested_expr.value.* == .lower_identifier);
+        try testing.expectEqualStrings("x", nested_expr.value.lower_identifier.identifier);
+
+        // Verify nested pipe func is 'f()'
+        try testing.expect(nested_expr.func.* == .function_call);
+        try testing.expectEqualStrings("f", nested_expr.func.function_call.function.lower_identifier.identifier);
+        try testing.expectEqual(@as(usize, 0), nested_expr.func.function_call.arguments.items.len);
+
+        // Verify top pipe func is 'g()'
+        try testing.expect(top_expr.func.* == .function_call);
+        try testing.expectEqualStrings("g", top_expr.func.function_call.function.lower_identifier.identifier);
+        try testing.expectEqual(@as(usize, 0), top_expr.func.function_call.arguments.items.len);
+    }
+
+    {
+        // Complex pipe expression with function call
+        const source = "[1, 2, 3] |> map(double)";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseExpression();
+        defer {
+            node.release(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify the node type is a pipe expression
+        try testing.expect(node.* == .pipe_expr);
+
+        const expr = node.pipe_expr;
+
+        // Verify the pipe operator
+        try testing.expectEqual(lexer.TokenKind{ .operator = .PipeRight }, expr.operator.kind);
+
+        // Verify value side of pipe is a list
+        try testing.expect(expr.value.* == .list);
+
+        const list = expr.value.list;
+        try testing.expectEqual(@as(usize, 3), list.elements.items.len);
+        try testing.expect(list.elements.items[0].* == .int_literal);
+        try testing.expectEqual(@as(i64, 1), list.elements.items[0].int_literal.value);
+        try testing.expect(list.elements.items[1].* == .int_literal);
+        try testing.expectEqual(@as(i64, 2), list.elements.items[1].int_literal.value);
+        try testing.expect(list.elements.items[2].* == .int_literal);
+        try testing.expectEqual(@as(i64, 3), list.elements.items[2].int_literal.value);
+
+        // Verify func side of pipe is a function call
+        try testing.expect(expr.func.* == .function_call);
+
+        const func_call = expr.func.function_call;
+        try testing.expectEqualStrings("map", func_call.function.lower_identifier.identifier);
+
+        // Verify function call argument
+        try testing.expectEqual(@as(usize, 1), func_call.arguments.items.len);
+        try testing.expect(func_call.arguments.items[0].* == .lower_identifier);
+        try testing.expectEqualStrings("double", func_call.arguments.items[0].lower_identifier.identifier);
+    }
+
+    {
+        // Pipe with expression precedence
+        const source = "1 + 2 |> toString()";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseExpression();
+        defer {
+            node.release(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify the node type is a pipe expression
+        try testing.expect(node.* == .pipe_expr);
+
+        const expr = node.pipe_expr;
+
+        // Verify the pipe operator
+        try testing.expectEqual(lexer.TokenKind{ .operator = .PipeRight }, expr.operator.kind);
+
+        // Verify value side of pipe is an addition expression
+        try testing.expect(expr.value.* == .arithmetic_expr);
+
+        const add_expr = expr.value.arithmetic_expr;
+        try testing.expectEqual(lexer.TokenKind{ .operator = .IntAdd }, add_expr.operator.kind);
+
+        // Verify the operands of the addition
+        try testing.expect(add_expr.left.* == .int_literal);
+        try testing.expectEqual(@as(i64, 1), add_expr.left.int_literal.value);
+        try testing.expect(add_expr.right.* == .int_literal);
+        try testing.expectEqual(@as(i64, 2), add_expr.right.int_literal.value);
+
+        // Verify func side of pipe is 'toString()'
+        try testing.expect(expr.func.* == .function_call);
+        try testing.expectEqualStrings("toString", expr.func.function_call.function.lower_identifier.identifier);
+        try testing.expectEqual(@as(usize, 0), expr.func.function_call.arguments.items.len);
     }
 }
 
