@@ -221,6 +221,7 @@ pub const Token = struct {
 pub const LexerError = error{
     CodePointOutOfRange,
     EmptyCharLiteral,
+    EmptyMultilineStringLiteral,
     InvalidFloatLiteral,
     InvalidIdentifier,
     InvalidIntLiteral,
@@ -428,6 +429,14 @@ pub const Lexer = struct {
 
                                 if (found_end) {
                                     const lexeme = self.source[span_start..self.loc.span.end];
+
+                                    assert(lexeme.len >= 6);
+                                    assert(std.mem.startsWith(u8, lexeme, "\"\"\""));
+                                    assert(std.mem.endsWith(u8, lexeme, "\"\"\""));
+
+                                    if (lexeme.len - 6 == 0) {
+                                        return error.EmptyMultilineStringLiteral;
+                                    }
 
                                     return Token.init(.{ .literal = .MultilineString }, lexeme, .{
                                         .filename = self.loc.filename,
@@ -3085,6 +3094,18 @@ test "[multiline string literal] error.UnterminatedStrLiteral" {
         // Verify error
         try testing.expectError(error.UnterminatedStrLiteral, result);
     }
+}
+
+test "[multiline string literal] error.EmptyMultilineStringLiteral" {
+    // Setup
+    var lexer = Lexer.init("\"\"\"\"\"\"", TEST_FILE);
+
+    // Action
+    const result = lexer.nextToken();
+
+    // Assertions
+    // Verify error
+    try testing.expectError(error.EmptyMultilineStringLiteral, result);
 }
 
 test "[integer literal]" {

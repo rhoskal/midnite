@@ -333,6 +333,104 @@ pub const Parser = struct {
         return node;
     }
 
+    /// Parses a multiline string literal into a structured node.
+    /// Handles triple-quoted strings `"""` that preserve line breaks and indentation,
+    /// with support for escape sequences but not interpolation.
+    ///
+    /// Examples:
+    /// - `"""Hello\nWorld"""`
+    /// - `"""
+    ///  This keeps
+    ///  indentation
+    ///"""`
+    fn parseMultilineStringLiteral(self: *Parser) ParserError!*ast.MultilineStrLiteralNode {
+        const start_token = try self.expect(lexer.TokenKind{ .literal = .MultilineString });
+
+        const full_lexeme = start_token.lexeme;
+        const content = full_lexeme[3 .. full_lexeme.len - 3];
+
+        var raw_content = std.ArrayList(u8).init(self.allocator);
+        defer raw_content.deinit();
+
+        var i: usize = 0;
+        while (i < content.len) {
+            if (content[i] == '\\') {
+                const sequence = try self.parseStrEscapeSequence(content[i..]);
+
+                try raw_content.appendSlice(sequence.value);
+
+                if (content[i + 1] == 'u') {
+                    self.allocator.free(sequence.value);
+                }
+
+                i += sequence.len;
+            } else {
+                try raw_content.append(content[i]);
+
+                i += 1;
+            }
+        }
+
+        // Dedent lines
+        var final_content = std.ArrayList(u8).init(self.allocator);
+        errdefer final_content.deinit();
+
+        var lines = std.mem.split(u8, raw_content.items, "\n");
+        var first_line = true;
+        var base_indent: ?usize = null;
+
+        while (lines.next()) |line| {
+            if (first_line) {
+                if (line.len == 0) {
+                    continue;
+                }
+
+                var indent: usize = 0;
+                for (line) |c| {
+                    if (!std.ascii.isWhitespace(c)) {
+                        break;
+                    }
+
+                    indent += 1;
+                }
+
+                base_indent = indent;
+                first_line = false;
+            }
+
+            if (line.len > 0) {
+                var trimmed: []const u8 = line;
+                if (base_indent) |indent| {
+                    const indent_spaces = try self.allocator.alloc(u8, indent);
+                    defer self.allocator.free(indent_spaces);
+                    @memset(indent_spaces, ' ');
+
+                    if (line.len > indent and std.mem.startsWith(u8, line, indent_spaces)) {
+                        trimmed = line[indent..];
+                    }
+                }
+
+                try final_content.appendSlice(trimmed);
+            }
+
+            if (lines.index != null) {
+                try final_content.append('\n');
+            }
+        }
+
+        const node = try self.allocator.create(ast.MultilineStrLiteralNode);
+        errdefer node.release(self.allocator);
+
+        node.* = .{
+            .value = try self.allocator.dupe(u8, final_content.items),
+            .token = start_token,
+        };
+
+        final_content.deinit();
+
+        return node;
+    }
+
     const EscapeSequence = struct {
         value: []const u8,
         len: usize,
@@ -1806,7 +1904,11 @@ pub const Parser = struct {
 
                         node.* = .{ .str_literal = str_literal };
                     },
-                    .MultilineString => return error.UnexpectedToken,
+                    .MultilineString => {
+                        const str_literal = try self.parseMultilineStringLiteral();
+
+                        node.* = .{ .multiline_str_literal = str_literal };
+                    },
                 }
 
                 return node;
@@ -2667,7 +2769,93 @@ test "[str_literal]" {
     }
 }
 
-test "[multiline_str_literal]" {}
+test "[multiline_str_literal]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    const TestCase = struct {
+        source: []const u8,
+        expected: []const u8,
+    };
+
+    const cases = [_]TestCase{
+        // Single line, no escapes
+        .{
+            .source = "\"\"\"Hello\"\"\"",
+            .expected = "Hello",
+        },
+
+        // Single line with escape sequence
+        .{
+            .source = "\"\"\"Hello\\tWorld\"\"\"",
+            .expected = "Hello\tWorld",
+        },
+
+        // Multiple lines, no indentation
+        .{
+            .source = "\"\"\"Hello\nWorld\"\"\"",
+            .expected = "Hello\nWorld",
+        },
+
+        // Multiple lines with consistent indentation (dedented)
+        .{
+            .source = "\"\"\"    Hello\n    World\"\"\"",
+            .expected = "Hello\nWorld",
+        },
+
+        // Multiple lines with varying indentation (dedented based on first line)
+        .{
+            .source = "\"\"\"    Hello\n        World\n    Goodbye\"\"\"",
+            .expected = "Hello\n    World\nGoodbye",
+        },
+
+        // Leading newline (ignored for indentation)
+        .{
+            .source = "\"\"\"\n    Hello\n    World\"\"\"",
+            .expected = "Hello\nWorld",
+        },
+
+        // Escape sequences across lines
+        .{
+            .source = "\"\"\"    Hello\\n\n    World\\t!\"\"\"",
+            .expected = "Hello\n\nWorld\t!",
+        },
+
+        // Unicode escape
+        .{
+            .source = "\"\"\"    Hello\\u{2665}\n    World\"\"\"",
+            .expected = "Hello♥\nWorld",
+        },
+
+        // Mixed content with escapes and indentation
+        .{
+            .source = "\"\"\"    Line1\\tTab\n        Line2\\n\n    Line3\"\"\"",
+            .expected = "Line1\tTab\n    Line2\n\nLine3",
+        },
+    };
+
+    for (cases) |case| {
+        var l = lexer.Lexer.init(case.source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const literal = try parser.parseMultilineStringLiteral();
+        defer literal.release(allocator);
+
+        // Assertions
+        // Validate the literal token and its properties
+        try testing.expectEqual(lexer.TokenKind{ .literal = .MultilineString }, literal.token.kind);
+
+        // Ensure the lexeme matches the source string
+        try testing.expectEqualStrings(case.source, literal.token.lexeme);
+
+        // Verify the parsed string value matches the expected value
+        try testing.expectEqualStrings(case.expected, literal.value);
+    }
+}
 
 test "[lower_identifier]" {
     // Setup
