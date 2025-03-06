@@ -1109,7 +1109,7 @@ pub const AstPrinter = struct {
                 self.indent_level += 1;
 
                 try self.printIndent();
-                try self.writer.styled(term.Color.Cyan, "path: [");
+                try self.writer.styled(term.Color.Cyan, "path: ");
 
                 for (decl.path.segments.items, 0..) |segment, i| {
                     if (i > 0) {
@@ -1119,7 +1119,7 @@ pub const AstPrinter = struct {
                     try self.writer.styled(term.Color.Magenta, segment.identifier);
                 }
 
-                try self.writer.plain("]\n");
+                try self.writer.plain("\n");
 
                 try self.printIndent();
                 try self.writer.styled(term.Color.Cyan, "exports: ");
