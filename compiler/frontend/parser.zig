@@ -2329,13 +2329,13 @@ pub const Parser = struct {
             i += 1;
         }
 
-        const trimmed = std.mem.trimRight(u8, start_token.lexeme[i..], &std.ascii.whitespace);
+        const text = std.mem.trimRight(u8, start_token.lexeme[i..], &std.ascii.whitespace);
 
         const comment_node = try self.allocator.create(ast.CommentNode);
         errdefer comment_node.release(self.allocator);
 
         comment_node.* = .{
-            .text = try self.allocator.dupe(u8, trimmed),
+            .text = try self.allocator.dupe(u8, text),
             .token = start_token,
         };
 
@@ -2360,13 +2360,13 @@ pub const Parser = struct {
             i += 1;
         }
 
-        const trimmed = std.mem.trimRight(u8, start_token.lexeme[i..], &std.ascii.whitespace);
+        const text = std.mem.trimRight(u8, start_token.lexeme[i..], &std.ascii.whitespace);
 
         const comment_node = try self.allocator.create(ast.DocCommentNode);
         errdefer comment_node.release(self.allocator);
 
         comment_node.* = .{
-            .text = try self.allocator.dupe(u8, trimmed),
+            .text = try self.allocator.dupe(u8, text),
             .token = start_token,
         };
 

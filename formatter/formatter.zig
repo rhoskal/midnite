@@ -816,17 +816,18 @@ pub const Formatter = struct {
                 try self.write(" ");
 
                 try self.formatNode(&.{ .export_spec = decl.exports });
-                try self.write("\n\n");
+                try self.write("\n");
 
                 self.indent_level += 1;
 
-                for (decl.declarations.items) |declaration| {
+                for (decl.declarations.items, 0..) |declaration, i| {
+                    try self.writeIndent();
                     try self.formatNode(declaration);
-                    try self.write("\n");
 
-                    // Add extra newline between declarations for readability
-                    if (declaration.* != .comment and declaration.* != .doc_comment and declaration.* != .foreign_function_decl) {
-                        try self.write("\n");
+                    if (i < decl.declarations.items.len - 1) {
+                        if (declaration.* != .comment or declaration.* != .doc_comment) {
+                            try self.write("\n");
+                        }
                     }
                 }
 
@@ -837,7 +838,10 @@ pub const Formatter = struct {
             .program => |prog| {
                 for (prog.statements.items) |stmt| {
                     try self.formatNode(stmt);
-                    try self.write("\n");
+
+                    if (stmt.* == .comment or stmt.* == .doc_comment) {
+                        try self.write("\n");
+                    }
                 }
             },
         }
