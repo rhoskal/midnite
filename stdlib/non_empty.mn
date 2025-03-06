@@ -1,4 +1,4 @@
-module NonEmpty where
+module NonEmpty exposing
     ( NonEmpty
     , drop_left
     , drop_while
@@ -30,7 +30,7 @@ module NonEmpty where
     let tail(list : NonEmpty(a)) -> a =
         todo("not implemented")
 
-    let map(f : (a -> b), list : NonEmpty(a)) -> NonEmpty(b) =
+    let map(f : ((a) -> b), list : NonEmpty(a)) -> NonEmpty(b) =
         todo("not implemented")
 
     let intersperse(x : a, list : NonEmpty(a)) -> NonEmpty(a) =
@@ -54,10 +54,10 @@ module NonEmpty where
     let drop_left(n : Int, list : NonEmpty(a)) -> List(a) =
         todo("not implemented")
 
-    let take_while(predicate : (a -> Bool), list : NonEmpty(a)) -> List(a) =
+    let take_while(predicate : ((a) -> Bool), list : NonEmpty(a)) -> List(a) =
         todo("not implemented")
 
-    let drop_while(predicate : (a -> Bool), list : NonEmpty(a)) -> List(a) =
+    let drop_while(predicate : ((a) -> Bool), list : NonEmpty(a)) -> List(a) =
         todo("not implemented")
 
     let from_list(list : List(a)) -> Maybe(NonEmpty(a)) =

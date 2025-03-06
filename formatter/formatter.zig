@@ -33,12 +33,20 @@ pub const Formatter = struct {
         switch (node.*) {
             // Basic Literals
             .comment => |comment| {
-                try self.write("# ");
-                try self.write(comment.text);
+                if (comment.text.len == 0) {
+                    try self.write("#");
+                } else {
+                    try self.write("# ");
+                    try self.write(comment.text);
+                }
             },
             .doc_comment => |comment| {
-                try self.write("## ");
-                try self.write(comment.text);
+                if (comment.text.len == 0) {
+                    try self.write("##");
+                } else {
+                    try self.write("## ");
+                    try self.write(comment.text);
+                }
             },
             .int_literal => |lit| {
                 try self.write(lit.token.lexeme);
@@ -470,7 +478,11 @@ pub const Formatter = struct {
 
                 for (vtype.constructors.items, 0..) |constructor, i| {
                     try self.writeIndent();
-                    try self.write("| ");
+
+                    if (vtype.constructors.items.len > 1) {
+                        try self.write("| ");
+                    }
+
                     try self.write(constructor.name.identifier);
 
                     if (constructor.parameters.items.len > 0) {
@@ -555,10 +567,10 @@ pub const Formatter = struct {
                 }
             },
             .export_spec => |spec| {
-                try self.write("exposing ");
+                try self.write("exposing");
 
                 if (spec.exposing_all) {
-                    try self.write("(..)");
+                    try self.write(" (..)");
 
                     return;
                 }
@@ -568,7 +580,7 @@ pub const Formatter = struct {
                     defer sorted.deinit();
 
                     if (sorted.items.len <= 2) {
-                        try self.write("(");
+                        try self.write(" (");
 
                         for (sorted.items, 0..) |item, i| {
                             try self.write(item.name);
@@ -584,27 +596,37 @@ pub const Formatter = struct {
 
                         try self.write(")");
                     } else {
-                        try self.write("(\n");
+                        try self.write("\n");
 
                         self.indent_level += 1;
 
-                        for (items.items, 0..) |item, i| {
+                        try self.writeIndent();
+                        try self.write("( ");
+
+                        try self.write(sorted.items[0].name);
+                        if (sorted.items[0].expose_constructors) {
+                            try self.write("(..)");
+                        }
+
+                        for (sorted.items[1..]) |item| {
+                            try self.write("\n");
+
                             try self.writeIndent();
+                            try self.write(", ");
+
                             try self.write(item.name);
 
                             if (item.expose_constructors) {
                                 try self.write("(..)");
                             }
-
-                            if (i < items.items.len - 1) {
-                                try self.write(",\n");
-                            }
                         }
 
-                        self.indent_level -= 1;
-
-                        try self.writeNewlineAndIndent();
+                        try self.write("\n");
+                        try self.writeIndent();
                         try self.write(")");
+                        try self.write("\n");
+
+                        self.indent_level -= 1;
                     }
                 }
             },
@@ -843,6 +865,8 @@ pub const Formatter = struct {
                         try self.write("\n");
                     }
                 }
+
+                try self.write("\n");
             },
         }
     }

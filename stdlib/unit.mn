@@ -1,8 +1,4 @@
-module Unit exposing
-    ( Unit(..)
-    , ignore
-    )
-
+module Unit exposing (Unit(..), ignore)
     type Unit =
         Unit
 

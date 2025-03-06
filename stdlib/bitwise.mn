@@ -12,17 +12,38 @@ module Bitwise exposing
     , xor
     )
 
-    foreign bitwise_and(x : Int, y : Int) -> Int = "zig_bitwise_and"
-    foreign bitwise_or(x : Int, y : Int) -> Int = "zig_bitwise_or"
-    foreign bitwise_not(x : Int) -> Int = "zig_bitwise_not"
-    foreign bitwise_xor(x : Int, y : Int) -> Int = "zig_bitwise_xor"
-    foreign bitwise_shl(x : Int, y : Int) -> Int = "zig_bitwise_shl"
-    foreign bitwise_shr(x : Int, y : Int) -> Int = "zig_bitwise_shr"
-    foreign bitwise_lshr(x : Int, y : Int) -> Int = "zig_bitwise_lshr"
-    foreign bitwise_rotl(x : Int, y : Int) -> Int = "zig_bitwise_rotl"
-    foreign bitwise_rotr(x : Int, y : Int) -> Int = "zig_bitwise_rotr"
-    foreign bitwise_hw(x : Int) -> Int = "zig_bitwise_hamming_weight"
-    foreign bitwise_dist(x : Int, y : Int) -> Int = "zig_bitwise_distance"
+    foreign bitwise_and(x : Int, y : Int) -> Int =
+        "zig_bitwise_and"
+
+    foreign bitwise_or(x : Int, y : Int) -> Int =
+        "zig_bitwise_or"
+
+    foreign bitwise_not(x : Int) -> Int =
+        "zig_bitwise_not"
+
+    foreign bitwise_xor(x : Int, y : Int) -> Int =
+        "zig_bitwise_xor"
+
+    foreign bitwise_shl(x : Int, y : Int) -> Int =
+        "zig_bitwise_shl"
+
+    foreign bitwise_shr(x : Int, y : Int) -> Int =
+        "zig_bitwise_shr"
+
+    foreign bitwise_lshr(x : Int, y : Int) -> Int =
+        "zig_bitwise_lshr"
+
+    foreign bitwise_rotl(x : Int, y : Int) -> Int =
+        "zig_bitwise_rotl"
+
+    foreign bitwise_rotr(x : Int, y : Int) -> Int =
+        "zig_bitwise_rotr"
+
+    foreign bitwise_hw(x : Int) -> Int =
+        "zig_bitwise_hamming_weight"
+
+    foreign bitwise_dist(x : Int, y : Int) -> Int =
+        "zig_bitwise_distance"
 
     ## Performs a bitwise AND operation between two integers.
     ## Each bit in the result is 1 only if the corresponding

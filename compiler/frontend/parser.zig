@@ -677,25 +677,49 @@ pub const Parser = struct {
             items = std.ArrayList(*ast.ExportItem).init(self.allocator);
 
             while (!self.check(lexer.TokenKind{ .delimiter = .RightParen })) {
-                const ident = try self.parseLowerIdentifier();
-                defer ident.release(self.allocator);
-
+                var name: []const u8 = undefined;
+                var token: lexer.Token = undefined;
                 var expose_constructors = false;
 
-                if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
-                    _ = try self.expect(lexer.TokenKind{ .operator = .Expand });
-                    _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+                switch (self.current_token.kind) {
+                    .identifier => |ident| switch (ident) {
+                        .Lower => {
+                            const ident_node = try self.parseLowerIdentifier();
+                            defer ident_node.release(self.allocator);
 
-                    expose_constructors = true;
+                            name = try self.allocator.dupe(u8, ident_node.identifier);
+                            token = ident_node.token;
+
+                            // Lowercase identifiers cannot have (..)
+                            if (self.check(lexer.TokenKind{ .delimiter = .LeftParen })) {
+                                return error.UnexpectedToken;
+                            }
+                        },
+                        .Upper => {
+                            const ident_node = try self.parseUpperIdentifier();
+                            defer ident_node.release(self.allocator);
+
+                            name = try self.allocator.dupe(u8, ident_node.identifier);
+                            token = ident_node.token;
+
+                            if (try self.match(lexer.TokenKind{ .delimiter = .LeftParen })) {
+                                _ = try self.expect(lexer.TokenKind{ .operator = .Expand });
+                                _ = try self.expect(lexer.TokenKind{ .delimiter = .RightParen });
+
+                                expose_constructors = true;
+                            }
+                        },
+                    },
+                    else => return error.UnexpectedToken,
                 }
 
                 const item = try self.allocator.create(ast.ExportItem);
                 errdefer item.release(self.allocator);
 
                 item.* = .{
-                    .name = try self.allocator.dupe(u8, ident.identifier),
+                    .name = name,
                     .expose_constructors = expose_constructors,
-                    .token = ident.token,
+                    .token = token,
                 };
 
                 try items.?.append(item);
@@ -1992,7 +2016,7 @@ pub const Parser = struct {
     fn parseParameter(self: *Parser) ParserError!*ast.ParamDeclNode {
         const param_token = self.current_token;
 
-        const name = try self.parseLowerIdentifier();
+        const name = try self.parseParamName(param_token);
         errdefer name.release(self.allocator);
 
         var type_annotation: ?*ast.Node = null;
@@ -2017,6 +2041,22 @@ pub const Parser = struct {
         };
 
         return node;
+    }
+
+    fn parseParamName(self: *Parser, param_token: lexer.Token) ParserError!*ast.LowerIdentifierNode {
+        if (try self.match(lexer.TokenKind{ .symbol = .Underscore })) {
+            const node = try self.allocator.create(ast.LowerIdentifierNode);
+            errdefer node.release(self.allocator);
+
+            node.* = .{
+                .identifier = try self.allocator.dupe(u8, "_"),
+                .token = param_token,
+            };
+
+            return node;
+        } else {
+            return try self.parseLowerIdentifier();
+        }
     }
 
     /// Parses a list expression surrounded by square brackets with comma-separated elements.
@@ -3973,6 +4013,51 @@ test "[function_decl]" {
 
         try testing.expectEqualStrings("x", value.identifier);
     }
+
+    {
+        // Test function declaration with type annotations
+        const source = "let ignore(_ : a) -> Unit = Unit";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseFunctionDecl();
+        defer {
+            node.release(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify the node is a function declaration
+        try testing.expect(node.* == .function_decl);
+
+        const decl = node.function_decl;
+
+        // Check the function name matches
+        try testing.expectEqualStrings("ignore", decl.name.identifier);
+
+        // Verify the fn has exactly one parameter
+        try testing.expectEqual(@as(usize, 1), decl.parameters.items.len);
+
+        const param1 = decl.parameters.items[0];
+
+        // Verify the parameter name is "_"
+        try testing.expectEqualStrings("_", param1.name.identifier);
+
+        // Verify paramater type is "a"
+        try testing.expectEqualStrings("a", param1.type_annotation.?.lower_identifier.identifier);
+
+        // Verify return type is "Unit"
+        try testing.expectEqualStrings("Unit", decl.return_type.?.upper_identifier.identifier);
+
+        // Verify the function's value is an identifier
+        try testing.expect(decl.value.* == .upper_identifier);
+
+        const value = decl.value.upper_identifier;
+
+        try testing.expectEqualStrings("Unit", value.identifier);
+    }
 }
 
 test "[function_call]" {
@@ -5230,6 +5315,141 @@ test "[tuple]" {
         try testing.expectEqual(@as(usize, 2), tuple.elements.items.len);
         try testing.expectEqualStrings("x", tuple.elements.items[0].lower_identifier.identifier);
         try testing.expectEqualStrings("True", tuple.elements.items[1].upper_identifier.identifier);
+    }
+}
+
+test "[export_spec]" {
+    // Setup
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    {
+        const source = "exposing (double)";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseExportSpec();
+        defer {
+            node.release(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify that the node type is an export spec
+        try testing.expect(node.* == .export_spec);
+
+        const export_spec = node.export_spec;
+
+        // Verify that we are not exposing all items
+        try testing.expect(!export_spec.exposing_all);
+
+        // Verify that the export spec has exactly one item
+        try testing.expectEqual(@as(usize, 1), export_spec.items.?.items.len);
+
+        // Check the exported item (double)
+        const item = export_spec.items.?.items[0];
+        try testing.expectEqualStrings("double", item.name);
+        try testing.expect(!item.expose_constructors);
+    }
+
+    {
+        const source = "exposing (..)";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseExportSpec();
+        defer {
+            node.release(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify that the node type is an export spec
+        try testing.expect(node.* == .export_spec);
+
+        const export_spec = node.export_spec;
+
+        // Verify that we are exposing all items
+        try testing.expect(export_spec.exposing_all);
+
+        // Verify that the export spec has no specific items
+        try testing.expect(export_spec.items == null);
+    }
+
+    {
+        const source = "exposing (Maybe(..), and_then)";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseExportSpec();
+        defer {
+            node.release(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify that the node type is an export spec
+        try testing.expect(node.* == .export_spec);
+
+        const export_spec = node.export_spec;
+
+        // Verify that we are not exposing all items
+        try testing.expect(!export_spec.exposing_all);
+
+        // Verify that the export spec has exactly two items
+        try testing.expectEqual(@as(usize, 2), export_spec.items.?.items.len);
+
+        // Check the first exported item (Maybe with constructors)
+        const type_item = export_spec.items.?.items[0];
+        try testing.expectEqualStrings("Maybe", type_item.name);
+        try testing.expect(type_item.expose_constructors);
+
+        // Check the second exported item (and_then function)
+        const func_item = export_spec.items.?.items[1];
+        try testing.expectEqualStrings("and_then", func_item.name);
+        try testing.expect(!func_item.expose_constructors);
+    }
+
+    {
+        const source = "exposing (Result, map, flatMap, withDefault)";
+        var l = lexer.Lexer.init(source, TEST_FILE);
+        var parser = try Parser.init(allocator, &l);
+        defer parser.deinit();
+
+        // Action
+        const node = try parser.parseExportSpec();
+        defer {
+            node.release(allocator);
+            allocator.destroy(node);
+        }
+
+        // Assertions
+        // Verify that the node type is an export spec
+        try testing.expect(node.* == .export_spec);
+
+        const export_spec = node.export_spec;
+
+        // Verify that we are not exposing all items
+        try testing.expect(!export_spec.exposing_all);
+
+        // Verify that the export spec has exactly four items
+        try testing.expectEqual(@as(usize, 4), export_spec.items.?.items.len);
+
+        // Check the first exported item (Result type without constructors)
+        try testing.expectEqualStrings("Result", export_spec.items.?.items[0].name);
+        try testing.expect(!export_spec.items.?.items[0].expose_constructors);
+
+        // Check the remaining function exports
+        try testing.expectEqualStrings("map", export_spec.items.?.items[1].name);
+        try testing.expectEqualStrings("flatMap", export_spec.items.?.items[2].name);
+        try testing.expectEqualStrings("withDefault", export_spec.items.?.items[3].name);
     }
 }
 
