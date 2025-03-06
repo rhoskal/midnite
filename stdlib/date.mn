@@ -30,12 +30,12 @@ module Date exposing
     let mk_date(month : Month, day : Int, year : Int) -> Date =
         Date({ month, day, year })
 
-    let today() -> Eff () Date =
+    let today() -> Eff((), Date) =
         todo("not implemented")
 
-    let map(f : (Date -> Date)), date : Date) -> Date =
+    let map(f : ((Date) -> Date)), date : Date) -> Date =
         f(date)
 
-    let and_then(mdate : Maybe(Date), f : (Date -> Maybe(Date))) -> Maybe(Date)
+    let and_then(mdate : Maybe(Date), f : ((Date) -> Maybe(Date))) -> Maybe(Date)
         Maybe.map(mdate, f)
 end
