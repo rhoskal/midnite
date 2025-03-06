@@ -433,8 +433,15 @@ pub const Formatter = struct {
                     try self.write(")");
                 }
 
-                try self.write(" = ");
+                try self.write(" =");
+
+                self.indent_level += 1;
+
+                try self.writeNewlineAndIndent();
                 try self.formatNode(atype.value);
+
+                self.indent_level -= 1;
+
                 try self.write("\n");
             },
             .variant_type => |vtype| {
@@ -442,14 +449,21 @@ pub const Formatter = struct {
 
                 try self.write(vtype.name.identifier);
 
-                try self.write(" ");
+                if (vtype.type_params.items.len > 0) {
+                    try self.write("(");
 
-                for (vtype.type_params.items) |param| {
-                    try self.write(param);
-                    try self.write(" ");
+                    for (vtype.type_params.items, 0..) |param, i| {
+                        try self.write(param);
+
+                        if (i < vtype.type_params.items.len - 1) {
+                            try self.write(", ");
+                        }
+                    }
+
+                    try self.write(")");
                 }
 
-                try self.write("=");
+                try self.write(" =");
                 try self.write("\n");
 
                 self.indent_level += 1;
@@ -459,19 +473,27 @@ pub const Formatter = struct {
                     try self.write("| ");
                     try self.write(constructor.name.identifier);
 
-                    for (constructor.parameters.items) |param| {
-                        try self.write(" ");
+                    if (constructor.parameters.items.len > 0) {
+                        try self.write("(");
 
-                        const needs_parens = (param.* == .type_application);
-                        if (needs_parens) {
-                            try self.write("(");
+                        for (constructor.parameters.items, 0..) |param, j| {
+                            const needs_parens = (param.* == .type_application);
+                            if (needs_parens) {
+                                try self.write("(");
+                            }
+
+                            try self.formatNode(param);
+
+                            if (needs_parens) {
+                                try self.write(")");
+                            }
+
+                            if (j < constructor.parameters.items.len - 1) {
+                                try self.write(", ");
+                            }
                         }
 
-                        try self.formatNode(param);
-
-                        if (needs_parens) {
-                            try self.write(")");
-                        }
+                        try self.write(")");
                     }
 
                     if (i < vtype.constructors.items.len - 1) {
