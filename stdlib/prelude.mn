@@ -43,13 +43,13 @@ module Prelude exposing
 include Boolean
 include Compareable
 
-foreign int_add(x : Int, y : Int) -> Int = "zig_int_add"
-foreign int_sub(x : Int, y : Int) -> Int = "zig_int_sub"
-foreign int_mul(x : Int, y : Int) -> Int = "zig_int_mul"
-foreign int_div(x : Int, y : Int) -> Int = "zig_int_div"
-foreign int_pow(x : Int, y : Int) -> Int = "zig_int_pow"
-foreign int_min(x : Int, y : Int) -> Int = "zig_int_min"
-foreign int_max(x : Int, y : Int) -> Int = "zig_int_max"
+foreign int_add(_ : Int, _ : Int) -> Int = "zig_int_add"
+foreign int_sub(_ : Int, _ : Int) -> Int = "zig_int_sub"
+foreign int_mul(_ : Int, _ : Int) -> Int = "zig_int_mul"
+foreign int_div(_ : Int, _ : Int) -> Int = "zig_int_div"
+foreign int_pow(_ : Int, _ : Int) -> Int = "zig_int_pow"
+foreign int_min(_ : Int, _ : Int) -> Int = "zig_int_min"
+foreign int_max(_ : Int, _ : Int) -> Int = "zig_int_max"
 
 # =============================
 #      HELPFUL FUNCTIONS

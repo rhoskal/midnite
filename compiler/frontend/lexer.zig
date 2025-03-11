@@ -137,15 +137,6 @@ pub const TokenKind = union(enum) {
     }
 };
 
-/// A structure representing raw buffer locations.
-pub const Span = struct {
-    /// The start index of the lexeme in the source buffer (inclusive).
-    start: usize,
-
-    /// The end index of the lexeme in the source buffer (exclusive).
-    end: usize,
-};
-
 /// A human-readable line/column position.
 pub const SourceLoc = struct {
     /// The line number in the source file (1-based).
@@ -155,6 +146,15 @@ pub const SourceLoc = struct {
     col: usize,
 };
 
+/// A structure representing raw buffer locations.
+pub const Span = struct {
+    /// The start index of the lexeme in the source buffer (inclusive).
+    start: usize,
+
+    /// The end index of the lexeme in the source buffer (exclusive).
+    end: usize,
+};
+
 /// Combines both raw and human-readable locations.
 /// This dual representation enables both efficient string slicing (Span)
 /// and meaningful error reporting (SourceLoc) without conversion overhead.
@@ -162,11 +162,11 @@ pub const TokenLoc = struct {
     /// The name of the source file where the token originated.
     filename: []const u8,
 
-    /// The raw buffer location of the token.
-    span: Span,
-
     /// The human-readable source location of the token.
     src: SourceLoc,
+
+    /// The raw buffer location of the token.
+    span: Span,
 };
 
 /// A structure representing a token with a specific kind, lexeme, and position in the source code.
@@ -258,8 +258,8 @@ pub const Lexer = struct {
             .source = source,
             .loc = .{
                 .filename = filename,
-                .span = .{ .start = 0, .end = 0 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 0 },
             },
         };
     }
@@ -282,13 +282,13 @@ pub const Lexer = struct {
         const c = self.peek() orelse {
             return Token.init(.{ .special = .Eof }, "", .{
                 .filename = self.loc.filename,
-                .span = .{
-                    .start = span_start,
-                    .end = self.loc.span.start,
-                },
                 .src = .{
                     .line = start_line,
                     .col = start_col,
+                },
+                .span = .{
+                    .start = span_start,
+                    .end = self.loc.span.start,
                 },
             });
         };
@@ -300,13 +300,13 @@ pub const Lexer = struct {
                 if (self.peek() == null) {
                     return Token.init(.{ .special = .Hole }, "?", .{
                         .filename = self.loc.filename,
-                        .span = .{
-                            .start = span_start,
-                            .end = self.loc.span.end,
-                        },
                         .src = .{
                             .line = start_line,
                             .col = start_col,
+                        },
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
                         },
                     });
                 } else {
@@ -347,13 +347,13 @@ pub const Lexer = struct {
 
                 return Token.init(kind, lexeme, .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -439,13 +439,13 @@ pub const Lexer = struct {
 
                                     return Token.init(.{ .literal = .MultilineString }, lexeme, .{
                                         .filename = self.loc.filename,
-                                        .span = .{
-                                            .start = span_start,
-                                            .end = self.loc.span.end,
-                                        },
                                         .src = .{
                                             .line = start_line,
                                             .col = start_col,
+                                        },
+                                        .span = .{
+                                            .start = span_start,
+                                            .end = self.loc.span.end,
                                         },
                                     });
                                 } else {
@@ -459,13 +459,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .literal = .String }, lexeme, .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -513,13 +513,13 @@ pub const Lexer = struct {
 
                     return Token.init(.{ .literal = .String }, lexeme, .{
                         .filename = self.loc.filename,
-                        .span = .{
-                            .start = span_start,
-                            .end = self.loc.span.end,
-                        },
                         .src = .{
                             .line = start_line,
                             .col = start_col,
+                        },
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
                         },
                     });
                 } else {
@@ -579,13 +579,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .literal = .Char }, lexeme, .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = position_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = position_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     } else {
@@ -604,13 +604,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .operator = .FloatAdd }, "+.", .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -622,13 +622,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .operator = .ListConcat }, "++", .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -636,13 +636,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .operator = .IntAdd }, "+", .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -655,13 +655,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .symbol = .ArrowRight }, "->", .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -671,13 +671,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .operator = .FloatSub }, "-.", .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -685,13 +685,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .operator = .IntSub }, "-", .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -704,13 +704,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .operator = .Exp }, "**", .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -720,13 +720,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .operator = .FloatMul }, "*.", .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -734,13 +734,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .operator = .IntMul }, "*", .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -753,13 +753,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .operator = .NotEqual }, "/=", .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -769,13 +769,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .operator = .FloatDiv }, "/.", .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -783,13 +783,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .operator = .IntDiv }, "/", .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -802,13 +802,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .operator = .LessThanEqual }, "<=", .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -818,13 +818,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .operator = .StrConcat }, "<>", .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -832,13 +832,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .operator = .LessThan }, "<", .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -851,13 +851,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .operator = .GreaterThanEqual }, ">=", .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -865,13 +865,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .operator = .GreaterThan }, ">", .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -884,13 +884,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .operator = .LogicalAnd }, "&&", .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -898,13 +898,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .special = .Unrecognized }, "&", .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -917,13 +917,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .operator = .LogicalOr }, "||", .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -933,13 +933,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .operator = .PipeRight }, "|>", .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -947,13 +947,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .symbol = .Pipe }, "|", .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -966,13 +966,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .operator = .Cons }, "::", .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -980,13 +980,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .delimiter = .Colon }, ":", .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -995,13 +995,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .delimiter = .Comma }, ",", .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -1018,13 +1018,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .operator = .Expand }, "..", .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -1032,13 +1032,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .delimiter = .Dot }, ".", .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -1047,13 +1047,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .delimiter = .LeftBrace }, "{", .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -1062,13 +1062,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .delimiter = .RightBrace }, "}", .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -1081,13 +1081,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .symbol = .DoubleArrowRight }, "=>", .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -1097,13 +1097,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .operator = .Equality }, "==", .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -1111,13 +1111,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .operator = .Equal }, "=", .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -1126,13 +1126,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .delimiter = .LeftParen }, "(", .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -1141,13 +1141,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .delimiter = .RightParen }, ")", .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -1156,13 +1156,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .delimiter = .LeftBracket }, "[", .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -1171,13 +1171,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .delimiter = .RightBracket }, "]", .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -1209,13 +1209,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .literal = .Int }, lexeme, .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -1231,13 +1231,13 @@ pub const Lexer = struct {
 
                         return Token.init(.{ .symbol = .Underscore }, lexeme, .{
                             .filename = self.loc.filename,
-                            .span = .{
-                                .start = span_start,
-                                .end = self.loc.span.end,
-                            },
                             .src = .{
                                 .line = start_line,
                                 .col = start_col,
+                            },
+                            .span = .{
+                                .start = span_start,
+                                .end = self.loc.span.end,
                             },
                         });
                     }
@@ -1275,26 +1275,26 @@ pub const Lexer = struct {
 
                                 return Token.init(.{ .identifier = .Lower }, lexeme, .{
                                     .filename = self.loc.filename,
-                                    .span = .{
-                                        .start = span_start,
-                                        .end = self.loc.span.end,
-                                    },
                                     .src = .{
                                         .line = start_line,
                                         .col = start_col,
+                                    },
+                                    .span = .{
+                                        .start = span_start,
+                                        .end = self.loc.span.end,
                                     },
                                 });
                             },
                             else => {
                                 return Token.init(.{ .symbol = .Underscore }, "_", .{
                                     .filename = self.loc.filename,
-                                    .span = .{
-                                        .start = span_start,
-                                        .end = self.loc.span.end,
-                                    },
                                     .src = .{
                                         .line = start_line,
                                         .col = start_col,
+                                    },
+                                    .span = .{
+                                        .start = span_start,
+                                        .end = self.loc.span.end,
                                     },
                                 });
                             },
@@ -1303,13 +1303,13 @@ pub const Lexer = struct {
 
                     return Token.init(.{ .symbol = .Underscore }, "_", .{
                         .filename = self.loc.filename,
-                        .span = .{
-                            .start = span_start,
-                            .end = self.loc.span.end,
-                        },
                         .src = .{
                             .line = start_line,
                             .col = start_col,
+                        },
+                        .span = .{
+                            .start = span_start,
+                            .end = self.loc.span.end,
                         },
                     });
                 }
@@ -1359,13 +1359,13 @@ pub const Lexer = struct {
 
                 const end_loc = TokenLoc{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 };
 
@@ -1382,13 +1382,13 @@ pub const Lexer = struct {
 
                 return Token.init(.{ .special = .Unrecognized }, lexeme, .{
                     .filename = self.loc.filename,
-                    .span = .{
-                        .start = span_start,
-                        .end = self.loc.span.end,
-                    },
                     .src = .{
                         .line = start_line,
                         .col = start_col,
+                    },
+                    .span = .{
+                        .start = span_start,
+                        .end = self.loc.span.end,
                     },
                 });
             },
@@ -1479,13 +1479,13 @@ pub const Lexer = struct {
 
             return Token.init(kind, lexeme, .{
                 .filename = self.loc.filename,
-                .span = .{
-                    .start = start,
-                    .end = self.loc.span.end,
-                },
                 .src = .{
                     .line = self.loc.src.line,
                     .col = self.loc.src.col - len,
+                },
+                .span = .{
+                    .start = start,
+                    .end = self.loc.span.end,
                 },
             });
         } else {
@@ -1631,13 +1631,13 @@ pub const Lexer = struct {
 
             return Token.init(.{ .literal = .Float }, lexeme, .{
                 .filename = self.loc.filename,
-                .span = .{
-                    .start = position_start,
-                    .end = self.loc.span.end,
-                },
                 .src = .{
                     .line = self.loc.src.line,
                     .col = start_col,
+                },
+                .span = .{
+                    .start = position_start,
+                    .end = self.loc.span.end,
                 },
             });
         }
@@ -1646,13 +1646,13 @@ pub const Lexer = struct {
 
         return Token.init(.{ .literal = .Int }, lexeme, .{
             .filename = self.loc.filename,
-            .span = .{
-                .start = position_start,
-                .end = self.loc.span.end,
-            },
             .src = .{
                 .line = self.loc.src.line,
                 .col = start_col,
+            },
+            .span = .{
+                .start = position_start,
+                .end = self.loc.span.end,
             },
         });
     }
@@ -1770,168 +1770,168 @@ test "[keyword]" {
             .source = "alias",
             .token = Token.init(.{ .keyword = .Alias }, "alias", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 5 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 5 },
             }),
         },
         .{
             .source = "as",
             .token = Token.init(.{ .keyword = .As }, "as", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "else",
             .token = Token.init(.{ .keyword = .Else }, "else", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 4 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 4 },
             }),
         },
         .{
             .source = "exposing",
             .token = Token.init(.{ .keyword = .Exposing }, "exposing", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 8 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 8 },
             }),
         },
         .{
             .source = "fn",
             .token = Token.init(.{ .keyword = .Fn }, "fn", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "foreign",
             .token = Token.init(.{ .keyword = .Foreign }, "foreign", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 7 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 7 },
             }),
         },
         .{
             .source = "hiding",
             .token = Token.init(.{ .keyword = .Hiding }, "hiding", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 6 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 6 },
             }),
         },
         .{
             .source = "if",
             .token = Token.init(.{ .keyword = .If }, "if", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "include",
             .token = Token.init(.{ .keyword = .Include }, "include", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 7 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 7 },
             }),
         },
         .{
             .source = "infixl",
             .token = Token.init(.{ .keyword = .InfixLeft }, "infixl", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 6 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 6 },
             }),
         },
         .{
             .source = "infixn",
             .token = Token.init(.{ .keyword = .InfixNon }, "infixn", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 6 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 6 },
             }),
         },
         .{
             .source = "infixr",
             .token = Token.init(.{ .keyword = .InfixRight }, "infixr", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 6 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 6 },
             }),
         },
         .{
             .source = "let",
             .token = Token.init(.{ .keyword = .Let }, "let", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 3 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 3 },
             }),
         },
         .{
             .source = "match",
             .token = Token.init(.{ .keyword = .Match }, "match", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 5 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 5 },
             }),
         },
         .{
             .source = "module",
             .token = Token.init(.{ .keyword = .Module }, "module", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 6 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 6 },
             }),
         },
         .{
             .source = "on",
             .token = Token.init(.{ .keyword = .On }, "on", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "open",
             .token = Token.init(.{ .keyword = .Open }, "open", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 4 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 4 },
             }),
         },
         .{
             .source = "then",
             .token = Token.init(.{ .keyword = .Then }, "then", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 4 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 4 },
             }),
         },
         .{
             .source = "type",
             .token = Token.init(.{ .keyword = .Type }, "type", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 4 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 4 },
             }),
         },
         .{
             .source = "using",
             .token = Token.init(.{ .keyword = .Using }, "using", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 5 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 5 },
             }),
         },
         .{
             .source = "when",
             .token = Token.init(.{ .keyword = .When }, "when", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 4 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 4 },
             }),
         },
     };
@@ -1968,72 +1968,72 @@ test "[delimiter]" {
             .source = ":",
             .token = Token.init(.{ .delimiter = .Colon }, ":", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         .{
             .source = ",",
             .token = Token.init(.{ .delimiter = .Comma }, ",", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         .{
             .source = ".",
             .token = Token.init(.{ .delimiter = .Dot }, ".", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         .{
             .source = "[",
             .token = Token.init(.{ .delimiter = .LeftBracket }, "[", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         .{
             .source = "{",
             .token = Token.init(.{ .delimiter = .LeftBrace }, "{", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         .{
             .source = "(",
             .token = Token.init(.{ .delimiter = .LeftParen }, "(", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         .{
             .source = "]",
             .token = Token.init(.{ .delimiter = .RightBracket }, "]", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         .{
             .source = "}",
             .token = Token.init(.{ .delimiter = .RightBrace }, "}", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         .{
             .source = ")",
             .token = Token.init(.{ .delimiter = .RightParen }, ")", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
     };
@@ -2070,32 +2070,32 @@ test "[symbol]" {
             .source = "->",
             .token = Token.init(.{ .symbol = .ArrowRight }, "->", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "=>",
             .token = Token.init(.{ .symbol = .DoubleArrowRight }, "=>", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "|",
             .token = Token.init(.{ .symbol = .Pipe }, "|", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         .{
             .source = "_",
             .token = Token.init(.{ .symbol = .Underscore }, "_", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
     };
@@ -2133,72 +2133,72 @@ test "[operator]" {
             .source = "**",
             .token = Token.init(.{ .operator = .Exp }, "**", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "+.",
             .token = Token.init(.{ .operator = .FloatAdd }, "+.", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "/.",
             .token = Token.init(.{ .operator = .FloatDiv }, "/.", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "*.",
             .token = Token.init(.{ .operator = .FloatMul }, "*.", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "-.",
             .token = Token.init(.{ .operator = .FloatSub }, "-.", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "+",
             .token = Token.init(.{ .operator = .IntAdd }, "+", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         .{
             .source = "/",
             .token = Token.init(.{ .operator = .IntDiv }, "/", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         .{
             .source = "*",
             .token = Token.init(.{ .operator = .IntMul }, "*", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         .{
             .source = "-",
             .token = Token.init(.{ .operator = .IntSub }, "-", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         // Comparision
@@ -2206,48 +2206,48 @@ test "[operator]" {
             .source = "==",
             .token = Token.init(.{ .operator = .Equality }, "==", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = ">",
             .token = Token.init(.{ .operator = .GreaterThan }, ">", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         .{
             .source = ">=",
             .token = Token.init(.{ .operator = .GreaterThanEqual }, ">=", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "<",
             .token = Token.init(.{ .operator = .LessThan }, "<", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         .{
             .source = "<=",
             .token = Token.init(.{ .operator = .LessThanEqual }, "<=", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "/=",
             .token = Token.init(.{ .operator = .NotEqual }, "/=", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         // Logical
@@ -2255,16 +2255,16 @@ test "[operator]" {
             .source = "&&",
             .token = Token.init(.{ .operator = .LogicalAnd }, "&&", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "||",
             .token = Token.init(.{ .operator = .LogicalOr }, "||", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         // Other
@@ -2272,48 +2272,48 @@ test "[operator]" {
             .source = "++",
             .token = Token.init(.{ .operator = .ListConcat }, "++", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "..",
             .token = Token.init(.{ .operator = .Expand }, "..", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "::",
             .token = Token.init(.{ .operator = .Cons }, "::", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "<>",
             .token = Token.init(.{ .operator = .StrConcat }, "<>", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "=",
             .token = Token.init(.{ .operator = .Equal }, "=", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         .{
             .source = "|>",
             .token = Token.init(.{ .operator = .PipeRight }, "|>", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
     };
@@ -2350,8 +2350,8 @@ test "[special]" {
             .source = "?",
             .token = Token.init(.{ .special = .Hole }, "?", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
     };
@@ -2388,40 +2388,40 @@ test "[comment]" {
             .source = "# this is a comment",
             .token = Token.init(.{ .comment = .Regular }, "# this is a comment", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 19 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 19 },
             }),
         },
         .{
             .source = "## this is a doc comment",
             .token = Token.init(.{ .comment = .Doc }, "## this is a doc comment", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 24 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 24 },
             }),
         },
         .{
             .source = "# 你好，世界",
             .token = Token.init(.{ .comment = .Regular }, "# 你好，世界", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 17 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 17 },
             }),
         },
         .{
             .source = "## こんにちは",
             .token = Token.init(.{ .comment = .Doc }, "## こんにちは", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 18 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 18 },
             }),
         },
         .{
             .source = "# 🚀 👽 💣",
             .token = Token.init(.{ .comment = .Regular }, "# 🚀 👽 💣", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 16 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 16 },
             }),
         },
     };
@@ -2458,144 +2458,144 @@ test "[char literal]" {
             .source = "'a'",
             .token = Token.init(.{ .literal = .Char }, "'a'", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 3 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 3 },
             }),
         },
         .{
             .source = "'1'",
             .token = Token.init(.{ .literal = .Char }, "'1'", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 3 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 3 },
             }),
         },
         .{
             .source = "'$'",
             .token = Token.init(.{ .literal = .Char }, "'$'", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 3 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 3 },
             }),
         },
         .{
             .source = "'\\n'",
             .token = Token.init(.{ .literal = .Char }, "'\\n'", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 4 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 4 },
             }),
         },
         .{
             .source = "'\\t'",
             .token = Token.init(.{ .literal = .Char }, "'\\t'", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 4 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 4 },
             }),
         },
         .{
             .source = "'\\r'",
             .token = Token.init(.{ .literal = .Char }, "'\\r'", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 4 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 4 },
             }),
         },
         .{
             .source = "'\\''",
             .token = Token.init(.{ .literal = .Char }, "'\\''", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 4 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 4 },
             }),
         },
         .{
             .source = "'\\\\'",
             .token = Token.init(.{ .literal = .Char }, "'\\\\'", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 4 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 4 },
             }),
         },
         .{
             .source = "'\\u{1}'",
             .token = Token.init(.{ .literal = .Char }, "'\\u{1}'", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 7 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 7 },
             }),
         },
         .{
             .source = "'\\u{10}'",
             .token = Token.init(.{ .literal = .Char }, "'\\u{10}'", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 8 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 8 },
             }),
         },
         .{
             .source = "'\\u{100}'",
             .token = Token.init(.{ .literal = .Char }, "'\\u{100}'", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 9 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 9 },
             }),
         },
         .{
             .source = "'\\u{1000}'",
             .token = Token.init(.{ .literal = .Char }, "'\\u{1000}'", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 10 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 10 },
             }),
         },
         .{
             .source = "'\\u{10000}'",
             .token = Token.init(.{ .literal = .Char }, "'\\u{10000}'", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 11 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 11 },
             }),
         },
         .{
             .source = "'\\u{100000}'",
             .token = Token.init(.{ .literal = .Char }, "'\\u{100000}'", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 12 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 12 },
             }),
         },
         .{
             .source = "'\\u{10FFFF}'",
             .token = Token.init(.{ .literal = .Char }, "'\\u{10FFFF}'", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 12 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 12 },
             }),
         },
         .{
             .source = "'\\u{0000}'",
             .token = Token.init(.{ .literal = .Char }, "'\\u{0000}'", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 10 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 10 },
             }),
         },
         .{
             .source = "'\\u{0020}'",
             .token = Token.init(.{ .literal = .Char }, "'\\u{0020}'", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 10 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 10 },
             }),
         },
         .{
             .source = "'\\u{007F}'",
             .token = Token.init(.{ .literal = .Char }, "'\\u{007F}'", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 10 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 10 },
             }),
         },
     };
@@ -2753,168 +2753,168 @@ test "[string literal]" {
             .source = "\"\"",
             .token = Token.init(.{ .literal = .String }, "\"\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "\"foo\"",
             .token = Token.init(.{ .literal = .String }, "\"foo\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 5 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 5 },
             }),
         },
         .{
             .source = "\"1\"",
             .token = Token.init(.{ .literal = .String }, "\"1\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 3 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 3 },
             }),
         },
         .{
             .source = "\"$\"",
             .token = Token.init(.{ .literal = .String }, "\"$\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 3 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 3 },
             }),
         },
         .{
             .source = "\"Backslash: \\\\\"",
             .token = Token.init(.{ .literal = .String }, "\"Backslash: \\\\\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 15 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 15 },
             }),
         },
         .{
             .source = "\"Double quote: \\\"Hello!\\\"\"",
             .token = Token.init(.{ .literal = .String }, "\"Double quote: \\\"Hello!\\\"\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 26 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 26 },
             }),
         },
         .{
             .source = "\"First line\\nSecond line\"",
             .token = Token.init(.{ .literal = .String }, "\"First line\\nSecond line\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 25 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 25 },
             }),
         },
         .{
             .source = "\"Column1\\tColumn2\\tColumn3\"",
             .token = Token.init(.{ .literal = .String }, "\"Column1\\tColumn2\\tColumn3\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 27 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 27 },
             }),
         },
         .{
             .source = "\"Carriage return\\rOverwritten text\"",
             .token = Token.init(.{ .literal = .String }, "\"Carriage return\\rOverwritten text\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 35 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 35 },
             }),
         },
         .{
             .source = "\"Unicode test: \\u{1}\"",
             .token = Token.init(.{ .literal = .String }, "\"Unicode test: \\u{1}\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 21 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 21 },
             }),
         },
         .{
             .source = "\"Unicode test: \\u{10}\"",
             .token = Token.init(.{ .literal = .String }, "\"Unicode test: \\u{10}\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 22 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 22 },
             }),
         },
         .{
             .source = "\"Unicode test: \\u{100}\"",
             .token = Token.init(.{ .literal = .String }, "\"Unicode test: \\u{100}\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 23 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 23 },
             }),
         },
         .{
             .source = "\"Unicode test: \\u{1000}\"",
             .token = Token.init(.{ .literal = .String }, "\"Unicode test: \\u{1000}\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 24 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 24 },
             }),
         },
         .{
             .source = "\"Unicode test: \\u{10000}\"",
             .token = Token.init(.{ .literal = .String }, "\"Unicode test: \\u{10000}\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 25 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 25 },
             }),
         },
         .{
             .source = "\"Unicode test: \\u{100000}\"",
             .token = Token.init(.{ .literal = .String }, "\"Unicode test: \\u{100000}\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 26 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 26 },
             }),
         },
         .{
             .source = "\"Unicode test: \\u{10FFFF}\"",
             .token = Token.init(.{ .literal = .String }, "\"Unicode test: \\u{10FFFF}\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 26 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 26 },
             }),
         },
         .{
             .source = "\"Unicode test: \\u{0000}\"",
             .token = Token.init(.{ .literal = .String }, "\"Unicode test: \\u{0000}\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 24 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 24 },
             }),
         },
         .{
             .source = "\"Unicode test: \\u{0020}\"",
             .token = Token.init(.{ .literal = .String }, "\"Unicode test: \\u{0020}\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 24 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 24 },
             }),
         },
         .{
             .source = "\"Unicode test: \\u{007F}\"",
             .token = Token.init(.{ .literal = .String }, "\"Unicode test: \\u{007F}\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 24 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 24 },
             }),
         },
         .{
             .source = "\"Unicode with extra: \\u{1234}Hello\"",
             .token = Token.init(.{ .literal = .String }, "\"Unicode with extra: \\u{1234}Hello\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 35 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 35 },
             }),
         },
         .{
             .source = "\"✅\"",
             .token = Token.init(.{ .literal = .String }, "\"✅\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 5 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 5 },
             }),
         },
     };
@@ -3034,8 +3034,8 @@ test "[multiline string literal]" {
             ,
             .token = Token.init(.{ .literal = .MultilineString }, "\"\"\" This is a\nmultiline string with\nunicode: 你好, こんにちは\n\"\"\"", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 72 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 72 },
             }),
         },
     };
@@ -3105,64 +3105,64 @@ test "[integer literal]" {
             .source = "42",
             .token = Token.init(.{ .literal = .Int }, "42", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 2 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 2 },
             }),
         },
         .{
             .source = "42_000_000",
             .token = Token.init(.{ .literal = .Int }, "42_000_000", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 10 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 10 },
             }),
         },
         .{
             .source = "0b101010",
             .token = Token.init(.{ .literal = .Int }, "0b101010", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 8 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 8 },
             }),
         },
         .{
             .source = "0b10_1010",
             .token = Token.init(.{ .literal = .Int }, "0b10_1010", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 9 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 9 },
             }),
         },
         .{
             .source = "0o52",
             .token = Token.init(.{ .literal = .Int }, "0o52", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 4 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 4 },
             }),
         },
         .{
             .source = "0o52_52",
             .token = Token.init(.{ .literal = .Int }, "0o52_52", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 7 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 7 },
             }),
         },
         .{
             .source = "0x2A",
             .token = Token.init(.{ .literal = .Int }, "0x2A", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 4 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 4 },
             }),
         },
         .{
             .source = "0x2A_2A",
             .token = Token.init(.{ .literal = .Int }, "0x2A_2A", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 7 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 7 },
             }),
         },
     };
@@ -3222,48 +3222,48 @@ test "[float literal]" {
             .source = "42.0",
             .token = Token.init(.{ .literal = .Float }, "42.0", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 4 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 4 },
             }),
         },
         .{
             .source = "42_000_000.0",
             .token = Token.init(.{ .literal = .Float }, "42_000_000.0", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 12 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 12 },
             }),
         },
         .{
             .source = "0.5",
             .token = Token.init(.{ .literal = .Float }, "0.5", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 3 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 3 },
             }),
         },
         .{
             .source = "1.23e3",
             .token = Token.init(.{ .literal = .Float }, "1.23e3", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 6 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 6 },
             }),
         },
         .{
             .source = "4.56e-2",
             .token = Token.init(.{ .literal = .Float }, "4.56e-2", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 7 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 7 },
             }),
         },
         .{
             .source = "3.141_592",
             .token = Token.init(.{ .literal = .Float }, "3.141_592", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 9 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 9 },
             }),
         },
     };
@@ -3319,144 +3319,144 @@ test "[identifier]" {
             .source = "Int",
             .token = Token.init(.{ .identifier = .Upper }, "Int", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 3 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 3 },
             }),
         },
         .{
             .source = "Float",
             .token = Token.init(.{ .identifier = .Upper }, "Float", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 5 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 5 },
             }),
         },
         .{
             .source = "Bool",
             .token = Token.init(.{ .identifier = .Upper }, "Bool", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 4 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 4 },
             }),
         },
         .{
             .source = "True",
             .token = Token.init(.{ .identifier = .Upper }, "True", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 4 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 4 },
             }),
         },
         .{
             .source = "False",
             .token = Token.init(.{ .identifier = .Upper }, "False", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 5 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 5 },
             }),
         },
         .{
             .source = "Unit",
             .token = Token.init(.{ .identifier = .Upper }, "Unit", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 4 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 4 },
             }),
         },
         .{
             .source = "foo",
             .token = Token.init(.{ .identifier = .Lower }, "foo", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 3 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 3 },
             }),
         },
         .{
             .source = "foo_bar",
             .token = Token.init(.{ .identifier = .Lower }, "foo_bar", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 7 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 7 },
             }),
         },
         .{
             .source = "_foo",
             .token = Token.init(.{ .identifier = .Lower }, "_foo", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 4 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 4 },
             }),
         },
         .{
             .source = "A",
             .token = Token.init(.{ .identifier = .Upper }, "A", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         .{
             .source = "a",
             .token = Token.init(.{ .identifier = .Lower }, "a", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         .{
             .source = "_",
             .token = Token.init(.{ .symbol = .Underscore }, "_", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 1 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 1 },
             }),
         },
         .{
             .source = "ABC123",
             .token = Token.init(.{ .identifier = .Upper }, "ABC123", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 6 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 6 },
             }),
         },
         .{
             .source = "abc123",
             .token = Token.init(.{ .identifier = .Lower }, "abc123", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 6 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 6 },
             }),
         },
         .{
             .source = "Foo_Bar",
             .token = Token.init(.{ .identifier = .Upper }, "Foo_Bar", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 7 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 7 },
             }),
         },
         .{
             .source = "_foo_BAR_123",
             .token = Token.init(.{ .identifier = .Lower }, "_foo_BAR_123", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 12 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 12 },
             }),
         },
         .{
             .source = "__foo",
             .token = Token.init(.{ .identifier = .Lower }, "__foo", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 5 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 5 },
             }),
         },
         .{
             .source = "foo?",
             .token = Token.init(.{ .identifier = .Lower }, "foo?", .{
                 .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 4 },
                 .src = .{ .line = 1, .col = 1 },
+                .span = .{ .start = 0, .end = 4 },
             }),
         },
     };
@@ -3514,43 +3514,43 @@ test "[type variant]" {
     const expected_tokens = [_]Token{
         Token.init(.{ .keyword = .Type }, "type", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 0, .end = 4 },
             .src = .{ .line = 1, .col = 1 },
+            .span = .{ .start = 0, .end = 4 },
         }),
         Token.init(.{ .identifier = .Upper }, "FooBar", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 5, .end = 11 },
             .src = .{ .line = 1, .col = 6 },
+            .span = .{ .start = 5, .end = 11 },
         }),
         Token.init(.{ .operator = .Equal }, "=", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 12, .end = 13 },
             .src = .{ .line = 1, .col = 13 },
+            .span = .{ .start = 12, .end = 13 },
         }),
         Token.init(.{ .symbol = .Pipe }, "|", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 14, .end = 15 },
             .src = .{ .line = 1, .col = 15 },
+            .span = .{ .start = 14, .end = 15 },
         }),
         Token.init(.{ .identifier = .Upper }, "Foo", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 16, .end = 19 },
             .src = .{ .line = 1, .col = 17 },
+            .span = .{ .start = 16, .end = 19 },
         }),
         Token.init(.{ .symbol = .Pipe }, "|", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 20, .end = 21 },
             .src = .{ .line = 1, .col = 21 },
+            .span = .{ .start = 20, .end = 21 },
         }),
         Token.init(.{ .identifier = .Upper }, "Bar", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 22, .end = 25 },
             .src = .{ .line = 1, .col = 23 },
+            .span = .{ .start = 22, .end = 25 },
         }),
         Token.init(.{ .special = .Eof }, "", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 25, .end = 25 },
             .src = .{ .line = 1, .col = 26 },
+            .span = .{ .start = 25, .end = 25 },
         }),
     };
 
@@ -3582,33 +3582,33 @@ test "[type alias]" {
     const expected_tokens = [_]Token{
         Token.init(.{ .keyword = .Type }, "type", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 0, .end = 4 },
             .src = .{ .line = 1, .col = 1 },
+            .span = .{ .start = 0, .end = 4 },
         }),
         Token.init(.{ .keyword = .Alias }, "alias", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 5, .end = 10 },
             .src = .{ .line = 1, .col = 6 },
+            .span = .{ .start = 5, .end = 10 },
         }),
         Token.init(.{ .identifier = .Upper }, "Seconds", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 11, .end = 18 },
             .src = .{ .line = 1, .col = 12 },
+            .span = .{ .start = 11, .end = 18 },
         }),
         Token.init(.{ .operator = .Equal }, "=", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 19, .end = 20 },
             .src = .{ .line = 1, .col = 20 },
+            .span = .{ .start = 19, .end = 20 },
         }),
         Token.init(.{ .identifier = .Upper }, "Int", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 21, .end = 24 },
             .src = .{ .line = 1, .col = 22 },
+            .span = .{ .start = 21, .end = 24 },
         }),
         Token.init(.{ .special = .Eof }, "", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 24, .end = 24 },
             .src = .{ .line = 1, .col = 25 },
+            .span = .{ .start = 24, .end = 24 },
         }),
     };
 
@@ -3640,68 +3640,68 @@ test "[record type]" {
     const expected_tokens = [_]Token{
         Token.init(.{ .keyword = .Type }, "type", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 0, .end = 4 },
             .src = .{ .line = 1, .col = 1 },
+            .span = .{ .start = 0, .end = 4 },
         }),
         Token.init(.{ .identifier = .Upper }, "FooBar", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 5, .end = 11 },
             .src = .{ .line = 1, .col = 6 },
+            .span = .{ .start = 5, .end = 11 },
         }),
         Token.init(.{ .operator = .Equal }, "=", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 12, .end = 13 },
             .src = .{ .line = 1, .col = 13 },
+            .span = .{ .start = 12, .end = 13 },
         }),
         Token.init(.{ .delimiter = .LeftBrace }, "{", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 14, .end = 15 },
             .src = .{ .line = 1, .col = 15 },
+            .span = .{ .start = 14, .end = 15 },
         }),
         Token.init(.{ .identifier = .Lower }, "foo", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 16, .end = 19 },
             .src = .{ .line = 1, .col = 17 },
+            .span = .{ .start = 16, .end = 19 },
         }),
         Token.init(.{ .delimiter = .Colon }, ":", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 20, .end = 21 },
             .src = .{ .line = 1, .col = 21 },
+            .span = .{ .start = 20, .end = 21 },
         }),
         Token.init(.{ .identifier = .Upper }, "Int", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 22, .end = 25 },
             .src = .{ .line = 1, .col = 23 },
+            .span = .{ .start = 22, .end = 25 },
         }),
         Token.init(.{ .delimiter = .Comma }, ",", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 25, .end = 26 },
             .src = .{ .line = 1, .col = 26 },
+            .span = .{ .start = 25, .end = 26 },
         }),
         Token.init(.{ .identifier = .Lower }, "bar", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 27, .end = 30 },
             .src = .{ .line = 1, .col = 28 },
+            .span = .{ .start = 27, .end = 30 },
         }),
         Token.init(.{ .delimiter = .Colon }, ":", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 31, .end = 32 },
             .src = .{ .line = 1, .col = 32 },
+            .span = .{ .start = 31, .end = 32 },
         }),
         Token.init(.{ .identifier = .Upper }, "String", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 33, .end = 39 },
             .src = .{ .line = 1, .col = 34 },
+            .span = .{ .start = 33, .end = 39 },
         }),
         Token.init(.{ .delimiter = .RightBrace }, "}", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 40, .end = 41 },
             .src = .{ .line = 1, .col = 41 },
+            .span = .{ .start = 40, .end = 41 },
         }),
         Token.init(.{ .special = .Eof }, "", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 41, .end = 41 },
             .src = .{ .line = 1, .col = 42 },
+            .span = .{ .start = 41, .end = 41 },
         }),
     };
 
@@ -3733,63 +3733,63 @@ test "[module declaration]" {
     const expected_tokens = [_]Token{
         Token.init(.{ .keyword = .Module }, "module", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 0, .end = 6 },
             .src = .{ .line = 1, .col = 1 },
+            .span = .{ .start = 0, .end = 6 },
         }),
         Token.init(.{ .identifier = .Upper }, "Foo", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 7, .end = 10 },
             .src = .{ .line = 1, .col = 8 },
+            .span = .{ .start = 7, .end = 10 },
         }),
         Token.init(.{ .keyword = .Exposing }, "exposing", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 11, .end = 19 },
             .src = .{ .line = 1, .col = 12 },
+            .span = .{ .start = 11, .end = 19 },
         }),
         Token.init(.{ .delimiter = .LeftParen }, "(", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 20, .end = 21 },
             .src = .{ .line = 1, .col = 21 },
+            .span = .{ .start = 20, .end = 21 },
         }),
         Token.init(.{ .identifier = .Upper }, "Foo", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 21, .end = 24 },
             .src = .{ .line = 1, .col = 22 },
+            .span = .{ .start = 21, .end = 24 },
         }),
         Token.init(.{ .delimiter = .LeftParen }, "(", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 24, .end = 25 },
             .src = .{ .line = 1, .col = 25 },
+            .span = .{ .start = 24, .end = 25 },
         }),
         Token.init(.{ .operator = .Expand }, "..", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 25, .end = 27 },
             .src = .{ .line = 1, .col = 26 },
+            .span = .{ .start = 25, .end = 27 },
         }),
         Token.init(.{ .delimiter = .RightParen }, ")", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 27, .end = 28 },
             .src = .{ .line = 1, .col = 28 },
+            .span = .{ .start = 27, .end = 28 },
         }),
         Token.init(.{ .delimiter = .Comma }, ",", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 28, .end = 29 },
             .src = .{ .line = 1, .col = 29 },
+            .span = .{ .start = 28, .end = 29 },
         }),
         Token.init(.{ .identifier = .Lower }, "bar", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 30, .end = 33 },
             .src = .{ .line = 1, .col = 31 },
+            .span = .{ .start = 30, .end = 33 },
         }),
         Token.init(.{ .delimiter = .RightParen }, ")", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 33, .end = 34 },
             .src = .{ .line = 1, .col = 34 },
+            .span = .{ .start = 33, .end = 34 },
         }),
         Token.init(.{ .special = .Eof }, "", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 34, .end = 34 },
             .src = .{ .line = 1, .col = 35 },
+            .span = .{ .start = 34, .end = 34 },
         }),
     };
 
@@ -3821,93 +3821,93 @@ test "[top level function definition]" {
     const expected_tokens = [_]Token{
         Token.init(.{ .keyword = .Let }, "let", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 0, .end = 3 },
             .src = .{ .line = 1, .col = 1 },
+            .span = .{ .start = 0, .end = 3 },
         }),
         Token.init(.{ .identifier = .Lower }, "add", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 4, .end = 7 },
             .src = .{ .line = 1, .col = 5 },
+            .span = .{ .start = 4, .end = 7 },
         }),
         Token.init(.{ .delimiter = .LeftParen }, "(", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 7, .end = 8 },
             .src = .{ .line = 1, .col = 8 },
+            .span = .{ .start = 7, .end = 8 },
         }),
         Token.init(.{ .identifier = .Lower }, "x", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 8, .end = 9 },
             .src = .{ .line = 1, .col = 9 },
+            .span = .{ .start = 8, .end = 9 },
         }),
         Token.init(.{ .delimiter = .Colon }, ":", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 10, .end = 11 },
             .src = .{ .line = 1, .col = 11 },
+            .span = .{ .start = 10, .end = 11 },
         }),
         Token.init(.{ .identifier = .Upper }, "Int", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 12, .end = 15 },
             .src = .{ .line = 1, .col = 13 },
+            .span = .{ .start = 12, .end = 15 },
         }),
         Token.init(.{ .delimiter = .Comma }, ",", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 15, .end = 16 },
             .src = .{ .line = 1, .col = 16 },
+            .span = .{ .start = 15, .end = 16 },
         }),
         Token.init(.{ .identifier = .Lower }, "y", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 17, .end = 18 },
             .src = .{ .line = 1, .col = 18 },
+            .span = .{ .start = 17, .end = 18 },
         }),
         Token.init(.{ .delimiter = .Colon }, ":", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 19, .end = 20 },
             .src = .{ .line = 1, .col = 20 },
+            .span = .{ .start = 19, .end = 20 },
         }),
         Token.init(.{ .identifier = .Upper }, "Int", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 21, .end = 24 },
             .src = .{ .line = 1, .col = 22 },
+            .span = .{ .start = 21, .end = 24 },
         }),
         Token.init(.{ .delimiter = .RightParen }, ")", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 24, .end = 25 },
             .src = .{ .line = 1, .col = 25 },
+            .span = .{ .start = 24, .end = 25 },
         }),
         Token.init(.{ .symbol = .ArrowRight }, "->", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 26, .end = 28 },
             .src = .{ .line = 1, .col = 27 },
+            .span = .{ .start = 26, .end = 28 },
         }),
         Token.init(.{ .identifier = .Upper }, "Int", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 29, .end = 32 },
             .src = .{ .line = 1, .col = 30 },
+            .span = .{ .start = 29, .end = 32 },
         }),
         Token.init(.{ .operator = .Equal }, "=", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 33, .end = 34 },
             .src = .{ .line = 1, .col = 34 },
+            .span = .{ .start = 33, .end = 34 },
         }),
         Token.init(.{ .identifier = .Lower }, "x", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 35, .end = 36 },
             .src = .{ .line = 1, .col = 36 },
+            .span = .{ .start = 35, .end = 36 },
         }),
         Token.init(.{ .operator = .IntAdd }, "+", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 37, .end = 38 },
             .src = .{ .line = 1, .col = 38 },
+            .span = .{ .start = 37, .end = 38 },
         }),
         Token.init(.{ .identifier = .Lower }, "y", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 39, .end = 40 },
             .src = .{ .line = 1, .col = 40 },
+            .span = .{ .start = 39, .end = 40 },
         }),
         Token.init(.{ .special = .Eof }, "", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 40, .end = 40 },
             .src = .{ .line = 1, .col = 41 },
+            .span = .{ .start = 40, .end = 40 },
         }),
     };
 
@@ -3939,78 +3939,78 @@ test "[pattern matching]" {
     const expected_tokens = [_]Token{
         Token.init(.{ .keyword = .Match }, "match", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 0, .end = 5 },
             .src = .{ .line = 1, .col = 1 },
+            .span = .{ .start = 0, .end = 5 },
         }),
         Token.init(.{ .identifier = .Lower }, "x", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 6, .end = 7 },
             .src = .{ .line = 1, .col = 7 },
+            .span = .{ .start = 6, .end = 7 },
         }),
         Token.init(.{ .keyword = .On }, "on", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 8, .end = 10 },
             .src = .{ .line = 1, .col = 9 },
+            .span = .{ .start = 8, .end = 10 },
         }),
         Token.init(.{ .symbol = .Pipe }, "|", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 11, .end = 12 },
             .src = .{ .line = 1, .col = 12 },
+            .span = .{ .start = 11, .end = 12 },
         }),
         Token.init(.{ .identifier = .Upper }, "Foo", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 13, .end = 16 },
             .src = .{ .line = 1, .col = 14 },
+            .span = .{ .start = 13, .end = 16 },
         }),
         Token.init(.{ .symbol = .DoubleArrowRight }, "=>", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 17, .end = 19 },
             .src = .{ .line = 1, .col = 18 },
+            .span = .{ .start = 17, .end = 19 },
         }),
         Token.init(.{ .literal = .Int }, "1", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 20, .end = 21 },
             .src = .{ .line = 1, .col = 21 },
+            .span = .{ .start = 20, .end = 21 },
         }),
         Token.init(.{ .symbol = .Pipe }, "|", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 22, .end = 23 },
             .src = .{ .line = 1, .col = 23 },
+            .span = .{ .start = 22, .end = 23 },
         }),
         Token.init(.{ .identifier = .Upper }, "Bar", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 24, .end = 27 },
             .src = .{ .line = 1, .col = 25 },
+            .span = .{ .start = 24, .end = 27 },
         }),
         Token.init(.{ .symbol = .DoubleArrowRight }, "=>", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 28, .end = 30 },
             .src = .{ .line = 1, .col = 29 },
+            .span = .{ .start = 28, .end = 30 },
         }),
         Token.init(.{ .literal = .Int }, "2", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 31, .end = 32 },
             .src = .{ .line = 1, .col = 32 },
+            .span = .{ .start = 31, .end = 32 },
         }),
         Token.init(.{ .symbol = .Underscore }, "_", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 33, .end = 34 },
             .src = .{ .line = 1, .col = 34 },
+            .span = .{ .start = 33, .end = 34 },
         }),
         Token.init(.{ .symbol = .DoubleArrowRight }, "=>", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 35, .end = 37 },
             .src = .{ .line = 1, .col = 36 },
+            .span = .{ .start = 35, .end = 37 },
         }),
         Token.init(.{ .literal = .Int }, "3", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 38, .end = 39 },
             .src = .{ .line = 1, .col = 39 },
+            .span = .{ .start = 38, .end = 39 },
         }),
         Token.init(.{ .special = .Eof }, "", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 39, .end = 39 },
             .src = .{ .line = 1, .col = 40 },
+            .span = .{ .start = 39, .end = 39 },
         }),
     };
 
@@ -4042,38 +4042,38 @@ test "[let block]" {
     const expected_tokens = [_]Token{
         Token.init(.{ .keyword = .Let }, "let", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 0, .end = 3 },
             .src = .{ .line = 1, .col = 1 },
+            .span = .{ .start = 0, .end = 3 },
         }),
         Token.init(.{ .identifier = .Lower }, "x", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 4, .end = 5 },
             .src = .{ .line = 1, .col = 5 },
+            .span = .{ .start = 4, .end = 5 },
         }),
         Token.init(.{ .delimiter = .Colon }, ":", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 6, .end = 7 },
             .src = .{ .line = 1, .col = 7 },
+            .span = .{ .start = 6, .end = 7 },
         }),
         Token.init(.{ .identifier = .Upper }, "Int", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 8, .end = 11 },
             .src = .{ .line = 1, .col = 9 },
+            .span = .{ .start = 8, .end = 11 },
         }),
         Token.init(.{ .operator = .Equal }, "=", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 12, .end = 13 },
             .src = .{ .line = 1, .col = 13 },
+            .span = .{ .start = 12, .end = 13 },
         }),
         Token.init(.{ .literal = .Int }, "42", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 14, .end = 16 },
             .src = .{ .line = 1, .col = 15 },
+            .span = .{ .start = 14, .end = 16 },
         }),
         Token.init(.{ .special = .Eof }, "", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 16, .end = 16 },
             .src = .{ .line = 1, .col = 17 },
+            .span = .{ .start = 16, .end = 16 },
         }),
     };
 
@@ -4104,48 +4104,48 @@ test "[if_then_else statement]" {
     const expected_tokens = [_]Token{
         Token.init(.{ .keyword = .If }, "if", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 0, .end = 2 },
             .src = .{ .line = 1, .col = 1 },
+            .span = .{ .start = 0, .end = 2 },
         }),
         Token.init(.{ .identifier = .Lower }, "x", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 3, .end = 4 },
             .src = .{ .line = 1, .col = 4 },
+            .span = .{ .start = 3, .end = 4 },
         }),
         Token.init(.{ .operator = .Equality }, "==", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 5, .end = 7 },
             .src = .{ .line = 1, .col = 6 },
+            .span = .{ .start = 5, .end = 7 },
         }),
         Token.init(.{ .literal = .Int }, "1", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 8, .end = 9 },
             .src = .{ .line = 1, .col = 9 },
+            .span = .{ .start = 8, .end = 9 },
         }),
         Token.init(.{ .keyword = .Then }, "then", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 10, .end = 14 },
             .src = .{ .line = 1, .col = 11 },
+            .span = .{ .start = 10, .end = 14 },
         }),
         Token.init(.{ .identifier = .Upper }, "True", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 15, .end = 19 },
             .src = .{ .line = 1, .col = 16 },
+            .span = .{ .start = 15, .end = 19 },
         }),
         Token.init(.{ .keyword = .Else }, "else", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 20, .end = 24 },
             .src = .{ .line = 1, .col = 21 },
+            .span = .{ .start = 20, .end = 24 },
         }),
         Token.init(.{ .identifier = .Upper }, "False", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 25, .end = 30 },
             .src = .{ .line = 1, .col = 26 },
+            .span = .{ .start = 25, .end = 30 },
         }),
         Token.init(.{ .special = .Eof }, "", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 30, .end = 30 },
             .src = .{ .line = 1, .col = 31 },
+            .span = .{ .start = 30, .end = 30 },
         }),
     };
 

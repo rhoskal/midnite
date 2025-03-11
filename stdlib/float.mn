@@ -47,10 +47,10 @@ type alias Radians =
 type alias Degrees =
     Float
 
-foreign float_sqrt(x : Float) -> Float =
+foreign float_sqrt(_ : Float) -> Float =
     "zig_float_sqrt"
 
-foreign float_log(x : Float, y : Float) -> Float =
+foreign float_log(_ : Float, _ : Float) -> Float =
     "zig_float_log"
 
 foreign float_e() -> Float =
@@ -59,70 +59,70 @@ foreign float_e() -> Float =
 foreign float_pi() -> Float =
     "zig_float_pi"
 
-foreign float_cos(x : Float) -> Float =
+foreign float_cos(_ : Float) -> Float =
     "zig_float_cos"
 
-foreign float_sin(x : Float) -> Float =
+foreign float_sin(_ : Float) -> Float =
     "zig_float_sin"
 
-foreign float_tan(x : Float) -> Float =
+foreign float_tan(_ : Float) -> Float =
     "zig_float_tan"
 
-foreign float_acos(x : Float) -> Float =
+foreign float_acos(_ : Float) -> Float =
     "zig_float_acos"
 
-foreign float_asin(x : Float) -> Float =
+foreign float_asin(_ : Float) -> Float =
     "zig_float_asin"
 
-foreign float_atan(x : Float) -> Float =
+foreign float_atan(_ : Float) -> Float =
     "zig_float_atan"
 
-foreign float_atan2(x : Float, y : Float) -> Float =
+foreign float_atan2(_ : Float, _ : Float) -> Float =
     "zig_float_atan2"
 
-foreign float_trunc(x : Float) -> Int =
+foreign float_trunc(_ : Float) -> Int =
     "zig_float_trunc"
 
-foreign float_ceil(x : Float) -> Int =
+foreign float_ceil(_ : Float) -> Int =
     "zig_float_ceil"
 
-foreign float_floor(x : Float) -> Int =
+foreign float_floor(_ : Float) -> Int =
     "zig_float_floor"
 
-foreign float_round(x : Float) -> Int =
+foreign float_round(_ : Float) -> Int =
     "zig_float_round"
 
-foreign float_cosh(x : Float) -> Float =
+foreign float_cosh(_ : Float) -> Float =
     "zig_float_cosh"
 
-foreign float_sinh(x : Float) -> Float =
+foreign float_sinh(_ : Float) -> Float =
     "zig_float_sinh"
 
-foreign float_tanh(x : Float) -> Float =
+foreign float_tanh(_ : Float) -> Float =
     "zig_float_tanh"
 
-foreign float_sech(x : Float) -> Float =
+foreign float_sech(_ : Float) -> Float =
     "zig_float_sech"
 
-foreign float_cosech(x : Float) -> Float =
+foreign float_cosech(_ : Float) -> Float =
     "zig_float_cosech"
 
-foreign float_acosh(x : Float) -> Float =
+foreign float_acosh(_ : Float) -> Float =
     "zig_float_acosh"
 
-foreign float_asinh(x : Float) -> Float =
+foreign float_asinh(_ : Float) -> Float =
     "zig_float_asinh"
 
-foreign float_atanh(x : Float) -> Float =
+foreign float_atanh(_ : Float) -> Float =
     "zig_float_atanh"
 
-foreign float_acoth(x : Float) -> Float =
+foreign float_acoth(_ : Float) -> Float =
     "zig_float_acoth"
 
-foreign float_asech(x : Float) -> Float =
+foreign float_asech(_ : Float) -> Float =
     "zig_float_asech"
 
-foreign float_acosech(x : Float) -> Float =
+foreign float_acosech(_ : Float) -> Float =
     "zig_float_acosech"
 
 foreign float_min() -> Float =
@@ -131,7 +131,7 @@ foreign float_min() -> Float =
 foreign float_max() -> Float =
     "zig_float_max"
 
-foreign float_from_int(x : Int) -> Float =
+foreign float_from_int(_ : Int) -> Float =
     "zig_float_from_int"
 
 ## Get the absolute value of a number.
@@ -467,4 +467,3 @@ let max() -> Float =
 ##
 let min() -> Float =
     float_min()
-
