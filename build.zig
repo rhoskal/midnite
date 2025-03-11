@@ -29,4 +29,23 @@ pub fn build(b: *std.Build) void {
 
     const run_step = b.step("run", "Run the compiler");
     run_step.dependOn(&run_exe.step);
+
+    const test_step = b.step("test", "Run compiler/frontend tests");
+
+    const frontend_test_files = [_][]const u8{
+        "compiler/frontend/ast.zig",
+        "compiler/frontend/lexer.zig",
+        "compiler/frontend/parser.zig",
+    };
+
+    for (frontend_test_files) |file| {
+        const test_file = b.addTest(.{
+            .root_source_file = b.path(file),
+            .target = target,
+            .optimize = optimize,
+        });
+
+        test_file.root_module.addImport("compiler", compiler_module);
+        test_step.dependOn(&test_file.step);
+    }
 }
