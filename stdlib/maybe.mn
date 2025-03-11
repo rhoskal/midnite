@@ -115,7 +115,7 @@ let satisfy?(ma : Maybe(a), predicate : (a -> Bool)) -> Bool =
 ## ➢ Maybe.map(Some(21), fn(x) => x * 2)
 ## Some(42) : Maybe(Int)
 ## ```
-let map(Maybe(a), (a -> value)) -> Maybe(value) =
+let map(ma : Maybe(a), f : (a -> value)) -> Maybe(value) =
     match ma on
     | None => None
     | Some(a) => Some(f(a))
@@ -200,7 +200,7 @@ let map4(
 ## ➢ Maybe.flatten(Some(Some(42)))
 ## Some(42) : Maybe(Int)
 ## ```
-let flatten(mma : Maybe(Maybe(a)) -> Maybe(a) =
+let flatten(mma : Maybe(Maybe(a))) -> Maybe(a) =
     match mma on
     | None => None
     | Some(ma) => ma

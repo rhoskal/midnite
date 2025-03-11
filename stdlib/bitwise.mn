@@ -12,37 +12,37 @@ module Bitwise exposing
     , xor
     )
 
-foreign bitwise_and(x : Int, y : Int) -> Int =
+foreign bitwise_and(_ : Int, _ : Int) -> Int =
     "zig_bitwise_and"
 
-foreign bitwise_or(x : Int, y : Int) -> Int =
+foreign bitwise_or(_ : Int, _ : Int) -> Int =
     "zig_bitwise_or"
 
-foreign bitwise_not(x : Int) -> Int =
+foreign bitwise_not(_ : Int) -> Int =
     "zig_bitwise_not"
 
-foreign bitwise_xor(x : Int, y : Int) -> Int =
+foreign bitwise_xor(_ : Int, _ : Int) -> Int =
     "zig_bitwise_xor"
 
-foreign bitwise_shl(x : Int, y : Int) -> Int =
+foreign bitwise_shl(_ : Int, _ : Int) -> Int =
     "zig_bitwise_shl"
 
-foreign bitwise_shr(x : Int, y : Int) -> Int =
+foreign bitwise_shr(_ : Int, _ : Int) -> Int =
     "zig_bitwise_shr"
 
-foreign bitwise_lshr(x : Int, y : Int) -> Int =
+foreign bitwise_lshr(_ : Int, _ : Int) -> Int =
     "zig_bitwise_lshr"
 
-foreign bitwise_rotl(x : Int, y : Int) -> Int =
+foreign bitwise_rotl(_ : Int, _ : Int) -> Int =
     "zig_bitwise_rotl"
 
-foreign bitwise_rotr(x : Int, y : Int) -> Int =
+foreign bitwise_rotr(_ : Int, _ : Int) -> Int =
     "zig_bitwise_rotr"
 
-foreign bitwise_hw(x : Int) -> Int =
+foreign bitwise_hw(_ : Int) -> Int =
     "zig_bitwise_hamming_weight"
 
-foreign bitwise_dist(x : Int, y : Int) -> Int =
+foreign bitwise_dist(_ : Int, _ : Int) -> Int =
     "zig_bitwise_distance"
 
 ## Performs a bitwise AND operation between two integers.
@@ -183,4 +183,3 @@ let hamming_weight(x : Int) -> Int =
 ## ```
 let distance(x : Int, y : Int) -> Int =
     bitwise_dist(x, y)
-

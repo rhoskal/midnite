@@ -379,7 +379,6 @@ let trim_right(str : String) -> String =
 ## ➢ String.pad("foobar", 10, '_')
 ## "__foobar__" : String
 ## ```
-let pad : Int -> Char -> String -> String =
 let pad(str : String, n : Int, char : Char) -> String =
     todo("not implemented")
 

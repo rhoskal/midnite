@@ -128,7 +128,7 @@ let from_maybe(ma : Maybe(a), err : e) -> Result(e, a) =
 ## ➢ Result.compact([Ok(1), Ok(2)])
 ## [1, 2] : List(Int)
 ## ```
-let compact(results : List(Result(e, a)) -> List(a) =
+let compact(results : List(Result(e, a))) -> List(a) =
     List.collect_map(results, identity)
 
 ## Combine a list of results into a single result (holding a list).
