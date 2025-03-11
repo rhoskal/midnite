@@ -839,7 +839,7 @@ pub const Formatter = struct {
                 try self.formatNode(&.{ .export_spec = decl.exports });
                 try self.write("\n");
 
-                self.indent_level += 1;
+                // self.indent_level += 1;
 
                 for (decl.declarations.items, 0..) |declaration, i| {
                     try self.writeIndent();
@@ -852,9 +852,9 @@ pub const Formatter = struct {
                     }
                 }
 
-                self.indent_level -= 1;
+                // self.indent_level -= 1;
 
-                try self.write("end");
+                // try self.write("end");
             },
             .program => |prog| {
                 for (prog.statements.items) |stmt| {

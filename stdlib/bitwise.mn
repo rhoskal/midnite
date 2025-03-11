@@ -12,175 +12,175 @@ module Bitwise exposing
     , xor
     )
 
-    foreign bitwise_and(x : Int, y : Int) -> Int =
-        "zig_bitwise_and"
+foreign bitwise_and(x : Int, y : Int) -> Int =
+    "zig_bitwise_and"
 
-    foreign bitwise_or(x : Int, y : Int) -> Int =
-        "zig_bitwise_or"
+foreign bitwise_or(x : Int, y : Int) -> Int =
+    "zig_bitwise_or"
 
-    foreign bitwise_not(x : Int) -> Int =
-        "zig_bitwise_not"
+foreign bitwise_not(x : Int) -> Int =
+    "zig_bitwise_not"
 
-    foreign bitwise_xor(x : Int, y : Int) -> Int =
-        "zig_bitwise_xor"
+foreign bitwise_xor(x : Int, y : Int) -> Int =
+    "zig_bitwise_xor"
 
-    foreign bitwise_shl(x : Int, y : Int) -> Int =
-        "zig_bitwise_shl"
+foreign bitwise_shl(x : Int, y : Int) -> Int =
+    "zig_bitwise_shl"
 
-    foreign bitwise_shr(x : Int, y : Int) -> Int =
-        "zig_bitwise_shr"
+foreign bitwise_shr(x : Int, y : Int) -> Int =
+    "zig_bitwise_shr"
 
-    foreign bitwise_lshr(x : Int, y : Int) -> Int =
-        "zig_bitwise_lshr"
+foreign bitwise_lshr(x : Int, y : Int) -> Int =
+    "zig_bitwise_lshr"
 
-    foreign bitwise_rotl(x : Int, y : Int) -> Int =
-        "zig_bitwise_rotl"
+foreign bitwise_rotl(x : Int, y : Int) -> Int =
+    "zig_bitwise_rotl"
 
-    foreign bitwise_rotr(x : Int, y : Int) -> Int =
-        "zig_bitwise_rotr"
+foreign bitwise_rotr(x : Int, y : Int) -> Int =
+    "zig_bitwise_rotr"
 
-    foreign bitwise_hw(x : Int) -> Int =
-        "zig_bitwise_hamming_weight"
+foreign bitwise_hw(x : Int) -> Int =
+    "zig_bitwise_hamming_weight"
 
-    foreign bitwise_dist(x : Int, y : Int) -> Int =
-        "zig_bitwise_distance"
+foreign bitwise_dist(x : Int, y : Int) -> Int =
+    "zig_bitwise_distance"
 
-    ## Performs a bitwise AND operation between two integers.
-    ## Each bit in the result is 1 only if the corresponding
-    ## bits in both operands are 1.
-    ##
-    ## @since 0.1.0
-    ##
-    ## ```
-    ## ➢ Bitwise.and(9, 3)
-    ## 1 : Int
-    ## ```
-    let and(x : Int, y : Int) -> Int =
-        bitwise_and(x, y)
+## Performs a bitwise AND operation between two integers.
+## Each bit in the result is 1 only if the corresponding
+## bits in both operands are 1.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Bitwise.and(9, 3)
+## 1 : Int
+## ```
+let and(x : Int, y : Int) -> Int =
+    bitwise_and(x, y)
 
-    ## Performs a bitwise OR operation between two integers.
-    ## Each bit in the result is 1 if at least one of the corresponding
-    ## bits in either operand is 1.
-    ##
-    ## @since 0.1.0
-    ##
-    ## ```
-    ## ➢ Bitwise.or(9, 3)
-    ## 11 : Int
-    ## ```
-    let or(x : Int, y : Int) -> Int =
-        bitwise_or(x, y)
+## Performs a bitwise OR operation between two integers.
+## Each bit in the result is 1 if at least one of the corresponding
+## bits in either operand is 1.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Bitwise.or(9, 3)
+## 11 : Int
+## ```
+let or(x : Int, y : Int) -> Int =
+    bitwise_or(x, y)
 
-    ## Performs a bitwise NOT operation on an integer, inverting all bits.
-    ## Each 0 becomes 1 and each 1 becomes 0 in the binary representation.
-    ##
-    ## @since 0.1.0
-    ##
-    ## ```
-    ## ➢ Bitwise.not(2)
-    ## -3 : Int
-    ## ```
-    let not(x : Int) -> Int =
-        bitwise_not(x)
+## Performs a bitwise NOT operation on an integer, inverting all bits.
+## Each 0 becomes 1 and each 1 becomes 0 in the binary representation.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Bitwise.not(2)
+## -3 : Int
+## ```
+let not(x : Int) -> Int =
+    bitwise_not(x)
 
-    ## Performs a bitwise XOR (exclusive OR) operation between two integers.
-    ## Each bit in the result is 1 only if the corresponding bits in the
-    ## operands are different.
-    ##
-    ## @since 0.1.0
-    ##
-    ## ```
-    ## ➢ Bitwise.xor(9, 3)
-    ## 10 : Int
-    ## ```
-    let xor(x : Int, y : Int) -> Int =
-        bitwise_xor(x, y)
+## Performs a bitwise XOR (exclusive OR) operation between two integers.
+## Each bit in the result is 1 only if the corresponding bits in the
+## operands are different.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Bitwise.xor(9, 3)
+## 10 : Int
+## ```
+let xor(x : Int, y : Int) -> Int =
+    bitwise_xor(x, y)
 
-    ## Shifts all bits in the first integer to the left by the number of
-    ## positions specified by the second integer. New bits are filled with zeros.
-    ##
-    ## @since 0.1.0
-    ##
-    ## ```
-    ## ➢ Bitwise.shift_left(1, 2)
-    ## 4 : Int
-    ## ```
-    let shift_left(x : Int, y : Int) -> Int =
-        bitwise_shl(x, y)
+## Shifts all bits in the first integer to the left by the number of
+## positions specified by the second integer. New bits are filled with zeros.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Bitwise.shift_left(1, 2)
+## 4 : Int
+## ```
+let shift_left(x : Int, y : Int) -> Int =
+    bitwise_shl(x, y)
 
-    ## Performs an arithmetic right shift, preserving the sign bit. All
-    ## bits are shifted right by the specified number of positions, with
-    ## the sign bit being copied into the newly vacated bit positions.
-    ##
-    ## @since 0.1.0
-    ##
-    ## ```
-    ## ➢ Bitwise.shift_right(1, 2)
-    ## 0 : Int
-    ## ```
-    let shift_right(x : Int, y : Int) -> Int =
-        bitwise_shr(x, y)
+## Performs an arithmetic right shift, preserving the sign bit. All
+## bits are shifted right by the specified number of positions, with
+## the sign bit being copied into the newly vacated bit positions.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Bitwise.shift_right(1, 2)
+## 0 : Int
+## ```
+let shift_right(x : Int, y : Int) -> Int =
+    bitwise_shr(x, y)
 
-    ## Performs a logical right shift, filling new bits with zeros
-    ## regardless of the sign bit. This differs from `shift_right` in how
-    ## it handles negative numbers.
-    ##
-    ## @since 0.1.0
-    ##
-    ## ```
-    ## ➢ Bitwise.logical_shift_right(1, 32)
-    ## 16 : Int
-    ## ```
-    let logical_shift_right(x : Int, y : Int) -> Int =
-        bitwise_lshr(x, y)
+## Performs a logical right shift, filling new bits with zeros
+## regardless of the sign bit. This differs from `shift_right` in how
+## it handles negative numbers.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Bitwise.logical_shift_right(1, 32)
+## 16 : Int
+## ```
+let logical_shift_right(x : Int, y : Int) -> Int =
+    bitwise_lshr(x, y)
 
-    ## Rotates all bits to the left by the specified number of positions.
-    ## Unlike shifting, bits that would be shifted out are wrapped around
-    ## to the rightmost positions.
-    ##
-    ## @since 0.1.0
-    ##
-    ## ```
-    ## ➢ Bitwise.rotate_left(11, 2)
-    ## 14 : Int
-    ## ```
-    let rotate_left(x : Int, y : Int) -> Int =
-        bitwise_rotl(x, y)
+## Rotates all bits to the left by the specified number of positions.
+## Unlike shifting, bits that would be shifted out are wrapped around
+## to the rightmost positions.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Bitwise.rotate_left(11, 2)
+## 14 : Int
+## ```
+let rotate_left(x : Int, y : Int) -> Int =
+    bitwise_rotl(x, y)
 
-    ## Rotates all bits to the right by the specified number of positions.
-    ## Unlike shifting, bits that would be shifted out are wrapped around
-    ## to the leftmost positions.
-    ##
-    ## @since 0.1.0
-    ##
-    ## ```
-    ## ➢ Bitwise.rotate_right(11, 2)
-    ## 14 : Int
-    ## ```
-    let rotate_right(x : Int, y : Int) -> Int =
-        bitwise_rotr(x, y)
+## Rotates all bits to the right by the specified number of positions.
+## Unlike shifting, bits that would be shifted out are wrapped around
+## to the leftmost positions.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Bitwise.rotate_right(11, 2)
+## 14 : Int
+## ```
+let rotate_right(x : Int, y : Int) -> Int =
+    bitwise_rotr(x, y)
 
-    ## Returns the Hamming weight (population count) of an integer - the
-    ## number of 1s in its binary representation.
-    ##
-    ## @since 0.1.0
-    ##
-    ## ```
-    ## ➢ Bitwise.hamming_weight(29)
-    ## 4 : Int
-    ## ```
-    let hamming_weight(x : Int) -> Int =
-        bitwise_hw(x)
+## Returns the Hamming weight (population count) of an integer - the
+## number of 1s in its binary representation.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Bitwise.hamming_weight(29)
+## 4 : Int
+## ```
+let hamming_weight(x : Int) -> Int =
+    bitwise_hw(x)
 
-    ## Calculates the Hamming distance between two integers - the number of
-    ## positions at which their binary representations differ.
-    ##
-    ## @since 0.1.0
-    ##
-    ## ```
-    ## ➢ Bitwise.distance(29, 21)
-    ## 1 : Int
-    ## ```
-    let distance(x : Int, y : Int) -> Int =
-        bitwise_dist(x, y)
-end
+## Calculates the Hamming distance between two integers - the number of
+## positions at which their binary representations differ.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Bitwise.distance(29, 21)
+## 1 : Int
+## ```
+let distance(x : Int, y : Int) -> Int =
+    bitwise_dist(x, y)
+

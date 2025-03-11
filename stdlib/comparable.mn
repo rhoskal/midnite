@@ -11,50 +11,50 @@ module Comparable exposing
     , neq
     )
 
-    type Ordering =
-        | EQ
-        | LT
-        | GT
+type Ordering =
+    | EQ
+    | LT
+    | GT
 
-    let eq(x : Bool, y : Bool) -> Bool =
-        if x == True && y == True then
-            True
+let eq(x : Bool, y : Bool) -> Bool =
+    if x == True && y == True then
+        True
+    else
+        False
+
+let neq(x : Bool, y : Bool) -> Bool =
+    not(eq(x, y))
+
+let lt(x : comparable, y : comparable) -> Bool =
+    todo("not implemented")
+
+let gt(x : comparable, y : comparable) -> Bool =
+    todo("not implemented")
+
+let lte(x : comparable, y : comparable) -> Bool =
+    todo("not implemented")
+
+let gte(x : comparable, y : comparable) -> Bool =
+    todo("not implemented")
+
+let compare(x : comparable, y : comparable) -> Ordering =
+    if x == y then
+        EQ
+    else
+        if x < y then
+            LT
         else
-            False
+            GT
 
-    let neq(x : Bool, y : Bool) -> Bool =
-        not(eq(x, y))
+let min(x : comparable, y : comparable) -> comparable =
+    if lt(x, y) then
+        x
+    else
+        y
 
-    let lt(x : comparable, y : comparable) -> Bool =
-        todo("not implemented")
+let max(x : comparable, y : comparable) -> comparable =
+    if gt(x, y) then
+        x
+    else
+        y
 
-    let gt(x : comparable, y : comparable) -> Bool =
-        todo("not implemented")
-
-    let lte(x : comparable, y : comparable) -> Bool =
-        todo("not implemented")
-
-    let gte(x : comparable, y : comparable) -> Bool =
-        todo("not implemented")
-
-    let compare(x : comparable, y : comparable) -> Ordering =
-        if x == y then
-            EQ
-        else
-            if x < y then
-                LT
-            else
-                GT
-
-    let min(x : comparable, y : comparable) -> comparable =
-        if lt(x, y) then
-            x
-        else
-            y
-
-    let max(x : comparable, y : comparable) -> comparable =
-        if gt(x, y) then
-            x
-        else
-            y
-end
