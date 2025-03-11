@@ -8,30 +8,29 @@ module Tuple exposing
     , snd
     )
 
-    # CREATE
+# CREATE
 
-    let pair(x : a, y : b) -> (a, b) =
-        (x, y)
+let pair(x : a, y : b) -> (a, b) =
+    (x, y)
 
-    # ACCESS
+# ACCESS
 
-    let fst(x : a, _ : b) -> a =
-        x
+let fst(x : a, _ : b) -> a =
+    x
 
-    let snd(_ : a, y: b) -> a =
-        y
+let snd(_ : a, y: b) -> a =
+    y
 
-    # TRANSFORM
+# TRANSFORM
 
-    let map_both(pair : (a, b), f : (a -> x), g : (b -> y)) -> (x, y) =
-        match pair on
-        | (x, y) => (f(x), g(y))
+let map_both(pair : (a, b), f : (a -> x), g : (b -> y)) -> (x, y) =
+    match pair on
+    | (x, y) => (f(x), g(y))
 
-    let map_first(pair : (a, b), f : (a -> x)) -> (x, b) =
-        match pair on
-        | (x, y) => (f(x), y)
+let map_first(pair : (a, b), f : (a -> x)) -> (x, b) =
+    match pair on
+    | (x, y) => (f(x), y)
 
-    let map_second(pair : (a, b), f : (b -> y)) -> (a, y) =
-        match pair on
-        | (x, y) => (x, f(y))
-end
+let map_second(pair : (a, b), f : (b -> y)) -> (a, y) =
+    match pair on
+    | (x, y) => (x, f(y))

@@ -587,7 +587,7 @@ pub const Parser = struct {
             declarations.deinit();
         }
 
-        while (!self.check(lexer.TokenKind{ .keyword = .End })) {
+        while (!self.check(lexer.TokenKind{ .special = .Eof })) {
             const decl = try self.parseModuleStmt();
             errdefer {
                 decl.release(self.allocator);
@@ -597,7 +597,7 @@ pub const Parser = struct {
             try declarations.append(decl);
         }
 
-        _ = try self.expect(lexer.TokenKind{ .keyword = .End });
+        _ = try self.expect(lexer.TokenKind{ .special = .Eof });
 
         const module_node = try self.allocator.create(ast.ModuleDeclNode);
         errdefer module_node.release(self.allocator);
@@ -5655,7 +5655,7 @@ test "[module_decl]" {
     const allocator = gpa.allocator();
 
     {
-        const source = "module Foo exposing (double)\n" ++ "let double(x : Int) -> Int = x * 2\n" ++ "end";
+        const source = "module Foo exposing (double)\n" ++ "let double(x : Int) -> Int = x * 2\n";
         var l = lexer.Lexer.init(source, TEST_FILE);
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();
@@ -5693,7 +5693,7 @@ test "[program]" {
     const allocator = gpa.allocator();
 
     {
-        const source = "## some doc comment\n" ++ "module Foo exposing (double)\n" ++ "let double(x : Int) -> Int = x * 2\n" ++ "end";
+        const source = "## some doc comment\n" ++ "module Foo exposing (double)\n" ++ "let double(x : Int) -> Int = x * 2\n";
         var l = lexer.Lexer.init(source, TEST_FILE);
         var parser = try Parser.init(allocator, &l);
         defer parser.deinit();

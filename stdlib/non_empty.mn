@@ -17,52 +17,51 @@ module NonEmpty exposing
     , to_list
     )
 
-    type NonEmpty(a) =
-        | [a]
-        | a :: List(a)
+type NonEmpty(a) =
+    | [a]
+    | a :: List(a)
 
-    let singleton(x : a) -> NonEmpty(a) =
-        todo("not implemented")
+let singleton(x : a) -> NonEmpty(a) =
+    todo("not implemented")
 
-    let head(list : NonEmpty(a)) -> a =
-        todo("not implemented")
+let head(list : NonEmpty(a)) -> a =
+    todo("not implemented")
 
-    let tail(list : NonEmpty(a)) -> a =
-        todo("not implemented")
+let tail(list : NonEmpty(a)) -> a =
+    todo("not implemented")
 
-    let map(f : ((a) -> b), list : NonEmpty(a)) -> NonEmpty(b) =
-        todo("not implemented")
+let map(f : ((a) -> b), list : NonEmpty(a)) -> NonEmpty(b) =
+    todo("not implemented")
 
-    let intersperse(x : a, list : NonEmpty(a)) -> NonEmpty(a) =
-        todo("not implemented")
+let intersperse(x : a, list : NonEmpty(a)) -> NonEmpty(a) =
+    todo("not implemented")
 
-    let size(list : NonEmpty(a)) -> Int =
-        todo("not implemented")
+let size(list : NonEmpty(a)) -> Int =
+    todo("not implemented")
 
-    let sort(list : NonEmpty(comparable)) -> NonEmpty(comparable) =
-        todo("not implemented")
+let sort(list : NonEmpty(comparable)) -> NonEmpty(comparable) =
+    todo("not implemented")
 
-    let reverse(list : NonEmpty(a)) -> NonEmpty(a) =
-        todo("not implemented")
+let reverse(list : NonEmpty(a)) -> NonEmpty(a) =
+    todo("not implemented")
 
-    let repeat(x : a) -> NonEmpty(a) =
-        todo("not implemented")
+let repeat(x : a) -> NonEmpty(a) =
+    todo("not implemented")
 
-    let take_left(n : Int, list : NonEmpty(a)) -> List(a) =
-        todo("not implemented")
+let take_left(n : Int, list : NonEmpty(a)) -> List(a) =
+    todo("not implemented")
 
-    let drop_left(n : Int, list : NonEmpty(a)) -> List(a) =
-        todo("not implemented")
+let drop_left(n : Int, list : NonEmpty(a)) -> List(a) =
+    todo("not implemented")
 
-    let take_while(predicate : ((a) -> Bool), list : NonEmpty(a)) -> List(a) =
-        todo("not implemented")
+let take_while(predicate : ((a) -> Bool), list : NonEmpty(a)) -> List(a) =
+    todo("not implemented")
 
-    let drop_while(predicate : ((a) -> Bool), list : NonEmpty(a)) -> List(a) =
-        todo("not implemented")
+let drop_while(predicate : ((a) -> Bool), list : NonEmpty(a)) -> List(a) =
+    todo("not implemented")
 
-    let from_list(list : List(a)) -> Maybe(NonEmpty(a)) =
-        todo("not implemented")
+let from_list(list : List(a)) -> Maybe(NonEmpty(a)) =
+    todo("not implemented")
 
-    let to_list(list : NonEmpty(a)) -> List(a) =
-        todo("not implemented")
-end
+let to_list(list : NonEmpty(a)) -> List(a) =
+    todo("not implemented")

@@ -7,7 +7,6 @@ pub const KeywordKind = enum {
     Alias,
     As,
     Else,
-    End,
     Exposing,
     Fn,
     Foreign,
@@ -1336,7 +1335,6 @@ pub const Lexer = struct {
                 if (self.checkExactMatch(span_start, "alias", .{ .keyword = .Alias })) |token| return token;
                 if (self.checkExactMatch(span_start, "as", .{ .keyword = .As })) |token| return token;
                 if (self.checkExactMatch(span_start, "else", .{ .keyword = .Else })) |token| return token;
-                if (self.checkExactMatch(span_start, "end", .{ .keyword = .End })) |token| return token;
                 if (self.checkExactMatch(span_start, "exposing", .{ .keyword = .Exposing })) |token| return token;
                 if (self.checkExactMatch(span_start, "fn", .{ .keyword = .Fn })) |token| return token;
                 if (self.checkExactMatch(span_start, "foreign", .{ .keyword = .Foreign })) |token| return token;
@@ -1789,14 +1787,6 @@ test "[keyword]" {
             .token = Token.init(.{ .keyword = .Else }, "else", .{
                 .filename = TEST_FILE,
                 .span = .{ .start = 0, .end = 4 },
-                .src = .{ .line = 1, .col = 1 },
-            }),
-        },
-        .{
-            .source = "end",
-            .token = Token.init(.{ .keyword = .End }, "end", .{
-                .filename = TEST_FILE,
-                .span = .{ .start = 0, .end = 3 },
                 .src = .{ .line = 1, .col = 1 },
             }),
         },
@@ -3736,9 +3726,9 @@ test "[record type]" {
     }
 }
 
-test "[module definition]" {
+test "[module declaration]" {
     // Setup
-    const source = "module Foo exposing (Foo(..), bar) end";
+    const source = "module Foo exposing (Foo(..), bar)";
 
     const expected_tokens = [_]Token{
         Token.init(.{ .keyword = .Module }, "module", .{
@@ -3796,15 +3786,10 @@ test "[module definition]" {
             .span = .{ .start = 33, .end = 34 },
             .src = .{ .line = 1, .col = 34 },
         }),
-        Token.init(.{ .keyword = .End }, "end", .{
-            .filename = TEST_FILE,
-            .span = .{ .start = 35, .end = 38 },
-            .src = .{ .line = 1, .col = 36 },
-        }),
         Token.init(.{ .special = .Eof }, "", .{
             .filename = TEST_FILE,
-            .span = .{ .start = 38, .end = 38 },
-            .src = .{ .line = 1, .col = 39 },
+            .span = .{ .start = 34, .end = 34 },
+            .src = .{ .line = 1, .col = 35 },
         }),
     };
 

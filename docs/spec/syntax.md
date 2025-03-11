@@ -10,7 +10,6 @@ The following are reserved keywords in the language:
 alias,
 as,
 else,
-end,
 exposing,
 foreign,
 fn,

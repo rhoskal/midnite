@@ -10,8 +10,8 @@ Modules are used to group functions around related types. Functions are private 
 
 ```mn
 module MyModule exposing (..)
-    # module contents here
-end
+
+# module contents here
 ```
 
 ### Access Control
@@ -75,10 +75,10 @@ Modules can be used to create opaque types by controlling what constructors are 
 ```mn
 # In MyModule.mn
 module MyModule exposing (MyType)  # Type but not constructors
-    type MyType = 
-        | Constructor1 
-        | Constructor2
-end
+
+type MyType = 
+    | Constructor1 
+    | Constructor2
 ```
 
 ## Best Practices
