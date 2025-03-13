@@ -1,0 +1,325 @@
+module TreeMap exposing
+    ( TreeMap
+    , empty
+    , empty?
+    , fold_left
+    , fold_right
+    , from_list
+    , get
+    , insert
+    , keys
+    , map
+    , remove
+    , singleton
+    , size
+    , to_list
+    , union
+    , values
+    , intersect
+    , diff
+    , keep
+    , reject
+    , partition
+    )
+
+## A map from keys to values, based on a balanced binary tree.
+## Keys must be comparable.
+##
+## @since 0.1.0
+type TreeMap(k, v) =
+    TreeMap(k, v)
+
+## Create an empty tree map.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.empty()
+## {} : TreeMap(k, v)
+## ```
+let empty() -> TreeMap(k, v) =
+    tree_map_empty()
+
+## Determine if a tree map is empty.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.empty?(TreeMap.empty())
+## True : Bool
+##
+## ➢ TreeMap.empty?(TreeMap.singleton(1, "one"))
+## False : Bool
+## ```
+let empty?(map : TreeMap(k, v)) -> Bool =
+    tree_map_is_empty(map)
+
+## Create a tree map with a single key-value pair.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.singleton(1, "one")
+## {1: "one"} : TreeMap(Int, String)
+## ```
+let singleton(key : comparable, value : v) -> TreeMap(comparable, v) =
+    tree_map_singleton(key, value)
+
+## Get the value associated with a key.
+## Returns `None` if the key is not found.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.get(TreeMap.singleton(1, "one"), 1)
+## Some("one") : Maybe(String)
+##
+## ➢ TreeMap.get(TreeMap.singleton(1, "one"), 2)
+## None : Maybe(String)
+## ```
+let get(map : TreeMap(comparable, v), key : comparable) -> Maybe(v) =
+    tree_map_get(map, key)
+
+## Insert a key-value pair into a tree map.
+## If the key already exists, the value is updated.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.insert(TreeMap.singleton(1, "one"), 2, "two")
+## {1: "one", 2: "two"} : TreeMap(Int, String)
+##
+## ➢ TreeMap.insert(TreeMap.singleton(1, "one"), 1, "ONE")
+## {1: "ONE"} : TreeMap(Int, String)
+## ```
+let insert(map : TreeMap(comparable, v), key : comparable, value : v) -> TreeMap(comparable, v) =
+    tree_map_insert(map, key, value)
+
+## Remove a key-value pair from a tree map.
+## If the key is not found, no changes are made.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.remove(TreeMap.from_list([(1, "one"), (2, "two")]), 1)
+## {2: "two"} : TreeMap(Int, String)
+## ```
+let remove(map : TreeMap(comparable, v), key : comparable) -> TreeMap(comparable, v) =
+    tree_map_remove(map, key)
+
+## Determine the number of key-value pairs in a tree map.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.size(TreeMap.from_list([(1, "one"), (2, "two")]))
+## 2 : Int
+## ```
+let size(map : TreeMap(k, v)) -> Int =
+    tree_map_size(map)
+
+## Convert a tree map into a list of key-value pairs, sorted by key.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.to_list(TreeMap.from_list([(2, "two"), (1, "one")]))
+## [(1, "one"), (2, "two")] : List((Int, String))
+## ```
+let to_list(map : TreeMap(k, v)) -> List((k, v)) =
+    tree_map_to_list(map)
+
+## Convert a list of key-value pairs into a tree map.
+## If there are duplicate keys, later values overwrite earlier ones.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.from_list([(1, "one"), (2, "two"), (1, "ONE")])
+## {1: "ONE", 2: "two"} : TreeMap(Int, String)
+## ```
+let from_list(list : List((comparable, v))) -> TreeMap(comparable, v) =
+    tree_map_from_list(list)
+
+## Get a list of all keys in a tree map, sorted.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.keys(TreeMap.from_list([(1, "one"), (2, "two")]))
+## [1, 2] : List(Int)
+## ```
+let keys(map : TreeMap(k, v)) -> List(k) =
+    tree_map_keys(map)
+
+## Get a list of all values in a tree map, in key order.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.values(TreeMap.from_list([(1, "one"), (2, "two")]))
+## ["one", "two"] : List(String)
+## ```
+let values(map : TreeMap(k, v)) -> List(v) =
+    tree_map_values(map)
+
+## Combine two tree maps, favoring values from the second map when keys overlap.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.union(TreeMap.from_list([(1, "one"), (2, "two")]), TreeMap.from_list([(2, "TWO"), (3, "three")]))
+## {1: "one", 2: "TWO", 3: "three"} : TreeMap(Int, String)
+## ```
+let union(map1 : TreeMap(comparable, v), map2 : TreeMap(comparable, v)) -> TreeMap(comparable, v) =
+    tree_map_union(map1, map2)
+
+## Keep only key-value pairs where the key exists in both maps.
+## Values are taken from the first map.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.intersect(TreeMap.from_list([(1, "one"), (2, "two")]), TreeMap.from_list([(2, "TWO"), (3, "three")]))
+## {2: "two"} : TreeMap(Int, String)
+## ```
+let intersect(map1 : TreeMap(comparable, v), map2 : TreeMap(comparable, v)) -> TreeMap(comparable, v) =
+    tree_map_intersect(map1, map2)
+
+## Keep only key-value pairs where the key exists in the first map but not the second.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.diff(TreeMap.from_list([(1, "one"), (2, "two")]), TreeMap.from_list([(2, "TWO"), (3, "three")]))
+## {1: "one"} : TreeMap(Int, String)
+## ```
+let diff(map1 : TreeMap(comparable, v), map2 : TreeMap(comparable, v)) -> TreeMap(comparable, v) =
+    tree_map_diff(map1, map2)
+
+## Fold over the key-value pairs in a tree map, in key order from lowest to highest.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.fold_left(TreeMap.from_list([(1, "one"), (2, "two")]), fn(k, v, acc) => acc ++ v, "")
+## "onetwo" : String
+## ```
+let fold_left(map : TreeMap(k, v), f : (k, v, acc -> acc), init : acc) -> acc =
+    tree_map_fold_left(map, f, init)
+
+## Fold over the key-value pairs in a tree map, in key order from highest to lowest.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.fold_right(TreeMap.from_list([(1, "one"), (2, "two")]), fn(k, v, acc) => acc ++ v, "")
+## "twoone" : String
+## ```
+let fold_right(map : TreeMap(k, v), f : (k, v, acc -> acc), init : acc) -> acc =
+    tree_map_fold_right(map, f, init)
+
+## Transform values in a tree map.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.map(TreeMap.from_list([(1, "one"), (2, "two")]), fn(k, v) => String.to_upper(v))
+## {1: "ONE", 2: "TWO"} : TreeMap(Int, String)
+## ```
+let map(map : TreeMap(k, v), f : (k, v -> v2)) -> TreeMap(k, v2) =
+    tree_map_map(map, f)
+
+## Keep only key-value pairs that satisfy the given predicate.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.keep(TreeMap.from_list([(1, "one"), (2, "two")]), fn(k, v) => k % 2 == 0)
+## {2: "two"} : TreeMap(Int, String)
+## ```
+let keep(map : TreeMap(comparable, v), pred : (comparable, v -> Bool)) -> TreeMap(comparable, v) =
+    tree_map_keep(map, pred)
+
+## Remove key-value pairs that satisfy the given predicate.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.reject(TreeMap.from_list([(1, "one"), (2, "two")]), fn(k, v) => k % 2 == 0)
+## {1: "one"} : TreeMap(Int, String)
+## ```
+let reject(map : TreeMap(comparable, v), pred : (comparable, v -> Bool)) -> TreeMap(comparable, v) =
+    tree_map_reject(map, pred)
+
+## Create two new maps. The first contains all key-value pairs that passed the
+## given test, and the second contains all key-value pairs that did not.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ TreeMap.partition(TreeMap.from_list([(1, "one"), (2, "two")]), fn(k, v) => k % 2 == 0)
+## ({2: "two"}, {1: "one"}) : (TreeMap(Int, String), TreeMap(Int, String))
+## ```
+let partition(map : TreeMap(comparable, v), pred : (comparable, v -> Bool)) -> (TreeMap(comparable, v), TreeMap(comparable, v)) =
+    tree_map_partition(map, pred)
+
+foreign tree_map_empty() -> TreeMap(k, v) =
+    "zig_tree_map_empty"
+
+foreign tree_map_is_empty(_ : TreeMap(k, v)) -> Bool =
+    "zig_tree_map_is_empty"
+
+foreign tree_map_singleton(_ : comparable, _ : v) -> TreeMap(comparable, v) =
+    "zig_tree_map_singleton"
+
+foreign tree_map_get(_ : TreeMap(comparable, v), _ : comparable) -> Maybe(v) =
+    "zig_tree_map_get"
+
+foreign tree_map_insert(_ : TreeMap(comparable, v), _ : comparable, _ : v) -> TreeMap(comparable, v) =
+    "zig_tree_map_insert"
+
+foreign tree_map_remove(_ : TreeMap(comparable, v), _ : comparable) -> TreeMap(comparable, v) =
+    "zig_tree_map_remove"
+
+foreign tree_map_size(_ : TreeMap(k, v)) -> Int =
+    "zig_tree_map_size"
+
+foreign tree_map_to_list(_ : TreeMap(k, v)) -> List((k, v)) =
+    "zig_tree_map_to_list"
+
+foreign tree_map_from_list(_ : List((comparable, v))) -> TreeMap(comparable, v) =
+    "zig_tree_map_from_list"
+
+foreign tree_map_keys(_ : TreeMap(k, v)) -> List(k) =
+    "zig_tree_map_keys"
+
+foreign tree_map_values(_ : TreeMap(k, v)) -> List(v) =
+    "zig_tree_map_values"
+
+foreign tree_map_union(_ : TreeMap(comparable, v), _ : TreeMap(comparable, v)) -> TreeMap(comparable, v) =
+    "zig_tree_map_union"
+
+foreign tree_map_intersect(_ : TreeMap(comparable, v), _ : TreeMap(comparable, v)) -> TreeMap(comparable, v) =
+    "zig_tree_map_intersect"
+
+foreign tree_map_diff(_ : TreeMap(comparable, v), _ : TreeMap(comparable, v)) -> TreeMap(comparable, v) =
+    "zig_tree_map_diff"
+
+foreign tree_map_fold_left(_ : TreeMap(k, v), _ : (k, v, acc -> acc), _ : acc) -> acc =
+    "zig_tree_map_fold_left"
+
+foreign tree_map_fold_right(_ : TreeMap(k, v), _ : (k, v, acc -> acc), _ : acc) -> acc =
+    "zig_tree_map_fold_right"
+
+foreign tree_map_map(_ : TreeMap(k, v), _ : (k, v -> v2)) -> TreeMap(k, v2) =
+    "zig_tree_map_map"
+
+foreign tree_map_keep(_ : TreeMap(comparable, v), _ : (comparable, v -> Bool)) -> TreeMap(comparable, v) =
+    "zig_tree_map_keep"
+
+foreign tree_map_reject(_ : TreeMap(comparable, v), _ : (comparable, v -> Bool)) -> TreeMap(comparable, v) =
+    "zig_tree_map_reject"
+
+foreign tree_map_partition(_ : TreeMap(comparable, v), _ : (comparable, v -> Bool)) -> (TreeMap(comparable, v), TreeMap(comparable, v)) =
+    "zig_tree_map_partition"

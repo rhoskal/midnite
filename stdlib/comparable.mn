@@ -16,27 +16,118 @@ type Ordering =
     | LT
     | GT
 
-let eq(x : Bool, y : Bool) -> Bool =
-    if x == True && y == True then
-        True
-    else
-        False
+## Tests if two values are equal.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Comparable.eq(42, 42)
+## True : Bool
+##
+## ➢ Comparable.eq(42, 41)
+## False : Bool
+## ```
+let eq(x : comparable, y : comparable) -> Bool =
+    match compare(x, y) on
+    | EQ => True
+    | _ => False
 
-let neq(x : Bool, y : Bool) -> Bool =
-    not(eq(x, y))
+## Tests if two values are not equal.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Comparable.neq(42, 41)
+## True : Bool
+##
+## ➢ Comparable.neq(42, 42)
+## False : Bool
+## ```
+let neq(x : comparable, y : comparable) -> Bool =
+    match compare(x, y) on
+    | EQ => False
+    | _ => True
 
+## Tests if the first value is less than the second.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Comparable.lt(41, 42)
+## True : Bool
+##
+## ➢ Comparable.lt(42, 42)
+## False : Bool
+## ```
 let lt(x : comparable, y : comparable) -> Bool =
-    todo("not implemented")
+    match compare(x, y) on
+    | LT => True
+    | _ => False
 
+## Tests if the first value is greater than the second.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Comparable.gt(43, 42)
+## True : Bool
+##
+## ➢ Comparable.gt(42, 42)
+## False : Bool
+## ```
 let gt(x : comparable, y : comparable) -> Bool =
-    todo("not implemented")
+    match compare(x, y) on
+    | GT => True
+    | _ => False
 
+## Tests if the first value is less than or equal to the second.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Comparable.lte(42, 42)
+## True : Bool
+##
+## ➢ Comparable.lte(43, 42)
+## False : Bool
+## ```
 let lte(x : comparable, y : comparable) -> Bool =
-    todo("not implemented")
+    match compare(x, y) on
+    | LT => True
+    | EQ => True
+    | _ => False
 
+## Tests if the first value is greater than or equal to the second.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Comparable.gte(42, 42)
+## True : Bool
+##
+## ➢ Comparable.gte(41, 42)
+## False : Bool
+## ```
 let gte(x : comparable, y : comparable) -> Bool =
-    todo("not implemented")
+    match compare(x, y) on
+    | GT => True
+    | EQ => True
+    | _ => False
 
+## Compares two values and returns an Ordering.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Comparable.compare(42, 42)
+## EQ : Ordering
+##
+## ➢ Comparable.compare(41, 42)
+## LT : Ordering
+##
+## ➢ Comparable.compare(43, 42)
+## GT : Ordering
+## ```
 let compare(x : comparable, y : comparable) -> Ordering =
     if x == y then
         EQ
@@ -46,15 +137,28 @@ let compare(x : comparable, y : comparable) -> Ordering =
         else
             GT
 
+## Returns the minimum of two comparable values.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Comparable.min(42, 41)
+## 41 : Int
+## ```
 let min(x : comparable, y : comparable) -> comparable =
-    if lt(x, y) then
-        x
-    else
-        y
+    match compare(x, y) on
+    | LT => x
+    | _ => y
 
+## Returns the maximum of two comparable values.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Comparable.max(42, 41)
+## 42 : Int
+## ```
 let max(x : comparable, y : comparable) -> comparable =
-    if gt(x, y) then
-        x
-    else
-        y
-
+    match compare(x, y) on
+    | GT => x
+    | _ => y

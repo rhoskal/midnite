@@ -1,6 +1,5 @@
 module Tuple exposing
-    ( Tuple(..)
-    , fst
+    ( fst
     , map_both
     , map_first
     , map_second
@@ -8,29 +7,71 @@ module Tuple exposing
     , snd
     )
 
-# CREATE
-
+## Creates a tuple pair from two values.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Tuple.pair(1, "a")
+## (1, "a") : (Int, String)
+## ```
 let pair(x : a, y : b) -> (a, b) =
     (x, y)
 
-# ACCESS
-
+## Gets the first value from a tuple.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Tuple.fst((1, "a"))
+## 1 : Int
+## ```
 let fst(x : a, _ : b) -> a =
     x
 
-let snd(_ : a, y: b) -> a =
+## Gets the second value from a tuple.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Tuple.snd((1, "a"))
+## "a" : String
+## ```
+let snd(_ : a, y: b) -> b =
     y
 
-# TRANSFORM
-
+## Applies functions to both elements of a tuple.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Tuple.map_both((1, "a"), String.from_int, String.to_upper)
+## ("1", "A") : (String, String)
+## ```
 let map_both(pair : (a, b), f : (a -> x), g : (b -> y)) -> (x, y) =
     match pair on
     | (x, y) => (f(x), g(y))
 
+## Applies a function to the first element of a tuple.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Tuple.map_first((1, "a"), String.from_int)
+## ("1", "a") : (String, String)
+## ```
 let map_first(pair : (a, b), f : (a -> x)) -> (x, b) =
     match pair on
     | (x, y) => (f(x), y)
 
+## Applies a function to the second element of a tuple.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Tuple.map_second((1, "a"), String.to_upper)
+## (1, "A") : (Int, String)
+## ```
 let map_second(pair : (a, b), f : (b -> y)) -> (a, y) =
     match pair on
     | (x, y) => (x, f(y))

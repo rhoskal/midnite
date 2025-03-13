@@ -30,27 +30,80 @@ type Result(e, a) =
     | Ok(a)
 
 ## Check whether the result is `Ok` without unwrapping it.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Result.ok?(Ok(42))
+## True : Bool
+##
+## ➢ Result.ok?(Err("failed"))
+## False : Bool
+## ```
 let ok?(ra : Result(e, a)) -> Bool =
     match ra on
     | Err(_) => False
     | Ok(_) => True
 
 ## Check whether the result is `Err` without unwrapping it.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Result.err?(Err("failed"))
+## True : Bool
+##
+## ➢ Result.err?(Ok(42))
+## False : Bool
+## ```
 let err?(ra : Result(e, a)) -> Bool =
     match ra on
     | Err(_)  => True
     | Ok(_)  => False
 
+## Extracts the value from an `Ok` result, or returns the provided default value.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Result.with_default(Ok(42), 0)
+## 42 : Int
+##
+## ➢ Result.with_default(Err("failed"), 0)
+## 0 : Int
+## ```
 let with_default(ra : Result(e, a), default : a) -> a =
     match ra on
     | Err(_) => default
     | Ok(a) => a
 
+## Applies a function to the value inside an `Ok` result.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Result.map(Ok(1), fn(x) => x + 1)
+## Ok(2) : Result(e, Int)
+##
+## ➢ Result.map(Err("failed"), fn(x) => x + 1)
+## Err("failed") : Result(String, Int)
+## ```
 let map(ra : Result(e, a), f : (a -> value)) -> Result(e, value) =
     match ra on
     | Err(e) => Err(e)
     | Ok(a) => Ok(f(a))
 
+## Combines two results using a function.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Result.map2(Ok(1), Ok(2), fn(a, b) => a + b)
+## Ok(3) : Result(e, Int)
+##
+## ➢ Result.map2(Err("failed"), Ok(2), fn(a, b) => a + b)
+## Err("failed") : Result(String, Int)
+## ```
 let map2(
     ra : Result(e, a),
     rb : Result(e, b),
@@ -63,6 +116,17 @@ let map2(
         | Err(e) => Err(e)
         | Ok(b) => Ok(f(a, b))
 
+## Combines three results using a function.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Result.map3(Ok(1), Ok(2), Ok(3), fn(a, b, c) => a + b + c)
+## Ok(6) : Result(e, Int)
+##
+## ➢ Result.map3(Ok(1), Err("failed"), Ok(3), fn(a, b, c) => a + b + c)
+## Err("failed") : Result(String, Int)
+## ```
 let map3(
     ra : Result(e, a),
     rb : Result(e, b),
@@ -79,7 +143,14 @@ let map3(
             | Err(e) => Err(e)
             | Ok(c) => Ok(f(a, b, c))
 
-
+## Combines four results using a function.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Result.map4(Ok(1), Ok(2), Ok(3), Ok(4), fn(a, b, c, d) => a + b + c + d)
+## Ok(10) : Result(e, Int)
+## ```
 let map4(
     ra : Result(e, a),
     rb : Result(e, b),
@@ -100,45 +171,96 @@ let map4(
                 | Err(e) => Err(e)
                 | Ok(d) => Ok(f(a, b, c, d))
 
+## Chains result-producing operations together.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Result.and_then(Ok(1), fn(x) => Ok(x + 1))
+## Ok(2) : Result(e, Int)
+##
+## ➢ Result.and_then(Err("failed"), fn(x) => Ok(x + 1))
+## Err("failed") : Result(String, Int)
+## ```
 let and_then(ra : Result(e, a), f : (a -> Result(e, b))) -> Result(e, b) =
     match ra on
     | Err(e) => Err(e)
     | Ok(a) => f(a)
 
+## Returns the first success between two results, or the second error if both fail.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Result.or(Ok(1), Ok(2))
+## Ok(1) : Result(e, Int)
+##
+## ➢ Result.or(Err("first"), Ok(2))
+## Ok(2) : Result(String, Int)
+##
+## ➢ Result.or(Err("first"), Err("second"))
+## Err("second") : Result(String, a)
+## ```
 let or(ra : Result(e, a), rb : Result(e, a)) -> Result(e, a) =
     match ra on
     | Err(_) => rb
     | Ok(_) => ra
 
+
+## Transforms the error value of a result.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Result.map_error(Err("failed"), String.size)
+## Err(6) : Result(Int, a)
+##
+## ➢ Result.map_error(Ok(42), String.size)
+## Ok(42) : Result(Int, Int)
+## ```
 let map_error(ra : Result(x, a), f : (x -> y)) -> Result(y, a) =
     match ra on
     | Err(e) => Err(f(e))
     | Ok(a) => Ok(a)
 
+## Converts a Maybe to a Result with a provided error.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Result.from_maybe(Some(42), "missing value")
+## Ok(42) : Result(String, Int)
+##
+## ➢ Result.from_maybe(None, "missing value")
+## Err("missing value") : Result(String, a)
+## ```
 let from_maybe(ma : Maybe(a), err : e) -> Result(e, a) =
     match ma on
     | None => Err(err)
     | Some(a) => Ok(a)
 
-## Combine a list of results into a single result (holding a list).
+## Extracts all successful values from a list of results.
 ##
 ## @since 0.1.0
 ##
 ## ```
-## ➢ Result.compact([Ok(1), Ok(2)])
+## ➢ Result.compact([Ok(1), Err("failed"), Ok(2)])
 ## [1, 2] : List(Int)
 ## ```
 let compact(results : List(Result(e, a))) -> List(a) =
     List.collect_map(results, identity)
 
-## Combine a list of results into a single result (holding a list).
+## Combines a list of results into a single result (holding a list).
 ## Also known as `sequence` on lists.
 ##
 ## @since 0.1.0
 ##
 ## ```
 ## ➢ Result.combine([Ok(1), Ok(2)])
-## Ok([1, 2]) : List(Int)
+## Ok([1, 2]) : Result(e, List(Int))
+##
+## ➢ Result.combine([Ok(1), Err("failed"), Ok(2)])
+## Err("failed") : Result(String, List(Int))
 ## ```
 let combine(results : List(Result(e, a))) -> Result(e, List(a)) =
     results
@@ -152,7 +274,7 @@ let combine(results : List(Result(e, a))) -> Result(e, List(a)) =
 ## @since 0.1.0
 ##
 ## ```
-## ➢ Result.paritition([Ok(1), Err("uh no!"), Ok(2)]
+## ➢ Result.partition([Ok(1), Err("uh oh!"), Ok(2)])
 ## (["uh oh!"], [1, 2]) : (List(String), List(Int))
 ## ```
 let partition(results : List(Result(e, a))) -> (List(e), List(a)) =
