@@ -57,7 +57,9 @@ let and(x : Bool, y : Bool) -> Bool =
 ## False : Bool
 ## ```
 let nand(x : Bool, y : Bool) -> Bool =
-    not(and(x, y))
+    match (x, y) on
+    | (True, True) => False
+    | _ => True
 
 ## Returns `True` if either input is `True`.
 ## Classic logical OR operation from boolean algebra.
@@ -89,7 +91,9 @@ let or(x : Bool, y : Bool) -> Bool =
 ## False : Bool
 ## ```
 let nor(x : Bool, y : Bool) -> Bool =
-    not(or(x, y))
+    match (x, y) on
+    | (False, False) => True
+    | _ => False
 
 ## Returns `True` if exactly one input is `True`.
 ## Also known as "exclusive or" - `True` when inputs differ.
@@ -108,3 +112,21 @@ let xor(x : Bool, y : Bool) -> Bool =
     | (False, False) => False
     | (True, True) => False
     | _ => True
+
+## Returns `True` only if both inputs are the same.
+## Equivalent to logical equivalence or negating the XOR of both inputs.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ Boolean.xnor(True, True)
+## True : Bool
+##
+## ➢ Boolean.xnor(False, True)
+## False : Bool
+## ```
+let xnor(x : Bool, y : Bool) -> Bool =
+    match (x, y) on
+    | (True, True) => True
+    | (False, False) => True
+    | _ => False

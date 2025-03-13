@@ -55,7 +55,7 @@ foreign int_max(_ : Int, _ : Int) -> Int = "zig_int_max"
 #      HELPFUL FUNCTIONS
 # =============================
 
-## ??
+## Returns the input value unchanged.
 ##
 ## @since 0.1.0
 ##
@@ -66,7 +66,8 @@ foreign int_max(_ : Int, _ : Int) -> Int = "zig_int_max"
 let identity(x : a) -> a =
     x
 
-## ??
+## Returns the first parameter and ignores the second. Useful in higher-order
+## functions where you need a function that returns a constant value.
 ##
 ## @since 0.1.0
 ##

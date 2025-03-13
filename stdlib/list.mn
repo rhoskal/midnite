@@ -33,8 +33,19 @@ type List(a) =
     | Nil
     | a :: List(a)
 
+## Add an element to the beginning of a list.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ List.cons([2, 3], 1)
+## [1, 2, 3] : List(Int)
+##
+## ➢ List.cons(Nil, 42)
+## [42] : List(Int)
+## ```
 let cons(xs : List(a), x : a) -> List(a) =
-    x :: xs
+    list_cons(xs, x)
 
 ## Create a list with only one element.
 ##
@@ -75,8 +86,7 @@ let empty?(list : List(a)) -> Bool =
 ## 0 : Int
 ## ```
 let size(list : List(a)) -> Int =
-    list
-    |> fold_left(0, fn(acc, _) => acc + 1)
+    list_size(list)
 
 ## Determine if a list contains a value.
 ##
@@ -121,12 +131,32 @@ let any?(list : List(a), predicate : (a -> Bool)) -> Bool =
             any?(xs, predicate)
 
 ## Reduce a list from the left.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ List.fold_left([1, 2, 3], 0, fn(acc, x) => acc + x)
+## 6 : Int
+##
+## ➢ List.fold_left([1, 2, 3], "", fn(acc, x) => acc ++ Int.to_string(x))
+## "123" : String
+## ```
 let fold_left(list : List(a), acc : b, f : (b, a) -> b) -> b =
     match list on
     | Nil => acc
     | x :: xs => fold_left(xs, f(acc, x), f)
 
 ## Reduce a list from the right.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ List.fold_right([1, 2, 3], 0, fn(x, acc) => x + acc)
+## 6 : Int
+##
+## ➢ List.fold_right([1, 2, 3], "", fn(x, acc) => Int.to_string(x) ++ acc)
+## "123" : String
+## ```
 let fold_right(list : List(a), acc : b, f : (a, b) -> b) -> b =
     match list on
     | Nil => acc
@@ -204,6 +234,16 @@ let map(list : List(a), f : (a -> b)) -> List(b) =
     fold_right(list, Nil, fn(x, acc) => cons(acc, f(x)))
 
 ## Keep elements that satisfy the given predicate.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ List.keep([1, 2, 3, 4, 5], fn(x) => Math.even?(x))
+## [2, 4] : List(Int)
+##
+## ➢ List.keep(["apple", "banana", "cherry"], fn(s) => String.size(s) > 5)
+## ["banana", "cherry"] : List(String)
+## ```
 let keep(list : List(a), predicate : (a -> Bool)) -> List(a) =
     list
     |> fold_right(
@@ -216,10 +256,30 @@ let keep(list : List(a), predicate : (a -> Bool)) -> List(a) =
     )
 
 ## Exclude elements that satisfy the given predicate.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ List.reject([1, 2, 3, 4, 5], fn(x) => Math.even?(x))
+## [1, 3, 5] : List(Int)
+##
+## ➢ List.reject(["apple", "banana", "cherry"], fn(s) => String.size(s) > 5)
+## ["apple"] : List(String)
+## ```
 let reject(list : List(a), predicate : (a -> Bool)) -> List(a) =
     keep(list, fn(x) => not(predicate(x)))
 
 ## Applies filter and map simultaneously.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ List.collect_map([1, 2, 3, 4], fn(x) => if Math.even?(x) then Some(x * 2) else None)
+## [4, 8] : List(Int)
+##
+## ➢ List.collect_map(["apple", "", "banana", ""], fn(s) => if String.empty?(s) then None else Some(String.to_upper(s)))
+## ["APPLE", "BANANA"] : List(String)
+## ```
 let collect_map(list : List(a), f : (a -> Maybe(b))) -> List(b) =
     list
     |> fold_right(
@@ -231,12 +291,37 @@ let collect_map(list : List(a), f : (a -> Maybe(b))) -> List(b) =
     )
 
 ## Create a list of numbers, every element increasing by one.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ List.range(1, 5)
+## [1, 2, 3, 4, 5] : List(Int)
+##
+## ➢ List.range(10, 12)
+## [10, 11, 12] : List(Int)
+##
+## ➢ List.range(5, 1)
+## [] : List(Int)
+## ```
 let range(start : Int, end : Int) -> List(Int) =
-    if start > end then
-        Nil
-    else
-        cons(range(start + 1, end), start)
+    list_range(start, end)
 
+## Insert an element at the specified index in a list.
+## Returns `None` if the index is out of bounds.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ List.insert_at([1, 2, 4], 2, 3)
+## Some([1, 2, 3, 4]) : Maybe(List(Int))
+##
+## ➢ List.insert_at([1, 2, 3], 0, 0)
+## Some([0, 1, 2, 3]) : Maybe(List(Int))
+##
+## ➢ List.insert_at([1, 2, 3], 10, 4)
+## None : Maybe(List(Int))
+## ```
 let insert_at(list : List(a), index : Int, elem : a) -> Maybe(List(a)) =
     match list on
     | _ when index == 0 => Some(cons(list, elem))
@@ -245,6 +330,21 @@ let insert_at(list : List(a), index : Int, elem : a) -> Maybe(List(a)) =
         |> Maybe.map(fn(rest) => cons(rest, x))
     | _ => None
 
+## Delete an element at the specified index in a list.
+## Returns `None` if the index is out of bounds.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ List.delete_at([1, 2, 3, 4], 2)
+## Some([1, 2, 4]) : Maybe(List(Int))
+##
+## ➢ List.delete_at([1, 2, 3], 0)
+## Some([2, 3]) : Maybe(List(Int))
+##
+## ➢ List.delete_at([1, 2, 3], 10)
+## None : Maybe(List(Int))
+## ```
 let delete_at(list : List(a), index : Int) -> Maybe(List(a)) =
     match list on
     | _ when index == 0 =>
@@ -256,25 +356,68 @@ let delete_at(list : List(a), index : Int) -> Maybe(List(a)) =
         |> Maybe.map(fn(rest) => cons(rest, x))
     | _ => None
 
+## Apply a function to the element at the specified index.
+## Returns `None` if the index is out of bounds.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ List.modify_at([1, 2, 3, 4], 2, fn(x) => x * 10)
+## Some([1, 2, 30, 4]) : Maybe(List(Int))
+##
+## ➢ List.modify_at(["a", "b", "c"], 1, String.to_upper)
+## Some(["a", "B", "c"]) : Maybe(List(String))
+##
+## ➢ List.modify_at([1, 2, 3], 10, fn(x) => x + 1)
+## None : Maybe(List(Int))
+## ```
 let modify_at(list : List(a), index : Int, f : (a -> a)) -> Maybe(List(a)) =
     alter_at(list, index, fn(x) => Some(f(x)))
 
+## Apply a function that returns `Maybe` to the element at the specified index.
+## The function can transform or remove the element.
+## Returns `None` if the index is out of bounds or if the function returns `None`.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ List.alter_at([1, 2, 3, 4], 2, fn(x) => Some(x * 10))
+## Some([1, 2, 30, 4]) : Maybe(List(Int))
+##
+## ➢ List.alter_at([1, 2, 3, 4], 2, fn(x) => if x > 2 then Some(x * 10) else None)
+## Some([1, 2, 30, 4]) : Maybe(List(Int))
+##
+## ➢ List.alter_at([1, 2, 3], 10, fn(x) => Some(x + 1))
+## None : Maybe(List(Int))
+## ```
 let alter_at(list : List(a), index : Int, f : (a -> Maybe(a))) -> Maybe(List(a)) =
     match list on
     | _ when index == 0 =>
         match list on
         | x :: xs =>
-            f(x)
-            |> Maybe.map(fn(y) => cons(xs, y))
+            Maybe.map(f(x), fn(y) => cons(xs, y))
         | _ => None
     | x :: xs =>
         alter_at(xs, index - 1, f)
         |> Maybe.map(fn(rest) => cons(rest, x))
     | _ => None
 
+## Flatten a list of lists into a single list.
+##
+## @since 0.1.0
+##
+## ```
+## ➢ List.flatten([[1, 2], [3, 4], [5]])
+## [1, 2, 3, 4, 5] : List(Int)
+##
+## ➢ List.flatten([[1, 2], [], [3, 4]])
+## [1, 2, 3, 4] : List(Int)
+##
+## ➢ List.flatten([] : List(List(Int)))
+## [] : List(Int)
+## ```
 let flatten(list : List(List(a))) -> List(a) =
-    list
-    |> fold_right(Nil, fn(xs, acc) => fold_right(xs, acc, cons))
+    list_flatten(list)
 
 ## Find the maximum element in a list.
 ##
@@ -320,8 +463,7 @@ let minimum(list : List(Comparable)) -> Maybe(Comparable) =
 ## 0.0 : Double
 ## ```
 let sum(list : List(Number)) -> Number =
-    list
-    |> fold_left(0, fn(acc, x) => acc + x)
+    list_sum(list)
 
 ## Get the product of the list elements.
 ##
@@ -335,5 +477,19 @@ let sum(list : List(Number)) -> Number =
 ## 1 : Int
 ## ```
 let product(list : List(Number)) -> Number =
-    list
-    |> fold_left(1, fn(acc, x) => acc * x)
+    fold_left(list, 1, fn(acc, x) => acc * x)
+
+foreign list_cons(_ : List(a), _ : a) -> List(a) =
+    "zig_list_cons"
+
+foreign list_size(_ : List(a)) -> Int =
+    "zig_list_size"
+
+foreign list_range(_ : Int, _ : Int) -> List(Int) =
+    "zig_list_range"
+
+foreign list_flatten(_ : List(List(a))) -> List(a) =
+    "zig_list_flatten"
+
+foreign list_sum(_ : List(Number)) -> Number =
+    "zig_list_sum"

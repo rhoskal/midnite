@@ -31,10 +31,16 @@ let mk_date(month : Month, day : Int, year : Int) -> Date =
     Date({ month, day, year })
 
 let today() -> Eff(Unit, Date) =
-    todo("not implemented")
+    date_today()
 
 let map(f : ((Date) -> Date)), date : Date) -> Date =
     f(date)
 
 let and_then(mdate : Maybe(Date), f : ((Date) -> Maybe(Date))) -> Maybe(Date) =
     Maybe.map(mdate, f)
+
+foreign date_make(_ : Month, _ : Int, _ : Int) -> Date =
+    "zig_date_make"
+
+foreign date_today() -> Eff(Unit, Date) =
+    "zig_date_today"

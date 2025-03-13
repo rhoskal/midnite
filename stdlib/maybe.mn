@@ -326,7 +326,7 @@ let one_of(default : a, fmbs : List((a -> Maybe(b)))) -> Maybe(b) =
 ## [1, 2] : List(Int)
 ## ```
 let compact(maybes : List(Maybe(a))) -> List(a) =
-    List.collect_map(identity, maybes)
+    List.collect_map(maybes, identity)
 
 ## Take two `Maybe` values. If the first one equals `None`, return `None`. Otherwise return the second value.
 ## Allows for chaining `Maybe` computations, with a possible "early return" in case of `None`.
